@@ -10,6 +10,12 @@
 #   2015-07-22 - first version
 # ------------------------------------------------
 
+#####################################
+# stm32 toolchain
+#####################################
+GCC_PATH = /home/xxbringup/dvb/gcc-arm-none-eabi-10.3-2021.10/bin
+
+
 ######################################
 # target
 ######################################
@@ -23,6 +29,7 @@ TARGET = STM32F407VET6_BMC
 DEBUG = 1
 # optimization
 OPT = -Og
+# OPT = -O2
 
 
 #######################################
@@ -38,12 +45,17 @@ BUILD_DIR = build
 C_SOURCES =  \
 Core/Src/main.c \
 Core/Src/freertos.c \
+Core/Src/hf_common.c \
+Core/Src/hf_power_process.c \
+Core/Src/hf_http_process.c \
+Core/Src/hf_gpio_process.c \
+Core/Src/protocol_lib/ringbuffer.c \
+Core/Src/protocol_lib/protocol.c \
+Core/Src/hf_i2c.c \
+Core/Src/hf_it_callback.c \
+Core/Src/hf_board_init.c \
 Core/Src/stm32f4xx_it.c \
 Core/Src/stm32f4xx_hal_msp.c \
-LWIP/App/lwip.c \
-LWIP/Target/ethernetif.c \
-Drivers/BSP/Components/lan8742/lan8742.c \
-Drivers/BSP/Components/lan8742/lan8742.c \
 Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_rcc.c \
 Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_rcc_ex.c \
 Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_flash.c \
@@ -70,6 +82,7 @@ Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_tim.c \
 Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_tim_ex.c \
 Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_uart.c \
 Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_wwdg.c \
+Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_iwdg.c \
 Core/Src/system_stm32f4xx.c \
 Middlewares/Third_Party/FreeRTOS/Source/croutine.c \
 Middlewares/Third_Party/FreeRTOS/Source/event_groups.c \
@@ -81,6 +94,9 @@ Middlewares/Third_Party/FreeRTOS/Source/timers.c \
 Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.c \
 Middlewares/Third_Party/FreeRTOS/Source/portable/MemMang/heap_4.c \
 Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM4F/port.c \
+LWIP/Target/ethernetif.c \
+LWIP/App/lwip.c \
+Drivers/BSP/Components/lan8742/lan8742.c \
 Middlewares/Third_Party/LwIP/src/netif/ppp/auth.c \
 Middlewares/Third_Party/LwIP/src/netif/ppp/ccp.c \
 Middlewares/Third_Party/LwIP/src/netif/ppp/chap_ms.c \
@@ -114,56 +130,57 @@ Middlewares/Third_Party/LwIP/src/netif/lowpan6_common.c \
 Middlewares/Third_Party/LwIP/src/netif/slipif.c \
 Middlewares/Third_Party/LwIP/src/netif/zepif.c \
 Middlewares/Third_Party/LwIP/src/netif/ppp/ecp.c \
-Middlewares/Third_Party/LwIP/src/apps/http/httpd.c \
-Middlewares/Third_Party/LwIP/src/apps/http/fs.c \
-Middlewares/Third_Party/LwIP/src/api/api_msg.c \
-Middlewares/Third_Party/LwIP/src/api/tcpip.c \
-Middlewares/Third_Party/LwIP/src/api/netbuf.c \
-Middlewares/Third_Party/LwIP/src/api/sockets.c \
-Middlewares/Third_Party/LwIP/src/api/if_api.c \
 Middlewares/Third_Party/LwIP/src/api/api_lib.c \
+Middlewares/Third_Party/LwIP/src/api/api_msg.c \
 Middlewares/Third_Party/LwIP/src/api/err.c \
+Middlewares/Third_Party/LwIP/src/api/if_api.c \
+Middlewares/Third_Party/LwIP/src/api/netbuf.c \
 Middlewares/Third_Party/LwIP/src/api/netdb.c \
 Middlewares/Third_Party/LwIP/src/api/netifapi.c \
-Middlewares/Third_Party/LwIP/src/core/altcp_tcp.c \
-Middlewares/Third_Party/LwIP/src/core/tcp_in.c \
-Middlewares/Third_Party/LwIP/src/core/pbuf.c \
-Middlewares/Third_Party/LwIP/src/core/ip.c \
-Middlewares/Third_Party/LwIP/src/core/stats.c \
-Middlewares/Third_Party/LwIP/src/core/udp.c \
-Middlewares/Third_Party/LwIP/src/core/timeouts.c \
-Middlewares/Third_Party/LwIP/src/core/def.c \
+Middlewares/Third_Party/LwIP/src/api/sockets.c \
+Middlewares/Third_Party/LwIP/src/api/tcpip.c \
 Middlewares/Third_Party/LwIP/src/core/altcp.c \
-Middlewares/Third_Party/LwIP/src/core/init.c \
-Middlewares/Third_Party/LwIP/src/core/netif.c \
-Middlewares/Third_Party/LwIP/src/core/mem.c \
-Middlewares/Third_Party/LwIP/src/core/raw.c \
 Middlewares/Third_Party/LwIP/src/core/altcp_alloc.c \
-Middlewares/Third_Party/LwIP/src/core/memp.c \
-Middlewares/Third_Party/LwIP/src/core/tcp.c \
+Middlewares/Third_Party/LwIP/src/core/altcp_tcp.c \
+Middlewares/Third_Party/LwIP/src/core/def.c \
 Middlewares/Third_Party/LwIP/src/core/dns.c \
-Middlewares/Third_Party/LwIP/src/core/tcp_out.c \
-Middlewares/Third_Party/LwIP/src/core/sys.c \
 Middlewares/Third_Party/LwIP/src/core/inet_chksum.c \
+Middlewares/Third_Party/LwIP/src/core/init.c \
+Middlewares/Third_Party/LwIP/src/core/ip.c \
+Middlewares/Third_Party/LwIP/src/core/mem.c \
+Middlewares/Third_Party/LwIP/src/core/memp.c \
+Middlewares/Third_Party/LwIP/src/core/netif.c \
+Middlewares/Third_Party/LwIP/src/core/pbuf.c \
+Middlewares/Third_Party/LwIP/src/core/raw.c \
+Middlewares/Third_Party/LwIP/src/core/stats.c \
+Middlewares/Third_Party/LwIP/src/core/sys.c \
+Middlewares/Third_Party/LwIP/src/core/tcp.c \
+Middlewares/Third_Party/LwIP/src/core/tcp_in.c \
+Middlewares/Third_Party/LwIP/src/core/tcp_out.c \
+Middlewares/Third_Party/LwIP/src/core/timeouts.c \
+Middlewares/Third_Party/LwIP/src/core/udp.c \
+Middlewares/Third_Party/LwIP/src/core/ipv4/autoip.c \
+Middlewares/Third_Party/LwIP/src/core/ipv4/dhcp.c \
+Middlewares/Third_Party/LwIP/src/core/ipv4/etharp.c \
 Middlewares/Third_Party/LwIP/src/core/ipv4/icmp.c \
 Middlewares/Third_Party/LwIP/src/core/ipv4/igmp.c \
 Middlewares/Third_Party/LwIP/src/core/ipv4/ip4.c \
-Middlewares/Third_Party/LwIP/src/core/ipv4/dhcp.c \
-Middlewares/Third_Party/LwIP/src/core/ipv4/ip4_frag.c \
-Middlewares/Third_Party/LwIP/src/core/ipv4/autoip.c \
 Middlewares/Third_Party/LwIP/src/core/ipv4/ip4_addr.c \
-Middlewares/Third_Party/LwIP/src/core/ipv4/etharp.c \
-Middlewares/Third_Party/LwIP/src/core/ipv6/ethip6.c \
-Middlewares/Third_Party/LwIP/src/core/ipv6/ip6_frag.c \
-Middlewares/Third_Party/LwIP/src/core/ipv6/icmp6.c \
-Middlewares/Third_Party/LwIP/src/core/ipv6/ip6.c \
-Middlewares/Third_Party/LwIP/src/core/ipv6/inet6.c \
-Middlewares/Third_Party/LwIP/src/core/ipv6/mld6.c \
-Middlewares/Third_Party/LwIP/src/core/ipv6/ip6_addr.c \
+Middlewares/Third_Party/LwIP/src/core/ipv4/ip4_frag.c \
 Middlewares/Third_Party/LwIP/src/core/ipv6/dhcp6.c \
+Middlewares/Third_Party/LwIP/src/core/ipv6/ethip6.c \
+Middlewares/Third_Party/LwIP/src/core/ipv6/icmp6.c \
+Middlewares/Third_Party/LwIP/src/core/ipv6/inet6.c \
+Middlewares/Third_Party/LwIP/src/core/ipv6/ip6.c \
+Middlewares/Third_Party/LwIP/src/core/ipv6/ip6_addr.c \
+Middlewares/Third_Party/LwIP/src/core/ipv6/ip6_frag.c \
+Middlewares/Third_Party/LwIP/src/core/ipv6/mld6.c \
 Middlewares/Third_Party/LwIP/src/core/ipv6/nd6.c \
 Middlewares/Third_Party/LwIP/system/OS/sys_arch.c \
-Middlewares/Third_Party/LwIP/src/apps/mqtt/mqtt.c  
+Middlewares/Third_Party/LwIP/src/apps/mqtt/mqtt.c \
+Middlewares/Third_Party/LwIP/src/apps/http/httpd.c \
+Middlewares/Third_Party/LwIP/src/apps/http/fs.c \
+Core/Src/stm32f4xx_hal_timebase_tim.c
 
 # ASM sources
 ASM_SOURCES =  \
@@ -226,19 +243,19 @@ AS_INCLUDES =  \
 # C includes
 C_INCLUDES =  \
 -ICore/Inc \
--ILWIP/App \
--ILWIP/Target \
--IMiddlewares/Third_Party/LwIP/src/include \
--IMiddlewares/Third_Party/LwIP/system \
 -IDrivers/STM32F4xx_HAL_Driver/Inc \
 -IDrivers/STM32F4xx_HAL_Driver/Inc/Legacy \
 -IMiddlewares/Third_Party/FreeRTOS/Source/include \
 -IMiddlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2 \
 -IMiddlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM4F \
+-IDrivers/CMSIS/Device/ST/STM32F4xx/Include \
+-IDrivers/CMSIS/Include \
+-ILWIP/App \
+-ILWIP/Target \
+-IMiddlewares/Third_Party/LwIP/src/include \
+-IMiddlewares/Third_Party/LwIP/system \
 -IDrivers/BSP/Components/lan8742 \
 -IMiddlewares/Third_Party/LwIP/src/include/netif/ppp \
--IMiddlewares/Third_Party/LwIP/src/apps/http \
--IDrivers/CMSIS/Device/ST/STM32F4xx/Include \
 -IMiddlewares/Third_Party/LwIP/src/include/lwip \
 -IMiddlewares/Third_Party/LwIP/src/include/lwip/apps \
 -IMiddlewares/Third_Party/LwIP/src/include/lwip/priv \
@@ -250,7 +267,8 @@ C_INCLUDES =  \
 -IMiddlewares/Third_Party/LwIP/src/include/compat/posix/sys \
 -IMiddlewares/Third_Party/LwIP/src/include/compat/stdc \
 -IMiddlewares/Third_Party/LwIP/system/arch \
--IDrivers/CMSIS/Include
+-IMiddlewares/Third_Party/LwIP/src/apps/http \
+-ICore/Src/protocol_lib
 
 
 # compile gcc flags
@@ -272,6 +290,7 @@ CFLAGS += -MMD -MP -MF"$(@:%.o=%.d)"
 #######################################
 # link script
 LDSCRIPT = STM32F407VETx_FLASH.ld
+# LDSCRIPT = STM32F407VETx_RAM.ld
 
 # libraries
 LIBS = -lc -lm -lnosys 
@@ -317,10 +336,11 @@ $(BUILD_DIR):
 
 #######################################
 # clean up
+#	-del /q $(BUILD_DIR)
 #######################################
 clean:
 	-rm -fR $(BUILD_DIR)
-  
+
 #######################################
 # dependencies
 #######################################

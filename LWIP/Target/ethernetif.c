@@ -7,7 +7,7 @@
   ******************************************************************************
   * @attention
   *
-  * Copyright (c) 2025 STMicroelectronics.
+  * Copyright (c) 2024 STMicroelectronics.
   * All rights reserved.
   *
   * This software is licensed under terms that can be found in the LICENSE file
@@ -41,7 +41,7 @@
 #define TIME_WAITING_FOR_INPUT ( portMAX_DELAY )
 /* USER CODE BEGIN OS_THREAD_STACK_SIZE_WITH_RTOS */
 /* Stack size of the interface thread */
-#define INTERFACE_THREAD_STACK_SIZE ( 350 )
+#define INTERFACE_THREAD_STACK_SIZE ( 1024 )
 /* USER CODE END OS_THREAD_STACK_SIZE_WITH_RTOS */
 /* Network interface name */
 #define IFNAME0 's'
@@ -189,14 +189,14 @@ static void low_level_init(struct netif *netif)
   ETH_MACConfigTypeDef MACConf = {0};
   /* Start ETH HAL Init */
 
-   uint8_t MACAddr[6] ;
+  uint8_t MACAddr[6] ;
   heth.Instance = ETH;
-  MACAddr[0] = 0x94;
-  MACAddr[1] = 0x47;
-  MACAddr[2] = 0xB0;
-  MACAddr[3] = 0x18;
-  MACAddr[4] = 0x42;
-  MACAddr[5] = 0xBC;
+  MACAddr[0] = MAC_ADDR0;
+  MACAddr[1] = MAC_ADDR1;
+  MACAddr[2] = MAC_ADDR2;
+  MACAddr[3] = MAC_ADDR3;
+  MACAddr[4] = MAC_ADDR4;
+  MACAddr[5] = MAC_ADDR5;
   heth.Init.MACAddr = &MACAddr[0];
   heth.Init.MediaInterface = HAL_ETH_RMII_MODE;
   heth.Init.TxDesc = DMATxDscrTab;
@@ -218,6 +218,11 @@ static void low_level_init(struct netif *netif)
 
   /* Initialize the RX POOL */
   LWIP_MEMPOOL_INIT(RX_POOL);
+
+#if LWIP_IPV6
+  /* Pass all multicast frames: needed for IPv6 protocol*/
+  heth.Instance->MACFFR |= ETH_MACFFR_PM;
+#endif
 
 #if LWIP_ARP || LWIP_ETHERNET
 
@@ -576,6 +581,9 @@ void HAL_ETH_MspInit(ETH_HandleTypeDef* ethHandle)
   {
   /* USER CODE BEGIN ETH_MspInit 0 */
 
+  /*Configure GPIO pin Output Level */
+  __HAL_RCC_GPIOC_CLK_ENABLE();
+
   /* USER CODE END ETH_MspInit 0 */
     /* Enable Peripheral clock */
     __HAL_RCC_ETH_CLK_ENABLE();
@@ -621,7 +629,11 @@ void HAL_ETH_MspInit(ETH_HandleTypeDef* ethHandle)
     HAL_NVIC_SetPriority(ETH_WKUP_IRQn, 5, 0);
     HAL_NVIC_EnableIRQ(ETH_WKUP_IRQn);
   /* USER CODE BEGIN ETH_MspInit 1 */
-
+  HAL_GPIO_WritePin(MCU_PHY_RESETN_GPIO_Port, MCU_PHY_RESETN_Pin, GPIO_PIN_SET);
+  osDelay(10);
+  HAL_GPIO_WritePin(MCU_PHY_RESETN_GPIO_Port, MCU_PHY_RESETN_Pin, GPIO_PIN_RESET);
+  osDelay(10);
+  HAL_GPIO_WritePin(MCU_PHY_RESETN_GPIO_Port, MCU_PHY_RESETN_Pin, GPIO_PIN_SET);
   /* USER CODE END ETH_MspInit 1 */
   }
 }

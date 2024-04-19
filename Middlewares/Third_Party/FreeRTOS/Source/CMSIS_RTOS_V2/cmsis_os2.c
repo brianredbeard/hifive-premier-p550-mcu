@@ -895,6 +895,14 @@ osStatus_t osDelay (uint32_t ticks) {
   return (stat);
 }
 
+osStatus_t osThreadList (uint8_t *buffer)
+{
+#if ( ( configUSE_TRACE_FACILITY == 1 ) && ( configUSE_STATS_FORMATTING_FUNCTIONS == 1 ) )
+  vTaskList((char *)buffer);
+#endif
+  return osOK;
+}
+
 osStatus_t osDelayUntil (uint32_t ticks) {
   TickType_t tcnt, delay;
   osStatus_t stat;

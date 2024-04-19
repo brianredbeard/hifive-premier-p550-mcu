@@ -450,6 +450,14 @@ uint32_t osThreadFlagsGet (void);
 /// \return thread flags before clearing or error code if highest bit set.
 uint32_t osThreadFlagsWait (uint32_t flags, uint32_t options, uint32_t timeout);
 
+/**
+* @brief   Lists all the current threads, along with their current state
+*          and stack usage high water mark.
+* @param   buffer   A buffer into which the above mentioned details
+*          will be written
+* @retval  status code that indicates the execution status of the function.
+*/
+osStatus_t osThreadList (uint8_t *buffer);
 
 //  ==== Generic Wait Functions ====
 

@@ -30,6 +30,7 @@
 
 /* Exported types ------------------------------------------------------------*/
 /* Exported constants --------------------------------------------------------*/
+#define HTTPD_FSDATA_FILE "../../../../../../../Core/Src/fsdata1.c"
 
 /* ########################## Module Selection ############################## */
 /**
@@ -55,7 +56,7 @@
 /* #define HAL_HASH_MODULE_ENABLED */
 #define HAL_I2C_MODULE_ENABLED
 /* #define HAL_I2S_MODULE_ENABLED */
-/* #define HAL_IWDG_MODULE_ENABLED */
+#define HAL_IWDG_MODULE_ENABLED
 /* #define HAL_LTDC_MODULE_ENABLED */
 #define HAL_RNG_MODULE_ENABLED
 #define HAL_RTC_MODULE_ENABLED
@@ -180,7 +181,7 @@
 #define  USE_HAL_PCD_REGISTER_CALLBACKS         0U /* PCD register callback disabled       */
 #define  USE_HAL_QSPI_REGISTER_CALLBACKS        0U /* QSPI register callback disabled      */
 #define  USE_HAL_RNG_REGISTER_CALLBACKS         0U /* RNG register callback disabled       */
-#define  USE_HAL_RTC_REGISTER_CALLBACKS         0U /* RTC register callback disabled       */
+#define  USE_HAL_RTC_REGISTER_CALLBACKS         1U /* RTC register callback disabled       */
 #define  USE_HAL_SAI_REGISTER_CALLBACKS         0U /* SAI register callback disabled       */
 #define  USE_HAL_SD_REGISTER_CALLBACKS          0U /* SD register callback disabled        */
 #define  USE_HAL_SMARTCARD_REGISTER_CALLBACKS   0U /* SMARTCARD register callback disabled */
@@ -190,8 +191,8 @@
 #define  USE_HAL_SMBUS_REGISTER_CALLBACKS       0U /* SMBUS register callback disabled     */
 #define  USE_HAL_SPI_REGISTER_CALLBACKS         0U /* SPI register callback disabled       */
 #define  USE_HAL_TIM_REGISTER_CALLBACKS         0U /* TIM register callback disabled       */
-#define  USE_HAL_UART_REGISTER_CALLBACKS        0U /* UART register callback disabled      */
-#define  USE_HAL_USART_REGISTER_CALLBACKS       0U /* USART register callback disabled     */
+#define  USE_HAL_UART_REGISTER_CALLBACKS        1U /* UART register callback disabled      */
+#define  USE_HAL_USART_REGISTER_CALLBACKS       1U /* USART register callback disabled     */
 #define  USE_HAL_WWDG_REGISTER_CALLBACKS        0U /* WWDG register callback disabled      */
 
 /* ########################## Assert Selection ############################## */
@@ -199,19 +200,36 @@
   * @brief Uncomment the line below to expanse the "assert_param" macro in the
   *        HAL drivers code
   */
-/* #define USE_FULL_ASSERT    1U */
+#define USE_FULL_ASSERT    1U
 
 /* ################## Ethernet peripheral configuration ##################### */
 
 /* Section 1 : Ethernet peripheral configuration */
+/* IP ADDRESS: IP_ADDR0:IP_ADDR1:IP_ADDR2:IP_ADDR3 */
+#define IP_ADDR0 10U
+#define IP_ADDR1 10U
+#define IP_ADDR2 207U
+#define IP_ADDR3 30U
+
+/* NETMASK ADDRESS: NETMASK_ADDR0:NETMASK_ADDR1:NETMASK_ADDR2:NETMASK_ADDR3 */
+#define NETMASK_ADDR0 255U
+#define NETMASK_ADDR1 255U
+#define NETMASK_ADDR2 240U
+#define NETMASK_ADDR3 0U
+
+/* GATEWAY_ADDRESS: GATEWAY_ADDR0:GATEWAY_ADDR1:GATEWAY_ADDR2:GATEWAY_ADDR3*/
+#define GATEWAY_ADDR0 10U
+#define GATEWAY_ADDR1 10U
+#define GATEWAY_ADDR2 192U
+#define GATEWAY_ADDR3 1U
 
 /* MAC ADDRESS: MAC_ADDR0:MAC_ADDR1:MAC_ADDR2:MAC_ADDR3:MAC_ADDR4:MAC_ADDR5 */
-#define MAC_ADDR0   2U
-#define MAC_ADDR1   0U
-#define MAC_ADDR2   0U
-#define MAC_ADDR3   0U
-#define MAC_ADDR4   0U
-#define MAC_ADDR5   0U
+#define MAC_ADDR0   0x94U
+#define MAC_ADDR1   0x47U
+#define MAC_ADDR2   0xB0U
+#define MAC_ADDR3   0x18U
+#define MAC_ADDR4   0x42U
+#define MAC_ADDR5   0xBCU
 
 /* Definition of the Ethernet driver buffers size and count */
 #define ETH_RX_BUF_SIZE                1536 /* buffer size for receive               */

@@ -7,7 +7,7 @@
   ******************************************************************************
   * @attention
   *
-  * Copyright (c) 2025 STMicroelectronics.
+  * Copyright (c) 2024 STMicroelectronics.
   * All rights reserved.
   *
   * This software is licensed under terms that can be found in the LICENSE file
@@ -30,33 +30,38 @@ extern "C" {
 #include "stm32f4xx_hal.h"
 
 /* Private includes ----------------------------------------------------------*/
-/* USER CODE BEGIN Includes */
-
-/* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
-/* USER CODE BEGIN ET */
-
-/* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/
-/* USER CODE BEGIN EC */
-
-/* USER CODE END EC */
+extern CRC_HandleTypeDef hcrc;
+extern I2C_HandleTypeDef hi2c1;
+extern I2C_HandleTypeDef hi2c3;
+extern RNG_HandleTypeDef hrng;
+extern RTC_HandleTypeDef hrtc;
+extern SPI_HandleTypeDef hspi1;
+extern SPI_HandleTypeDef hspi2;
+extern DMA_HandleTypeDef hdma_spi1_rx;
+extern DMA_HandleTypeDef hdma_spi1_tx;
+extern DMA_HandleTypeDef hdma_spi2_rx;
+extern DMA_HandleTypeDef hdma_spi2_tx;
+extern TIM_HandleTypeDef htim4;
+extern UART_HandleTypeDef huart4;
+extern UART_HandleTypeDef huart3;
+extern UART_HandleTypeDef huart6;
+extern WWDG_HandleTypeDef hwwdg;
+extern IWDG_HandleTypeDef hiwdg;
 
 /* Exported macro ------------------------------------------------------------*/
-/* USER CODE BEGIN EM */
-
-/* USER CODE END EM */
-
-void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
 
 /* Exported functions prototypes ---------------------------------------------*/
+void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
 void Error_Handler(void);
-
-/* USER CODE BEGIN EFP */
-
-/* USER CODE END EFP */
+void i2c_init(I2C_TypeDef *Instance);
+void i2c_deinit(I2C_TypeDef *Instance);
+void uart_init(USART_TypeDef *Instance);
+void uart_deinit(USART_TypeDef *Instance);
+int board_init(void);
 
 /* Private defines -----------------------------------------------------------*/
 #define ATX_PS_ON_Pin GPIO_PIN_3
@@ -83,6 +88,7 @@ void Error_Handler(void);
 #define JTAG_MUX_EN_GPIO_Port GPIOA
 #define PWR_SW_P_Pin GPIO_PIN_12
 #define PWR_SW_P_GPIO_Port GPIOA
+#define PWR_SW_P_EXTI_IRQn EXTI15_10_IRQn
 #define BOOT_SEL0_Pin GPIO_PIN_0
 #define BOOT_SEL0_GPIO_Port GPIOD
 #define BOOT_SEL1_Pin GPIO_PIN_1
@@ -103,10 +109,6 @@ void Error_Handler(void);
 #define CHASS_FAN_TACH1_GPIO_Port GPIOE
 #define CHASS_FAN_TACH2_Pin GPIO_PIN_1
 #define CHASS_FAN_TACH2_GPIO_Port GPIOE
-
-/* USER CODE BEGIN Private defines */
-
-/* USER CODE END Private defines */
 
 #ifdef __cplusplus
 }

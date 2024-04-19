@@ -553,7 +553,7 @@ http_write(struct altcp_pcb *pcb, const void *ptr, u16_t *length, u8_t apiflags)
 #endif /* HTTPD_MAX_WRITE_LEN */
   do {
     LWIP_DEBUGF(HTTPD_DEBUG | LWIP_DBG_TRACE, ("Trying to send %d bytes\n", len));
-    err = altcp_write(pcb, ptr, len, apiflags);
+    err = altcp_write(pcb, ptr, len, 1);
     if (err == ERR_MEM) {
       if ((altcp_sndbuf(pcb) == 0) ||
           (altcp_sndqueuelen(pcb) >= TCP_SND_QUEUELEN)) {

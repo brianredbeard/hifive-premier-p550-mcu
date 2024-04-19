@@ -7,7 +7,7 @@
   ******************************************************************************
   * @attention
   *
-  * Copyright (c) 2025 STMicroelectronics.
+  * Copyright (c) 2024 STMicroelectronics.
   * All rights reserved.
   *
   * This software is licensed under terms that can be found in the LICENSE file
@@ -45,6 +45,14 @@ struct netif gnetif;
 ip4_addr_t ipaddr;
 ip4_addr_t netmask;
 ip4_addr_t gw;
+#if LWIP_IPV6
+ip6_addr_t ip6addr;
+#endif
+uint8_t IP_ADDRESS[4] = {0};
+#if !LWIP_DHCP
+uint8_t NETMASK_ADDRESS[4];
+uint8_t GATEWAY_ADDRESS[4];
+#endif
 /* USER CODE BEGIN OS_THREAD_ATTR_CMSIS_RTOS_V2 */
 #define INTERFACE_THREAD_STACK_SIZE ( 1024 )
 osThreadAttr_t attributes;
@@ -53,22 +61,55 @@ osThreadAttr_t attributes;
 /* USER CODE BEGIN 2 */
 
 /* USER CODE END 2 */
-
 /**
   * LwIP initialization function
   */
 void MX_LWIP_Init(void)
 {
+  /* IP addresses initialization */
+  #if !LWIP_DHCP
+  if(!IP_ADDRESS[0]) {
+    IP_ADDRESS[0] = IP_ADDR0;
+    IP_ADDRESS[1] = IP_ADDR1;
+    IP_ADDRESS[2] = IP_ADDR2;
+    IP_ADDRESS[3] = IP_ADDR3;
+  }
+  NETMASK_ADDRESS[0] = NETMASK_ADDR0;
+  NETMASK_ADDRESS[1] = NETMASK_ADDR1;
+  NETMASK_ADDRESS[2] = NETMASK_ADDR2;
+  NETMASK_ADDRESS[3] = NETMASK_ADDR3;
+  GATEWAY_ADDRESS[0] = GATEWAY_ADDR0;
+  GATEWAY_ADDRESS[1] = GATEWAY_ADDR1;
+  GATEWAY_ADDRESS[2] = GATEWAY_ADDR2;
+  GATEWAY_ADDRESS[3] = GATEWAY_ADDR3;
+  #endif
+/* USER CODE BEGIN IP_ADDRESSES */
+/* USER CODE END IP_ADDRESSES */
+
   /* Initilialize the LwIP stack with RTOS */
   tcpip_init( NULL, NULL );
 
-  /* IP addresses initialization with DHCP (IPv4) */
+  #if !LWIP_DHCP
+  /* IP addresses initialization without DHCP (IPv4) */
+  IP4_ADDR(&ipaddr, IP_ADDRESS[0], IP_ADDRESS[1], IP_ADDRESS[2], IP_ADDRESS[3]);
+  IP4_ADDR(&netmask, NETMASK_ADDRESS[0], NETMASK_ADDRESS[1] , NETMASK_ADDRESS[2], NETMASK_ADDRESS[3]);
+  IP4_ADDR(&gw, GATEWAY_ADDRESS[0], GATEWAY_ADDRESS[1], GATEWAY_ADDRESS[2], GATEWAY_ADDRESS[3]);
+  #else
+  /* IP addresses initialization to zero with DHCP (IPv4) */
   ipaddr.addr = 0;
   netmask.addr = 0;
   gw.addr = 0;
+  #endif
 
   /* add the network interface (IPv4/IPv6) with RTOS */
   netif_add(&gnetif, &ipaddr, &netmask, &gw, NULL, &ethernetif_init, &tcpip_input);
+
+#if LWIP_IPV6
+  /* Create IPv6 local address */
+  netif_create_ip6_linklocal_address(&gnetif, 0);
+  netif_ip6_addr_set_state(&gnetif, 0, IP6_ADDR_VALID);
+  gnetif.ip6_autoconfig_enabled = 1;
+#endif
 
   /* Registers the default network interface */
   netif_set_default(&gnetif);
@@ -89,10 +130,10 @@ void MX_LWIP_Init(void)
 /* USER CODE END H7_OS_THREAD_NEW_CMSIS_RTOS_V2 */
 
   /* Start DHCP negotiation for a network interface (IPv4) */
+  #if LWIP_DHCP
   dhcp_start(&gnetif);
-
+  #endif
 /* USER CODE BEGIN 3 */
-
 /* USER CODE END 3 */
 }
 
@@ -113,11 +154,13 @@ static void ethernet_link_status_updated(struct netif *netif)
   if (netif_is_up(netif))
   {
 /* USER CODE BEGIN 5 */
+  printf("%s %d netif_is_up \n",__func__, __LINE__);
 /* USER CODE END 5 */
   }
   else /* netif is down */
   {
 /* USER CODE BEGIN 6 */
+  printf("%s %d netif is down  \n",__func__, __LINE__);
 /* USER CODE END 6 */
   }
 }

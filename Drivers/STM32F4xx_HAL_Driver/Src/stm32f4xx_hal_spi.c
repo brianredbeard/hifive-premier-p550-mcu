@@ -308,6 +308,7 @@ static HAL_StatusTypeDef SPI_EndRxTxTransaction(SPI_HandleTypeDef *hspi, uint32_
   *               the configuration information for SPI module.
   * @retval HAL status
   */
+
 HAL_StatusTypeDef HAL_SPI_Init(SPI_HandleTypeDef *hspi)
 {
   /* Check the SPI handle allocation */
@@ -337,6 +338,7 @@ HAL_StatusTypeDef HAL_SPI_Init(SPI_HandleTypeDef *hspi)
     else
     {
       /* Baudrate prescaler not use in Motoraola Slave mode. force to default value */
+
       hspi->Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
     }
   }

@@ -7,7 +7,7 @@
   ******************************************************************************
   * @attention
   *
-  * Copyright (c) 2025 STMicroelectronics.
+  * Copyright (c) 2024 STMicroelectronics.
   * All rights reserved.
   *
   * This software is licensed under terms that can be found in the LICENSE file
@@ -49,12 +49,18 @@
 /* Parameters set in STM32CubeMX LwIP Configuration GUI -*/
 /*----- Value in opt.h for LWIP_DHCP: 0 -----*/
 #define LWIP_DHCP 1
+/*----- Value in opt.h for LWIP_DHCP: 0 -----*/
+#define LWIP_AUTOIP 0
+/*----- Default Value for LWIP_DHCP_AUTOIP_COOP: 0 ---*/
+#define LWIP_DHCP_AUTOIP_COOP 0
 /*----- Value in opt.h for MEM_ALIGNMENT: 1 -----*/
 #define MEM_ALIGNMENT 4
 /*----- Value in opt.h for MEMP_NUM_SYS_TIMEOUT: (LWIP_TCP + IP_REASSEMBLY + LWIP_ARP + (2*LWIP_DHCP) + LWIP_AUTOIP + LWIP_IGMP + LWIP_DNS + (PPP_SUPPORT*6*MEMP_NUM_PPP_PCB) + (LWIP_IPV6 ? (1 + LWIP_IPV6_REASS + LWIP_IPV6_MLD) : 0)) -*/
-#define MEMP_NUM_SYS_TIMEOUT 5
+#define MEMP_NUM_SYS_TIMEOUT 10
 /*----- Value in opt.h for LWIP_ETHERNET: LWIP_ARP || PPPOE_SUPPORT -*/
 #define LWIP_ETHERNET 1
+/*----- Value in opt.h for LWIP_MULTICAST_TX_OPTIONS: LWIP_IGMP -----*/
+#define LWIP_MULTICAST_TX_OPTIONS 1
 /*----- Value in opt.h for LWIP_DNS_SECURE: (LWIP_DNS_SECURE_RAND_XID | LWIP_DNS_SECURE_NO_MULTIPLE_OUTSTANDING | LWIP_DNS_SECURE_RAND_SRC_PORT) -*/
 #define LWIP_DNS_SECURE 7
 /*----- Value in opt.h for TCP_SND_QUEUELEN: (4*TCP_SND_BUF + (TCP_MSS - 1))/TCP_MSS -----*/
@@ -65,10 +71,14 @@
 #define TCP_SNDQUEUELOWAT 5
 /*----- Value in opt.h for TCP_WND_UPDATE_THRESHOLD: LWIP_MIN(TCP_WND/4, TCP_MSS*4) -----*/
 #define TCP_WND_UPDATE_THRESHOLD 536
+/*----- Default Value for LWIP_NETIF_STATUS_CALLBACK: 0 ---*/
+#define LWIP_NETIF_STATUS_CALLBACK 0
+/*----- Default Value for LWIP_NETIF_EXT_STATUS_CALLBACK: 0 ---*/
+#define LWIP_NETIF_EXT_STATUS_CALLBACK 0
 /*----- Value in opt.h for LWIP_NETIF_LINK_CALLBACK: 0 -----*/
 #define LWIP_NETIF_LINK_CALLBACK 1
 /*----- Value in opt.h for TCPIP_THREAD_STACKSIZE: 0 -----*/
-#define TCPIP_THREAD_STACKSIZE 1024
+#define TCPIP_THREAD_STACKSIZE 1024 *2
 /*----- Value in opt.h for TCPIP_THREAD_PRIO: 1 -----*/
 #define TCPIP_THREAD_PRIO 24
 /*----- Value in opt.h for TCPIP_MBOX_SIZE: 0 -----*/
@@ -89,8 +99,35 @@
 #define DEFAULT_ACCEPTMBOX_SIZE 6
 /*----- Value in opt.h for RECV_BUFSIZE_DEFAULT: INT_MAX -----*/
 #define RECV_BUFSIZE_DEFAULT 2000000000
+/*----- Default Value for LWIP_IPV6: 0 ---*/
+#define LWIP_IPV6 0
+/*----- Default Value for LWIP_DISABLE_TCP_SANITY_CHECKS: 0 ---*/
+#define LWIP_DISABLE_TCP_SANITY_CHECKS 1
+/*----- Default Value for LWIP_DISABLE_MEMP_SANITY_CHECKS: 0 ---*/
+#define LWIP_DISABLE_MEMP_SANITY_CHECKS 1
+/*----- Default Value for LWIP_PERF: 0 ---*/
+#define LWIP_PERF 1
+/*----- Value in opt.h for LWIP_IPV4: 1 -----*/
+#define LWIP_IPV4                1
+/* ---------- TCP options ---------- */
+#define LWIP_TCP                1
+#define TCP_TTL                 255
 /*----- Default Value for LWIP_HTTPD: 0 ---*/
 #define LWIP_HTTPD 1
+/*----- Default Value for LWIP_HTTPD_TIMING: 0 ---*/
+#define LWIP_HTTPD_TIMING             1
+/*----- Default Value for LWIP_HTTPD_DYNAMIC_FILE_READ: 0 ---*/
+#define LWIP_HTTPD_DYNAMIC_FILE_READ  1
+/*----- Default Value for LWIP_HTTPD_FILE_STATE: 0 ---*/
+#define LWIP_HTTPD_FILE_STATE         0
+/*----- Default Value for LWIP_HTTPD_SUPPORT_11_KEEPALIVE: 0 ---*/
+#define LWIP_HTTPD_SUPPORT_11_KEEPALIVE     1
+/*----- Default Value for LWIP_HTTPD_SSI: 0 ---*/
+#define LWIP_HTTPD_SSI            1
+/*----- Default Value for LWIP_HTTPD_CGI: 0 ---*/
+#define LWIP_HTTPD_CGI            1
+/*----- Default Value for LWIP_TCPIP_CORE_LOCKING_INPUT: 0 ---*/
+#define LWIP_TCPIP_CORE_LOCKING_INPUT   1
 /*----- Value in opt.h for LWIP_STATS: 1 -----*/
 #define LWIP_STATS 0
 /*----- Value in opt.h for CHECKSUM_GEN_IP: 1 -----*/
@@ -115,6 +152,10 @@
 #define CHECKSUM_CHECK_ICMP6 0
 /*-----------------------------------------------------------------------------*/
 /* USER CODE BEGIN 1 */
+#define LWIP_DEBUG
+#define LWIP_DBG_TYPES_ON               LWIP_DBG_OFF
+#define IP_DEBUG                        LWIP_DBG_OFF
+#define HTTPD_DEBUG                     LWIP_DBG_OFF
 
 /* USER CODE END 1 */
 
