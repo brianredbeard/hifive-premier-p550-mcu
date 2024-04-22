@@ -13,7 +13,7 @@
 #####################################
 # stm32 toolchain
 #####################################
-GCC_PATH = /home/xxbringup/dvb/gcc-arm-none-eabi-10.3-2021.10/bin
+GCC_PATH = /IBU_8T/IBU_SOFTWARE/bringup/tools/gcc-arm-none-eabi-10.3-2021.10/bin
 
 
 ######################################
@@ -49,6 +49,7 @@ Core/Src/hf_common.c \
 Core/Src/hf_power_process.c \
 Core/Src/hf_http_process.c \
 Core/Src/hf_gpio_process.c \
+Core/Src/hf_protocol_process.c \
 Core/Src/protocol_lib/ringbuffer.c \
 Core/Src/protocol_lib/protocol.c \
 Core/Src/hf_i2c.c \

@@ -32,7 +32,7 @@
 osThreadId_t main_task_handle;
 const osThreadAttr_t main_task_attributes = {
   .name = "MainTask",
-  .stack_size = 1024*2,
+  .stack_size = 1024*4,
   .priority = (osPriority_t) osPriorityNormal,
 };
 
@@ -91,7 +91,6 @@ int main(void)
 
   /* configure the system clock and Initialize all configured peripherals. */
   board_init();
-  printf("\r\n%s %d %s %s\r\n",__func__, __LINE__, __DATE__, __TIME__);
 
   /* Init scheduler */
   osKernelInitialize();
@@ -133,6 +132,7 @@ static void mcu_status_led_on(uint8_t turnon)
   * @param  argument: Not used
   * @retval None
   */
+extern void get_rtc_info(void);
 extern void hf_power_task (void* parameter);
 extern void hf_gpio_task (void* parameter);
 void hf_main_task(void *argument)
@@ -141,52 +141,87 @@ void hf_main_task(void *argument)
   power_task_handle = osThreadNew(hf_power_task, NULL, &power_task_attributes);
   key_task_handle = osThreadNew(hf_gpio_task, NULL, &gpio_task_attributes);
   http_task_handle = osThreadNew(hf_http_task, NULL, &http_task_attributes);
-  moniter_task_handle = osThreadNew(MoniterTask, NULL, &MoniterTask_attributes);
-  // protocol_task_handle = osThreadNew(protocol_task, NULL, &protocol_task_attributes);
-  printf("HiFive 106SC \n");
+  // moniter_task_handle = osThreadNew(MoniterTask, NULL, &MoniterTask_attributes);
+  protocol_task_handle = osThreadNew(protocol_task, NULL, &protocol_task_attributes);
   osDelay(900);
+  printf("HiFive 106SC \n");
   // extern void MX_IWDG_Init(void);
 
 	// MX_IWDG_Init();
 
+
   mcu_status_led_on(pdTRUE);
+  // extern uint32_t PWM2_T_Count;
+  // extern uint32_t PWM2_D_Count;
+  // uint32_t uiFrequency;
   for(;;)
   {
-
+	  HAL_Delay(500);
+		// uiFrequency = 1000000 / PWM2_D_Count;
+		// printf("占空:%dus    周期:%dus    频率:%dHz    \r\n", PWM2_T_Count, PWM2_D_Count, uiFrequency);
+    // PWM2_T_Count = 0;
+    // PWM2_D_Count = 0;
+    // uiFrequency = 0;
     // HAL_IWDG_Refresh(&hiwdg);
+    // get_rtc_info();
     osDelay(800);
   }
 }
 
 
 #if 0
+void fan_info(void)
+{
+  if (HAL_TIM_PWM_Start(&htim4,TIM_CHANNEL_1) != HAL_OK)
+	{
+	  printf("HAL_TIM_PWM_Start(&htim4,TIM_CHANNEL_1) err\n");
+	  Error_Handler();
+	}
+	if (HAL_TIM_PWM_Start(&htim4,TIM_CHANNEL_2) != HAL_OK)
+	{
+	  printf("HAL_TIM_PWM_Start(&htim4,TIM_CHANNEL_2) err\n");
+	  Error_Handler();
+	}
+
+  if (HAL_TIM_IC_Start_IT(&htim5,TIM_CHANNEL_1) != HAL_OK)
+	{
+	  printf("HAL_TIM_IC_Start(&htim5,TIM_CHANNEL_1) err\n");
+	  Error_Handler();
+	}
+	if (HAL_TIM_IC_Start_IT(&htim5,TIM_CHANNEL_2) != HAL_OK)
+	{
+		printf("HAL_TIM_IC_Start(&htim5,TIM_CHANNEL_2) err\n");
+		Error_Handler();
+	}
+}
+
 void get_rtc_info(void)
 {
   RTC_DateTypeDef GetData;
   RTC_TimeTypeDef GetTime;
-  RTC_AlarmTypeDef alarm1;
-  RTC_AlarmTypeDef alarm2;
   HAL_RTC_GetTime(&hrtc, &GetTime, RTC_FORMAT_BIN);
   /* Get the RTC current Date */
   HAL_RTC_GetDate(&hrtc, &GetData, RTC_FORMAT_BIN);
 
   /* Display date Format : yy/mm/dd */
-  printf("%02d/%02d/%02d\r\n",2000 + GetData.Year, GetData.Month, GetData.Date);
+  printf("yy/mm/dd  %02d/%02d/%02d\r\n",2000 + GetData.Year, GetData.Month, GetData.Date);
   /* Display time Format : hh:mm:ss */
-  printf("%02d:%02d:%02d\r\n",GetTime.Hours, GetTime.Minutes, GetTime.Seconds);
+  printf(" hh:mm:ss %02d:%02d:%02d\r\n",GetTime.Hours, GetTime.Minutes, GetTime.Seconds);
 
-  HAL_RTC_GetAlarm(&hrtc, &alarm1, RTC_ALARM_A, RTC_FORMAT_BIN);
-  HAL_RTC_GetAlarm(&hrtc, &alarm2, RTC_ALARM_B, RTC_FORMAT_BIN);
-  printf("alarm1 info :\n");
-  printf("AlarmMask %x, AlarmSubSecondMask %x, \n AlarmDateWeekDaySel %x, AlarmDateWeekDay %x, Alarm %x:\n",
-        alarm1.AlarmMask, alarm1.AlarmSubSecondMask, alarm1.AlarmDateWeekDaySel, alarm1.AlarmDateWeekDay, alarm1.Alarm );
-  printf("%02d/%02d/%02d\r\n",alarm1.AlarmTime.Hours, alarm1.AlarmTime.Minutes, alarm1.AlarmTime.Seconds);
+  // RTC_AlarmTypeDef alarm1;
+  // RTC_AlarmTypeDef alarm2;
+  // HAL_RTC_GetAlarm(&hrtc, &alarm1, RTC_ALARM_A, RTC_FORMAT_BIN);
+  // HAL_RTC_GetAlarm(&hrtc, &alarm2, RTC_ALARM_B, RTC_FORMAT_BIN);
+  // printf("alarm1 info :\n");
+  // printf("AlarmMask %x, AlarmSubSecondMask %x, \n AlarmDateWeekDaySel %x, AlarmDateWeekDay %x, Alarm %x:\n",
+  //       alarm1.AlarmMask, alarm1.AlarmSubSecondMask, alarm1.AlarmDateWeekDaySel, alarm1.AlarmDateWeekDay, alarm1.Alarm );
+  // printf("%02d/%02d/%02d\r\n",alarm1.AlarmTime.Hours, alarm1.AlarmTime.Minutes, alarm1.AlarmTime.Seconds);
 
-  printf("alarm2 info :\n");
-  printf("AlarmMask %x, AlarmSubSecondMask %x, \n AlarmDateWeekDaySel %x, AlarmDateWeekDay %x, Alarm %x:\n",
-        alarm2.AlarmMask, alarm2.AlarmSubSecondMask, alarm2.AlarmDateWeekDaySel, alarm2.AlarmDateWeekDay, alarm2.Alarm );
-  printf("%02d/%02d/%02d\r\n",alarm2.AlarmTime.Hours, alarm2.AlarmTime.Minutes, alarm2.AlarmTime.Seconds);
-  printf("\r\n");
+  // printf("alarm2 info :\n");
+  // printf("AlarmMask %x, AlarmSubSecondMask %x, \n AlarmDateWeekDaySel %x, AlarmDateWeekDay %x, Alarm %x:\n",
+  //       alarm2.AlarmMask, alarm2.AlarmSubSecondMask, alarm2.AlarmDateWeekDaySel, alarm2.AlarmDateWeekDay, alarm2.Alarm );
+  // printf("%02d/%02d/%02d\r\n",alarm2.AlarmTime.Hours, alarm2.AlarmTime.Minutes, alarm2.AlarmTime.Seconds);
+  // printf("\r\n");
 }
 #endif
 void MoniterTask(void *argument)
@@ -200,24 +235,24 @@ void MoniterTask(void *argument)
   osDelay(9000);
   for(;;)
   {
-    task_num = uxTaskGetNumberOfTasks();      //获取系统任务数量
+    task_num = uxTaskGetNumberOfTasks();
     printf("\nuxTaskGetNumberOfTasks %ld\r\n", task_num);
 
-    StatusArray = pvPortMalloc(task_num*sizeof(TaskStatus_t));//申请内存
-    if(StatusArray!=NULL)                   //内存申请成功
+    StatusArray = pvPortMalloc(task_num*sizeof(TaskStatus_t));
+    if(StatusArray!=NULL)
     {
-        uxTaskGetSystemState((TaskStatus_t*   )StatusArray,   //任务信息存储数组
-                                      (UBaseType_t     )task_num,  //任务信息存储数组大小
-                                      (uint32_t*       )&TotalRunTime);//保存系统总的运行时间
+        uxTaskGetSystemState((TaskStatus_t*   )StatusArray,
+                                      (UBaseType_t     )task_num,
+                                      (uint32_t*       )&TotalRunTime);
         printf("\nTaskName\t\tPriority\t\tTaskNumber\t\t\r\n");
         for(uint32_t x=0;x < task_num;x++)
         {
-              TaskHandle = xTaskGetHandle(StatusArray[x].pcTaskName);         //根据任务名获取任务句柄
+              TaskHandle = xTaskGetHandle(StatusArray[x].pcTaskName);
 
-              vTaskGetInfo((TaskHandle_t  )TaskHandle,        //任务句柄
-                          (TaskStatus_t* )&TaskStatus,       //任务信息结构体
-                          (BaseType_t    )pdTRUE,            //允许统计任务堆栈历史最小剩余大小
-                          (eTaskState    )eInvalid);         //函数自己获取任务运行壮态
+              vTaskGetInfo((TaskHandle_t  )TaskHandle,
+                          (TaskStatus_t* )&TaskStatus,
+                          (BaseType_t    )pdTRUE,
+                          (eTaskState    )eInvalid);
 
               printf("task name:                %s\r\n",TaskStatus.pcTaskName);
               printf("task number:              %d\r\n",(int)TaskStatus.xTaskNumber);

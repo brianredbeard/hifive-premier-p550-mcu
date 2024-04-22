@@ -89,6 +89,32 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 	}
 }
 
+
+/**
+  * @brief  Input Capture callback in non-blocking mode
+  * @param  htim TIM IC handle
+  * @retval None
+  */
+uint32_t PWM2_T_Count =0;
+uint32_t PWM2_D_Count =0;
+
+__weak void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
+{
+  /* Prevent unused argument(s) compilation warning */
+  UNUSED(htim);
+	if(htim->Instance == TIM5)
+	{
+		if(htim->Channel == HAL_TIM_ACTIVE_CHANNEL_1)
+		{
+			PWM2_T_Count = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_1);
+		}
+		else if(htim->Channel == HAL_TIM_ACTIVE_CHANNEL_2)   // 通道2
+		{
+			PWM2_D_Count = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_2);
+		}
+	}
+}
+
 #ifdef USE_FULL_ASSERT
 /**
  * @brief  Reports the name of the source file and the source line number

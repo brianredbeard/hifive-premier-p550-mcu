@@ -42,6 +42,44 @@
 
 /* USER CODE BEGIN 0 */
 
+/**
+ * is_multicast_ethaddr - Determine if the Ethernet address is a multicast.
+ * @addr: Pointer to a six-byte array containing the Ethernet address
+ *
+ * Return true if the address is a multicast address.
+ * By definition the broadcast address is also a multicast address.
+ */
+static inline int is_multicast_ethaddr(const uint8_t *addr)
+{
+	return 0x01 & addr[0];
+}
+
+/**
+ * is_zero_ethaddr - Determine if give Ethernet address is all zeros.
+ * @addr: Pointer to a six-byte array containing the Ethernet address
+ *
+ * Return true if the address is all zeroes.
+ */
+static inline int is_zero_ethaddr(const uint8_t *addr)
+{
+	return !(addr[0] | addr[1] | addr[2] | addr[3] | addr[4] | addr[5]);
+}
+
+/*
+ * is_valid_ethaddr - Determine if the given Ethernet address is valid
+ * @addr: Pointer to a six-byte array containing the Ethernet address
+ *
+ * Check that the Ethernet address (MAC) is not 00:00:00:00:00:00, is not
+ * a multicast address, and is not FF:FF:FF:FF:FF:FF.
+ *
+ * Return true if the address is valid.
+ */
+static inline int is_valid_ethaddr(const uint8_t *addr)
+{
+	/* FF:FF:FF:FF:FF:FF is a multicast address so we don't need to
+	 * explicitly check for it here. */
+	return !is_multicast_ethaddr(addr) && !is_zero_ethaddr(addr);
+}
 /* USER CODE END 0 */
 
 /* Global Variables ----------------------------------------------------------*/

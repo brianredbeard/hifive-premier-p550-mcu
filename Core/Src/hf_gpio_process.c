@@ -22,16 +22,6 @@
 #define KEY_PUSHDOWN GPIO_PIN_RESET
 #define KEY_RELEASE GPIO_PIN_SET
 /* Private macro -------------------------------------------------------------*/
-typedef enum {
-  KEY_IDLE_STATE = 0,
-  KEY_PRESS_DETECTED_STATE,
-  KEY_RELEASE_DETECTED_STATE,
-  KEY_SHORT_PRESS_STATE,
-  KEY_LONG_PRESS_STATE,
-  KEY_DOUBLE_PRESS_STATE,
-  KEY_PRESS_STATE_END
-} button_state_t;
-
 /* Private variables ---------------------------------------------------------*/
 extern power_switch_t som_power_state;
 

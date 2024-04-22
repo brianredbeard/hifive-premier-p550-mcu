@@ -18,7 +18,6 @@
 
 /* Private macro -------------------------------------------------------------*/
 #define PCA9450_ADDR (0x25u << 1)
-
 /* Private variables ---------------------------------------------------------*/
 power_switch_t som_power_state = SOM_POWER_OFF;
 

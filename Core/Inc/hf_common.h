@@ -22,6 +22,16 @@ typedef enum {
 } power_state_t;
 
 typedef enum {
+  KEY_IDLE_STATE = 0,
+  KEY_PRESS_DETECTED_STATE,
+  KEY_RELEASE_DETECTED_STATE,
+  KEY_SHORT_PRESS_STATE,
+  KEY_LONG_PRESS_STATE,
+  KEY_DOUBLE_PRESS_STATE,
+  KEY_PRESS_STATE_END
+} button_state_t;
+
+typedef enum {
   SOM_POWER_OFF,
   SOM_POWER_ON
 } power_switch_t;

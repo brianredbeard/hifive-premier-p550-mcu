@@ -42,6 +42,7 @@ DMA_HandleTypeDef hdma_spi1_tx;
 DMA_HandleTypeDef hdma_spi2_rx;
 DMA_HandleTypeDef hdma_spi2_tx;
 TIM_HandleTypeDef htim4;
+TIM_HandleTypeDef htim5;
 UART_HandleTypeDef huart4;
 UART_HandleTypeDef huart3;
 UART_HandleTypeDef huart6;
@@ -68,6 +69,7 @@ static void MX_UART4_Init(void);
 static void MX_CRC_Init(void);
 static void MX_RNG_Init(void);
 void MX_IWDG_Init(void);
+static void MX_TIM5_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* For cross-domain devices, initialize the I2C after the atx is powered on */
@@ -136,7 +138,7 @@ int board_init(void)
 	MX_SPI1_Init();
 	MX_CRC_Init();
 	MX_RNG_Init();
-
+	// MX_TIM5_Init();
 	/* There is leakage, the som must be released before initialization */
 	// MX_UART4_Init();
 	// MX_USART6_UART_Init();
@@ -148,15 +150,6 @@ int board_init(void)
 	/* watch dog */
 	// MX_WWDG_Init();
 	// MX_IWDG_Init();
-
-	// HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6 | GPIO_PIN_7, GPIO_PIN_RESET);
-	// GPIO_InitTypeDef GPIO_InitStruct = {0};
-	// GPIO_InitStruct.Pin = GPIO_PIN_6 | GPIO_PIN_7;
-	// GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-	// GPIO_InitStruct.Pull = GPIO_NOPULL;
-	// GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
-	// HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-	// HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6 | GPIO_PIN_7, GPIO_PIN_RESET);
 
 	printf("\r\n%s %d %s %s\r\n", __func__, __LINE__, __DATE__, __TIME__);
 	return 0;
@@ -299,8 +292,6 @@ void MX_IWDG_Init(void)
  */
 static void MX_RTC_Init(void)
 {
-
-
 	/** Initialize RTC Only */
 	hrtc.Instance = RTC;
 	hrtc.Init.HourFormat = RTC_HOURFORMAT_24;
@@ -432,6 +423,7 @@ static void MX_SPI2_Init(void)
  * @param None
  * @retval None
  */
+uint32_t pwm_period = 1000;
 static void MX_TIM4_Init(void)
 {
 	TIM_ClockConfigTypeDef sClockSourceConfig = {0};
@@ -439,9 +431,9 @@ static void MX_TIM4_Init(void)
 	TIM_OC_InitTypeDef sConfigOC = {0};
 
 	htim4.Instance = TIM4;
-	htim4.Init.Prescaler = 0;
+	htim4.Init.Prescaler = 8;
 	htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
-	htim4.Init.Period = 65535;
+	htim4.Init.Period = pwm_period;
 	htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
 	htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
 	if (HAL_TIM_Base_Init(&htim4) != HAL_OK) {
@@ -454,39 +446,37 @@ static void MX_TIM4_Init(void)
 	if (HAL_TIM_PWM_Init(&htim4) != HAL_OK) {
 		Error_Handler();
 	}
-	if (HAL_TIM_OC_Init(&htim4) != HAL_OK) {
-		Error_Handler();
-	}
 	sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
 	sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
 	if (HAL_TIMEx_MasterConfigSynchronization(&htim4, &sMasterConfig) != HAL_OK) {
 		Error_Handler();
 	}
-	// sConfigOC.OCMode = TIM_OCMODE_PWM1;
-	// sConfigOC.Pulse = 0;
-	// sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
-	// sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
-	// if (HAL_TIM_PWM_ConfigChannel(&htim4, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
-	// {
-	//   Error_Handler();
-	// }
-	// sConfigOC.OCMode = TIM_OCMODE_PWM1;
-	// sConfigOC.Pulse = 0;
-	// sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
-	// sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
-	// if (HAL_TIM_OC_ConfigChannel(&htim4, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
-	// {
-	//   Error_Handler();
-	// }
+
 	sConfigOC.OCMode = TIM_OCMODE_PWM1;
-	sConfigOC.Pulse = 30000;
+	sConfigOC.Pulse = pwm_period/2;
+	sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+	sConfigOC.OCFastMode = TIM_OCFAST_ENABLE;
+	if (HAL_TIM_PWM_ConfigChannel(&htim4, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+	{
+	  Error_Handler();
+	}
+	sConfigOC.OCMode = TIM_OCMODE_PWM1;
+	sConfigOC.Pulse = pwm_period/2;
+	sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+	sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+	if (HAL_TIM_PWM_ConfigChannel(&htim4, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
+	{
+	  Error_Handler();
+	}
+	sConfigOC.OCMode = TIM_OCMODE_PWM1;
+	sConfigOC.Pulse = pwm_period/2;
 	sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
 	sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
 	if (HAL_TIM_PWM_ConfigChannel(&htim4, &sConfigOC, TIM_CHANNEL_3) != HAL_OK) {
 		Error_Handler();
 	}
 	sConfigOC.OCMode = TIM_OCMODE_PWM1;
-	sConfigOC.Pulse = 30000;
+	sConfigOC.Pulse = pwm_period/2;
 	sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
 	sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
 	if (HAL_TIM_PWM_ConfigChannel(&htim4, &sConfigOC, TIM_CHANNEL_4) != HAL_OK) {
@@ -494,11 +484,79 @@ static void MX_TIM4_Init(void)
 	}
 
 	HAL_TIM_MspPostInit(&htim4);
-	// if (HAL_TIM_PWM_Start(&htim4,TIM_CHANNEL_3) != HAL_OK)
-	// {
-	//   printf("HAL_TIM_PWM_Start(&htim4,TIM_CHANNEL_3) err\n");
-	//   Error_Handler();
-	// }
+}
+
+
+/**
+  * @brief TIM5 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM5_Init(void)
+{
+
+  /* USER CODE BEGIN TIM5_Init 0 */
+
+  /* USER CODE END TIM5_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_SlaveConfigTypeDef sSlaveConfig = {0};
+  TIM_IC_InitTypeDef sConfigIC = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM5_Init 1 */
+
+  /* USER CODE END TIM5_Init 1 */
+  htim5.Instance = TIM5;
+  htim5.Init.Prescaler = 71;
+  htim5.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim5.Init.Period = 3000;
+  htim5.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim5.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+  if (HAL_TIM_Base_Init(&htim5) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim5, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_IC_Init(&htim5) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sSlaveConfig.SlaveMode = TIM_SLAVEMODE_RESET;
+  sSlaveConfig.InputTrigger = TIM_TS_TI2FP2;
+  sSlaveConfig.TriggerPolarity = TIM_INPUTCHANNELPOLARITY_FALLING;
+  sSlaveConfig.TriggerPrescaler = TIM_ICPSC_DIV1;
+  sSlaveConfig.TriggerFilter = 0;
+  if (HAL_TIM_SlaveConfigSynchro(&htim5, &sSlaveConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigIC.ICPolarity = TIM_INPUTCHANNELPOLARITY_RISING;
+  sConfigIC.ICSelection = TIM_ICSELECTION_INDIRECTTI;
+  sConfigIC.ICPrescaler = TIM_ICPSC_DIV1;
+  sConfigIC.ICFilter = 0;
+  if (HAL_TIM_IC_ConfigChannel(&htim5, &sConfigIC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigIC.ICPolarity = TIM_INPUTCHANNELPOLARITY_FALLING;
+  sConfigIC.ICSelection = TIM_ICSELECTION_DIRECTTI;
+  if (HAL_TIM_IC_ConfigChannel(&htim5, &sConfigIC, TIM_CHANNEL_2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_UPDATE;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_ENABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim5, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM5_Init 2 */
+  /* USER CODE END TIM5_Init 2 */
 
 }
 

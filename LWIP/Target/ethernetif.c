@@ -178,6 +178,8 @@ void HAL_ETH_ErrorCallback(ETH_HandleTypeDef *handlerEth)
  * @param netif the already initialized lwip network interface structure
  *        for this ethernetif
  */
+extern uint8_t mac_address[6];
+
 static void low_level_init(struct netif *netif)
 {
   HAL_StatusTypeDef hal_eth_init_status = HAL_OK;
@@ -191,12 +193,12 @@ static void low_level_init(struct netif *netif)
 
   uint8_t MACAddr[6] ;
   heth.Instance = ETH;
-  MACAddr[0] = MAC_ADDR0;
-  MACAddr[1] = MAC_ADDR1;
-  MACAddr[2] = MAC_ADDR2;
-  MACAddr[3] = MAC_ADDR3;
-  MACAddr[4] = MAC_ADDR4;
-  MACAddr[5] = MAC_ADDR5;
+  MACAddr[0] = mac_address[0];
+  MACAddr[1] = mac_address[1];
+  MACAddr[2] = mac_address[2];
+  MACAddr[3] = mac_address[3];
+  MACAddr[4] = mac_address[4];
+  MACAddr[5] = mac_address[5];
   heth.Init.MACAddr = &MACAddr[0];
   heth.Init.MediaInterface = HAL_ETH_RMII_MODE;
   heth.Init.TxDesc = DMATxDscrTab;
