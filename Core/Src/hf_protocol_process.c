@@ -25,7 +25,6 @@ void es_send_req(b_frame_class_t *pframe, uint8_t req_cmd, int8_t *frame_data, u
 {
 	uint8_t buf[MAX_FRAME_LEN] = {0};
 	uint8_t b_len, xor = 0;
-	printf("%s\n", frame_data);
 	for (int i = 0; i < len; i++) {
 		xor ^= frame_data[i];
 	}
@@ -45,9 +44,6 @@ void es_send_req(b_frame_class_t *pframe, uint8_t req_cmd, int8_t *frame_data, u
 
 	memcpy(buf + b_len, pframe->frame_info.end, pframe->frame_info.end_len);
 	b_len += pframe->frame_info.end_len;
-	printf("len = %d \n", len);
-	printf("xor = %d \n", xor);
-	return 0;
 
 	HAL_UART_Transmit(&huart3, buf, b_len, HAL_MAX_DELAY); // transmit the full sentence again
 }
@@ -133,11 +129,12 @@ int32_t es_set_eth(struct ip_t *ip, struct netmask_t *netmask, struct getway_t *
 int32_t es_set_rtc_date(struct rtc_date_t *sdate)
 {
 	RTC_DateTypeDef sDate = {0};
-	sDate.Year = sdate->Year;
+	sDate.Year = sdate->Year - 2000;
 	sDate.Month = sdate->Month;
 	sDate.Date = sdate->Date;
 	sDate.WeekDay = sdate->WeekDay;
 
+	// printf("yy/mm/dd  %02d/%02d/%02d\r\n", sDate.Year, sDate.Month, sDate.Date);
 	if (HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BCD) != HAL_OK)
 		return HAL_ERROR;
 	return HAL_OK;
@@ -161,7 +158,7 @@ int32_t es_get_rtc_date(struct rtc_date_t *sdate)
 	RTC_DateTypeDef GetData;
 	if (HAL_RTC_GetDate(&hrtc, &GetData, RTC_FORMAT_BIN) != HAL_OK)
 		return HAL_ERROR;
-	printf("yy/mm/dd  %02d/%02d/%02d\r\n", 2000 + GetData.Year, GetData.Month, GetData.Date);
+	// printf("yy/mm/dd  %02d/%02d/%02d\r\n", 2000 + GetData.Year, GetData.Month, GetData.Date);
 	sdate->Year = 2000 + GetData.Year;
 	sdate->Month = GetData.Month;
 	sdate->Date = GetData.Date;
@@ -225,7 +222,7 @@ int32_t es_get_rtc_time(struct rtc_time_t *stime)
 	RTC_TimeTypeDef GetTime;
 	if (HAL_RTC_GetTime(&hrtc, &GetTime, RTC_FORMAT_BIN) != HAL_OK)
 		return HAL_ERROR;
-	printf(" hh:mm:ss %02d:%02d:%02d\r\n", GetTime.Hours, GetTime.Minutes, GetTime.Seconds);
+	// printf(" hh:mm:ss %02d:%02d:%02d\r\n", GetTime.Hours, GetTime.Minutes, GetTime.Seconds);
 	stime->Hours = GetTime.Hours;
 	stime->Minutes = GetTime.Minutes;
 	stime->Seconds = GetTime.Seconds;
@@ -334,6 +331,7 @@ void protocol_task(void *argument)
 			if (!es_get_cmd_and_data(&frame_uart3)) {
 				protocol_status = CHECK_TAIL;
 			} else {
+				// printf("%s CHECK_CMD fail\n", __func__);
 				es_send_req(&frame_uart3, CMD_RES, req_fail, sizeof(req_fail) - 1);
 				protocol_status = CHECK_HEAD;
 			}

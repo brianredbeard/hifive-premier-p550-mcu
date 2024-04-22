@@ -83,7 +83,7 @@ uint8_t es_get_cmd(b_frame_class_t *pframe)
 	uint8_t cmd, ret = B_ERROR;
 	if (read_ring_buf(&pframe->_frame_ring, &cmd, 1) == 1) {
 		// printf("cmd %x\n", cmd);
-		if (CMD_EEPROM_WP <= cmd && CMD_SET_IP >= cmd) {
+		if (CMD_EEPROM_WP <= cmd && CMD_RES >= cmd) {
 			pframe->frame.cmd = cmd;
 			ret = B_SUCCESS;
 		}
@@ -112,7 +112,7 @@ uint8_t es_check_frame(b_frame_class_t *pframe)
 		// printf("buf[%d] %x\n", i, buf[i]);
 	}
 
-	// printf("%s %d\n", __func__, __LINE__);
+	// printf("%s %d current_xor %x\n", __func__, __LINE__, current_xor);
 	if (read_ring_buf(&pframe->_frame_ring, &xor, 1) != 1)
 		return B_ERROR;
 	// printf("%s %d\n", __func__, __LINE__);

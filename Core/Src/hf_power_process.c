@@ -35,7 +35,6 @@ void hf_power_task(void *parameter)
 	HAL_StatusTypeDef status = HAL_OK;
 	power_state_t power_state = IDLE_STATE;
 	GPIO_PinState pin_state = GPIO_PIN_RESET;
-	printf("\r\n%s %d %s %s\r\n", __func__, __LINE__, __DATE__, __TIME__);
 	#ifdef AUTO_BOOT
 	power_state = ATX_PS_ON_STATE;
 	som_power_state = SOM_POWER_ON;
