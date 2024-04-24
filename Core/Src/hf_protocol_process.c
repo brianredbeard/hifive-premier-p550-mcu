@@ -18,8 +18,6 @@ extern uint8_t ip_address[4];
 extern uint8_t netmask_address[4];
 extern uint8_t getway_address[4];
 extern uint8_t mac_address[6];
-extern osThreadId_t http_task_handle;
-extern osThreadAttr_t http_task_attributes;
 
 void es_send_req(b_frame_class_t *pframe, uint8_t req_cmd, int8_t *frame_data, uint8_t len)
 {
@@ -86,31 +84,29 @@ int32_t es_set_gpio(struct gpio_cmd *gpio)
 
 int32_t es_set_eth(struct ip_t *ip, struct netmask_t *netmask, struct getway_t *gw, struct eth_mac_t *mac)
 {
-	if (http_task_handle)
-		osThreadTerminate(http_task_handle);
 	if (ip != NULL) {
 		ip_address[0] = ip->ip_addr0;
 		ip_address[1] = ip->ip_addr1;
 		ip_address[2] = ip->ip_addr2;
 		ip_address[3] = ip->ip_addr3;
 		// printf("IP_ADDR0:%d IP_ADDR1: %d IP_ADDR2: %d IP_ADDR3 %d\n", \
-			ip_address[0], ip_address[1], ip_address[2], ip_address[3]);
+			// ip_address[0], ip_address[1], ip_address[2], ip_address[3]);
 	}
 	if (netmask != NULL) {
 		netmask_address[0] = netmask->netmask_addr0;
 		netmask_address[1] = netmask->netmask_addr1;
 		netmask_address[2] = netmask->netmask_addr2;
 		netmask_address[3] = netmask->netmask_addr3;
-		// printf("NETMASK_ADDR0:%d NETMASK_ADDR1: %d NETMASK_ADDR2: %d NETMASK_ADDR3 %d\n", \
-		netmask_address[0], netmask_address[1], netmask_address[2], netmask_address[3]);
+		// printf("NETMASK_ADDR0:%d NETMASK_ADDR1: %d NETMASK_ADDR2: %d NETMASK_ADDR3 %d\n",
+		// netmask_address[0], netmask_address[1], netmask_address[2], netmask_address[3]);
 	}
 	if (gw != NULL) {
 		getway_address[0] = gw->getway_addr0;
 		getway_address[1] = gw->getway_addr1;
 		getway_address[2] = gw->getway_addr2;
 		getway_address[3] = gw->getway_addr3;
-		// printf("GETWAY_ADDR0:%d GETWAY_ADDR1: %dGETWAY_ADDR2: %d GETWAY_ADDR3 %d\n", \
-			getway_address[0], getway_address[1], getway_address[2], getway_address[3]);
+		// printf("GETWAY_ADDR0:%d GETWAY_ADDR1: %dGETWAY_ADDR2: %d GETWAY_ADDR3 %d\n",
+			// getway_address[0], getway_address[1], getway_address[2], getway_address[3]);
 	}
 	if (mac != NULL) {
 		mac_address[0] = mac->eth_mac_addr0;
@@ -119,10 +115,11 @@ int32_t es_set_eth(struct ip_t *ip, struct netmask_t *netmask, struct getway_t *
 		mac_address[3] = mac->eth_mac_addr3;
 		mac_address[4] = mac->eth_mac_addr4;
 		mac_address[5] = mac->eth_mac_addr5;
-		// printf("GETWAY_ADDR0:%d GETWAY_ADDR1: %dGETWAY_ADDR2: %d GETWAY_ADDR3 %d\n", \
-			getway_address[0], getway_address[1], getway_address[2], getway_address[3]);
+		// printf("GETWAY_ADDR0:%d GETWAY_ADDR1: %dGETWAY_ADDR2: %d GETWAY_ADDR3 %d\n",
+			// getway_address[0], getway_address[1], getway_address[2], getway_address[3]);
 	}
-	http_task_handle = osThreadNew(hf_http_task, NULL, &http_task_attributes);
+	extern void dynamic_change_eth(void);
+	dynamic_change_eth();
 	return HAL_OK;
 }
 
@@ -156,7 +153,7 @@ int32_t es_set_rtc_time(struct rtc_time_t *stime)
 int32_t es_get_rtc_date(struct rtc_date_t *sdate)
 {
 	RTC_DateTypeDef GetData;
-	if (HAL_RTC_GetDate(&hrtc, &GetData, RTC_FORMAT_BIN) != HAL_OK)
+	if (HAL_RTC_GetDate(&hrtc, &GetData, RTC_FORMAT_BCD) != HAL_OK)
 		return HAL_ERROR;
 	// printf("yy/mm/dd  %02d/%02d/%02d\r\n", 2000 + GetData.Year, GetData.Month, GetData.Date);
 	sdate->Year = 2000 + GetData.Year;
@@ -166,7 +163,22 @@ int32_t es_get_rtc_date(struct rtc_date_t *sdate)
 	return HAL_OK;
 }
 
+int32_t es_get_rtc_time(struct rtc_time_t *stime)
+{
+	RTC_TimeTypeDef GetTime;
+	if (HAL_RTC_GetTime(&hrtc, &GetTime, RTC_FORMAT_BCD) != HAL_OK)
+		return HAL_ERROR;
+	// printf(" hh:mm:ss %02d:%02d:%02d\r\n", GetTime.Hours, GetTime.Minutes, GetTime.Seconds);
+	stime->Hours = GetTime.Hours;
+	stime->Minutes = GetTime.Minutes;
+	stime->Seconds = GetTime.Seconds;
+	return HAL_OK;
+}
+
 extern uint32_t pwm_period;
+uint32_t fan0_duty = 0;
+uint32_t fan1_duty = 0;
+
 int32_t es_set_fan_duty(struct fan_control_t *fan)
 {
 	TIM_OC_InitTypeDef sConfigOC = {0};
@@ -177,6 +189,7 @@ int32_t es_set_fan_duty(struct fan_control_t *fan)
 		if (HAL_TIM_PWM_Stop(&htim4, TIM_CHANNEL_1) != HAL_OK)
 			return HAL_ERROR;
 
+		fan0_duty = fan->duty;
 		sConfigOC.OCMode = TIM_OCMODE_PWM1;
 		sConfigOC.Pulse = fan->duty*pwm_period/100;
 		sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
@@ -190,6 +203,7 @@ int32_t es_set_fan_duty(struct fan_control_t *fan)
 		if (HAL_TIM_PWM_Stop(&htim4, TIM_CHANNEL_2) != HAL_OK)
 			return HAL_ERROR;
 
+		fan1_duty = fan->duty;
 		sConfigOC.OCMode = TIM_OCMODE_PWM1;
 		sConfigOC.Pulse = fan->duty*pwm_period/100;
 		sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
@@ -208,26 +222,15 @@ int32_t es_set_fan_duty(struct fan_control_t *fan)
 int32_t es_get_fan_duty(struct fan_control_t *fan)
 {
 	if (fan->fan_num == 0) {
-		fan->duty = 50;
+		fan->duty = fan0_duty;
 	} else if (fan->fan_num == 1) {
-		fan->duty = 60;
+		fan->duty = fan1_duty;
 	} else {
 		return HAL_ERROR;
 	}
 	return HAL_OK;
 }
 
-int32_t es_get_rtc_time(struct rtc_time_t *stime)
-{
-	RTC_TimeTypeDef GetTime;
-	if (HAL_RTC_GetTime(&hrtc, &GetTime, RTC_FORMAT_BIN) != HAL_OK)
-		return HAL_ERROR;
-	// printf(" hh:mm:ss %02d:%02d:%02d\r\n", GetTime.Hours, GetTime.Minutes, GetTime.Seconds);
-	stime->Hours = GetTime.Hours;
-	stime->Minutes = GetTime.Minutes;
-	stime->Seconds = GetTime.Seconds;
-	return HAL_OK;
-}
 
 void es_process_cmd(b_frame_class_t *pframe)
 {

@@ -64,7 +64,7 @@ void Error_Handler(void)
  */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-	if (htim->Instance == TIM1) {
+	if (htim->Instance == TIM2) {
 		HAL_IncTick();
 	}
 }

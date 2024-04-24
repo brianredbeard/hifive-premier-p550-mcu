@@ -41,6 +41,7 @@ DMA_HandleTypeDef hdma_spi1_rx;
 DMA_HandleTypeDef hdma_spi1_tx;
 DMA_HandleTypeDef hdma_spi2_rx;
 DMA_HandleTypeDef hdma_spi2_tx;
+TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim4;
 TIM_HandleTypeDef htim5;
 UART_HandleTypeDef huart4;
@@ -150,8 +151,6 @@ int board_init(void)
 	/* watch dog */
 	// MX_WWDG_Init();
 	// MX_IWDG_Init();
-
-	printf("\r\n%s %d %s %s\r\n", __func__, __LINE__, __DATE__, __TIME__);
 	return 0;
 }
 

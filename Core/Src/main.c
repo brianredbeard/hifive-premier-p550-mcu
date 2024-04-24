@@ -149,14 +149,13 @@ void hf_main_task(void *argument)
 
 	// MX_IWDG_Init();
 
-
   mcu_status_led_on(pdTRUE);
   // extern uint32_t PWM2_T_Count;
   // extern uint32_t PWM2_D_Count;
   // uint32_t uiFrequency;
+
   for(;;)
   {
-	  HAL_Delay(500);
 		// uiFrequency = 1000000 / PWM2_D_Count;
 		// printf("占空:%dus    周期:%dus    频率:%dHz    \r\n", PWM2_T_Count, PWM2_D_Count, uiFrequency);
     // PWM2_T_Count = 0;
@@ -199,9 +198,9 @@ void get_rtc_info(void)
 {
   RTC_DateTypeDef GetData;
   RTC_TimeTypeDef GetTime;
-  HAL_RTC_GetTime(&hrtc, &GetTime, RTC_FORMAT_BIN);
+  HAL_RTC_GetTime(&hrtc, &GetTime, RTC_FORMAT_BCD);
   /* Get the RTC current Date */
-  HAL_RTC_GetDate(&hrtc, &GetData, RTC_FORMAT_BIN);
+  HAL_RTC_GetDate(&hrtc, &GetData, RTC_FORMAT_BCD);
 
   /* Display date Format : yy/mm/dd */
   printf("yy/mm/dd  %02d/%02d/%02d\r\n",2000 + GetData.Year, GetData.Month, GetData.Date);
@@ -210,8 +209,8 @@ void get_rtc_info(void)
 
   // RTC_AlarmTypeDef alarm1;
   // RTC_AlarmTypeDef alarm2;
-  // HAL_RTC_GetAlarm(&hrtc, &alarm1, RTC_ALARM_A, RTC_FORMAT_BIN);
-  // HAL_RTC_GetAlarm(&hrtc, &alarm2, RTC_ALARM_B, RTC_FORMAT_BIN);
+  // HAL_RTC_GetAlarm(&hrtc, &alarm1, RTC_ALARM_A, RTC_FORMAT_BCD);
+  // HAL_RTC_GetAlarm(&hrtc, &alarm2, RTC_ALARM_B, RTC_FORMAT_BCD);
   // printf("alarm1 info :\n");
   // printf("AlarmMask %x, AlarmSubSecondMask %x, \n AlarmDateWeekDaySel %x, AlarmDateWeekDay %x, Alarm %x:\n",
   //       alarm1.AlarmMask, alarm1.AlarmSubSecondMask, alarm1.AlarmDateWeekDaySel, alarm1.AlarmDateWeekDay, alarm1.Alarm );

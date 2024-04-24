@@ -11,7 +11,7 @@
 /* Private define ------------------------------------------------------------*/
 #define SHORT_CLICK_THRESHOLD 50
 #define LONG_PRESS_THRESHOLD 3000
-#define PRESS_Time 100
+#define PRESS_Time 50
 #define BUTTON_ERROR_Time 10000
 
 #define FLAGS_KEY 0x00000001U
