@@ -70,7 +70,7 @@ void hf_http_task(void *argument)
   /* init code for LWIP */
   eth_get_address();
   MX_LWIP_Init();
-  httpd_init();
+  // httpd_init();
   // /* Infinite loop */
   osDelay(5000);
   dhcp = netif_dhcp_data(&gnetif);
@@ -80,6 +80,7 @@ void hf_http_task(void *argument)
   memcpy((uint8_t *)ip_address, &gnetif.ip_addr, 4);
   memcpy((uint8_t *)netmask_address, &gnetif.netmask, 4);
   memcpy((uint8_t *)getway_address, &gnetif.gw, 4);
+  httpserver_init();
   for(;;)
   {
     osDelay(1000);
