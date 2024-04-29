@@ -11,9 +11,12 @@
 
 #define SESSION_ID_LENGTH 32
 #define BUF_SIZE 1024
+#define BUF_SIZE_64 64
+#define BUF_SIZE_128 128
+#define BUF_SIZE_256 256
 #define STATIC_PATH "/tmp/static"
 #define EEPROM_USERNAME_PASSWORD_ADDR 0x0100
-#define EEPROM_USERNAME_PASSWORD_BUFFER_SIZE 64 
+#define EEPROM_USERNAME_PASSWORD_BUFFER_SIZE 64
 #define AT24C_ADDR (0x50<<1) //todoooooooooooooooooo
 
 #if LWIP_NETCONN
@@ -9473,6 +9476,9 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
 											</form> \
                                         </div> \
                                         <h2>Machine Status</h2> \
+										<div class=\"power-status\"> \
+											Power On/Off:<button id=\"power-on-change\" >unknow</button>   <br> \
+										</div> \
                                         <div class=\"basic-static\" > \
                                             <h3>Basic Status</h3> \
                                             CPU Temperature:<input type=\"text\" id=\"cpu_temp\" value=\"0\" style=\"width: 60px;\" disabled><br> \
@@ -9536,7 +9542,49 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
                                                             }\n \
                                                         });\n\
                                                     });\n\
-   													$('#net-work-refresh').click(); \n\
+													$('#power-on-change').click(function() {\n \
+													 	var power_status = $('#power-on-change').val();\n \
+                                                        $.ajax({\n \
+                                                            url: '/power_status',\n \
+                                                            type: 'POST',\n \
+                                                            contentType: 'application/x-www-form-urlencoded', // 设置Content-Type \n \
+                                                            data: {\n \
+                                                                power_status: power_status,\n \
+                                                            },\
+                                                            success: function(response) {\n \
+                                                                if(response.status===0){\n \
+                                                                    alert(\"update success!\");\n \
+                                                                }else{\n \
+                                                                    alert(response.status);\n \
+                                                                }\n \
+                                                                // 请求成功时的回调函数\n \
+                                                                console.log('power-on-change updated successfully.');\n \
+                                                            },\n \
+                                                            error: function(xhr, status, error) {\n \
+                                                                alert(\"udpate failed!\");\n \
+                                                                // 请求失败时的回调函数\n \
+                                                                console.error('Error updating power-on-change settings:', error);\n \
+                                                            }\n \
+                                                        });\n\
+                                                    });\n\
+   													// $('#net-work-refresh').click(); \n\
+													$.ajax({ \n \
+														url: '/power_status',\n \
+														type: 'GET',\n \
+														success: function(data) {\n \
+															// 假设返回的数据是{ buttonText: '新按钮文本' }\n \
+															if(data.data.power_status===\"0\"){\n \
+																$('#power-on-change').text('powerON');\n \
+																$('#power-on-change').val('1');\n \
+															}else{\n \
+																$('#power-on-change').text('powerOFF');\n \
+																$('#power-on-change').val('0');\n \
+															}\n \
+														},\n \
+														error: function(xhr, status, error) {\n \
+															console.error(\"An error occurred: \" + status  + error);\n \
+														}\n \
+													});\n \
                                                 });\n\
                                             </script>\n \
                                     </body> \
@@ -9954,9 +10002,19 @@ const char* process_header(const char *header) {
 //              "Hello, World!\n",
 //              new_cookie);
 
-//     write(client_fd, response, strlen(response));
+//     write(client_fd, response, strlenpower_status(response));
 // }
 static bool led_on = FALSE;
+
+int get_power_status(){
+	printf("TODO call get_power_status \n");
+	return 1;//poweron,TODO call
+}
+int change_power_status(int status){//status 0:power off,1:power on
+	//pass
+	printf("TODO call change_power_status %d \n",status);
+	return 0;//0 success,TODO call
+}
  /** Serve one HTTP connection accepted in the http thread */
  static void
  http_server_netconn_serve(struct netconn *conn)
@@ -9979,8 +10037,8 @@ static bool led_on = FALSE;
      {
         netbuf_data(inbuf, (void**)&buf, &buflen);
 
-        // printf(" ############### buf: ##############");
-        // for (int i = 0; i < sizeof(buf)>10?10:sizeof(buf); ++i) {
+        printf(" ############### buf: ############## %d %d",sizeof(buf),strlen(buf));
+        // for (int i = 0; i < sizeof(buf)>10?10:sizeof(buf); i++) {
         //     printf("%c", buf[i]);
         // }
         // printf("\n"); // 打印换行符
@@ -10101,30 +10159,19 @@ static bool led_on = FALSE;
             }else if(strcmp(path, "/info.html")==0){
                 printf("GET location: info.html \n");
 
-                // char* b=NULL;
-                // kv_pair *current = params.hSet-Cookie: user=wangermazi; Max-Age=3600; Path=/\r\nead;
-                // while (current) {
-                //     // printf("%s = %s\n", current->key, current->value);
-                //     if(strcmp(current->key,"b")==0){
-                //         b= current->value;
-                //         break;
-                //     }
-                //     current = current->next;
-                // }
-                // printf("param b: %s \n",b);
-                // strcpy(resp_cookies,"");
-                // strcpy(resp_cookies,"Set-Cookie: user=lisi; Max-Age=3600; Path=/\r\n");
-				if(found_session_user_name!=NULL && strlen(found_session_user_name)>0){
-					printf("response info.html%s \n",found_session_user_name);
+				//todo tmp modify
+				// if(found_session_user_name!=NULL && strlen(found_session_user_name)>0){
+					// printf("response info.html%s \n",found_session_user_name);
                		send_response_content(conn,NULL, info_html);
-				}else{
-					printf("redirect to login.html \n");
-					sprintf(resp_cookies, "Set-Cookie: sid=;  Path=/\r\n");
-                    send_redirect(conn,"/login.html",resp_cookies);
-                    // send_redirect(conn,"/login.html",NULL);
-				}
+				// }else{
+				// 	printf("redirect to login.html \n");
+				// 	sprintf(resp_cookies, "Set-Cookie: sid=;  Path=/\r\n");
+                //     send_redirect(conn,"/login.html",resp_cookies);
+                //     // send_redirect(conn,"/login.html",NULL);
+				// }
 
             }else if(strcmp(path,"/modify_account.html")==0){
+				printf("GET location: modify_account.html \n");
 				if(found_session_user_name!=NULL && strlen(found_session_user_name)>0){	
 					printf("response modify_account_html.html%s \n",found_session_user_name);
 					assert(strlen(found_session_user_name)<64);
@@ -10138,7 +10185,30 @@ static bool led_on = FALSE;
                     // send_redirect(conn,"/login.html",NULL);
 				}
 
+
+			}else if(strcmp(path, "/power_status")==0 ){ //get 
+				printf("GET location: power_status \n");
+				int power_status=get_power_status();
+				char json_response[BUF_SIZE_128]={0};
+				 // 创建JSON格式的字符串
+                char *json_response_patt = "{\"status\":0,\"message\":\"success\",\"data\":{\"power_status\":\"%d\"}}";//0 success, msg
+                sprintf(json_response, json_response_patt,power_status);
+
+                // 发送HTTP头部
+                const char *header = "HTTP/1.1 200 OK\r\n"
+                                    "Content-Type: application/json\r\n"
+                                    "Connection: close\r\n"
+                                    "Content-Length: %d\r\n\r\n";
+
+                char response_header[BUF_SIZE_256];
+                sprintf(response_header, header, strlen(json_response));
+
+                printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
+
+                netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
+                netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
 			}else if(strcmp(path, "/network")==0 ){
+				printf("GET location: network \n");
              
                 // 创建JSON格式的字符串
                 char *json_response = "{\"status\":0,\"message\":\"success\",\"data\":{\"ipaddr\":\"1.1.10.10\",\"gateway\":\"1.2.3.4\",\"subnetwork\":\"5.5.5.5\"}}";//0 success, msg
@@ -10437,7 +10507,48 @@ static bool led_on = FALSE;
 					sprintf(resp_cookies, "Set-Cookie: sid=;  Path=/\r\n");
                     send_redirect(conn,"/login.html",resp_cookies);
 
-                }else if(strcmp(path, "/network")==0 ){		//post network
+                }else if(strcmp(path, "/power_status")==0 ){
+					
+					
+                    char* status=NULL;
+                    assert(p_params!=NULL);
+                    kv_pair *current = params.head;
+                    while (current) {
+                        if(strcmp(current->key,"power_status")==0){
+                            status= current->value;
+                                break;
+                        }
+                        current = current->next;
+                    }
+                    assert( status!=NULL);
+                    printf("param status: %s \n",status);
+					int change_status_ret=0;
+					if(status=="0"){//power on -> power off
+						change_status_ret =change_power_status(0);
+					}else {
+						change_status_ret=change_power_status(1);
+					}
+
+				
+					// 创建JSON格式的字符串
+                    char *json_response_patt = "{\"status\":%d,\"message\":\"success!\",\"data\":{}}";//0 success, msg
+					char json_response[BUF_SIZE_64]={0};
+					sprintf(json_response, json_response_patt, change_status_ret);
+
+                    // 发送HTTP头部
+                    const char *header = "HTTP/1.1 200 OK\r\n"
+                                        "Content-Type: application/json\r\n"
+                                        "Connection: close\r\n"
+                                        "Content-Length: %d\r\n\r\n";
+                    char response_header[256];
+                    sprintf(response_header, header, strlen(json_response));
+
+                    printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
+
+                    netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
+                    netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
+
+				}else if(strcmp(path, "/network")==0 ){		//post network
                     printf("POST ,location: network \n");
 
                     char* ipaddr=NULL;
@@ -10523,7 +10634,7 @@ static bool led_on = FALSE;
                 printf("func:httpserver_serve method:POST  exit \n");
             }
         }else{
-            printf("ERROR unsupport methoc(only support GET,POST) \n");
+            printf("ERROR unsupport methoc(only support GET,POST) %S \n",method);
             send_response_200(conn);
         }
         free(buf_copy);
