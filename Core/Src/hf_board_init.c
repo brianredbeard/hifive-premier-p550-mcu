@@ -141,7 +141,7 @@ int board_init(void)
 	MX_RNG_Init();
 	// MX_TIM5_Init();
 	/* There is leakage, the som must be released before initialization */
-	// MX_UART4_Init();
+	MX_UART4_Init();
 	// MX_USART6_UART_Init();
 
 	/* To ensure that the i2c runs properly, initialize the som after it is powered on */

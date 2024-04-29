@@ -37,9 +37,10 @@ const osThreadAttr_t main_task_attributes = {
 };
 
 osThreadId_t protocol_task_handle;
+osThreadId_t uart4_protocol_task_handle;
 const osThreadAttr_t protocol_task_attributes = {
   .name = "protocolTask",
-  .stack_size = 1024*8,
+  .stack_size = 1024*2,
   .priority = (osPriority_t) osPriorityNormal,
 };
 
@@ -75,6 +76,7 @@ const osThreadAttr_t MoniterTask_attributes = {
 void hf_main_task(void *argument);
 void MoniterTask(void *argument);
 void protocol_task(void *argument);
+void uart4_protocol_task(void *argument);
 
 /* Private user code ---------------------------------------------------------*/
 
@@ -143,8 +145,9 @@ void hf_main_task(void *argument)
   http_task_handle = osThreadNew(hf_http_task, NULL, &http_task_attributes);
   // moniter_task_handle = osThreadNew(MoniterTask, NULL, &MoniterTask_attributes);
   protocol_task_handle = osThreadNew(protocol_task, NULL, &protocol_task_attributes);
+  uart4_protocol_task_handle = osThreadNew(uart4_protocol_task, NULL, &protocol_task_attributes);
   osDelay(900);
-  printf("HiFive 106SC \n");
+  printf("HiFive 106SC!\n");
   // extern void MX_IWDG_Init(void);
 
 	// MX_IWDG_Init();

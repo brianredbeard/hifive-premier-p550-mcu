@@ -94,6 +94,7 @@ typedef struct {
 	ring_buf_t _frame_ring;
 	uint32_t _in_frame_buffer_size;
 	struct frame_data frame;
+	UART_HandleTypeDef *uart;
 } b_frame_class_t;
 
 typedef enum protocol_status_type {

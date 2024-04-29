@@ -15,6 +15,7 @@ typedef struct {
     uint8_t *pTail;
     uint8_t *pWrite;
     uint8_t *pRead;
+    uint8_t is_full; // New member to indicate if the ring buffer is full
 }ring_buf_t;
 
 uint8_t ring_buf_init(ring_buf_t *r, uint32_t size);

@@ -70,6 +70,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 }
 
 extern DMA_HandleTypeDef hdma_usart3_rx;
+extern DMA_HandleTypeDef hdma_uart4_rx;
 
 #include "protocol_lib/protocol.h"
 #include "protocol_lib/ringbuffer.h"
@@ -77,18 +78,39 @@ extern DMA_HandleTypeDef hdma_usart3_rx;
 extern uint32_t RxBuf_SIZE;
 extern uint8_t RxBuf[96];
 extern b_frame_class_t frame_uart3;
+extern b_frame_class_t frame_uart4;
+
+static void buf_dump(uint8_t *data)
+{
+	int i;
+
+	for (i = 0; i < sizeof(UART4_RxBuf); i++) {
+		printf("0x%x ", UART4_RxBuf[i]);
+		if (i != 0 && i % 20 == 0) {
+			printf("\n");
+		}
+	}
+	printf("\n");
+}
+
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {
 	if (huart->Instance == USART3) {
-		printf("%s Size %d sizeof(RxBuf) %d\n", __func__, Size, sizeof(RxBuf));
+		printf("%s Size %d sizeof(UART3_RxBuf) %d\n", __func__, Size, sizeof(RxBuf));
 		es_frame_put(&frame_uart3, RxBuf, Size);
 		memset(RxBuf, 0, sizeof(RxBuf) / sizeof(uint8_t));
-
 		HAL_UARTEx_ReceiveToIdle_DMA(&huart3, RxBuf, RxBuf_SIZE);
 		__HAL_DMA_DISABLE_IT(&hdma_usart3_rx, DMA_IT_HT);
+	} else if (huart->Instance == UART4) {
+		printf("%s Size %d sizeof(UART4_RxBuf) %d\n", __func__, Size, sizeof(UART4_RxBuf));
+		if (HAL_UART_RXEVENT_TC == huart->RxEventType) {
+			buf_dump(UART4_RxBuf);
+			es_frame_put(&frame_uart4, UART4_RxBuf, sizeof(UART4_RxBuf));
+			memset(UART4_RxBuf, 0, sizeof(UART4_RxBuf) / sizeof(uint8_t));
+			HAL_UARTEx_ReceiveToIdle_DMA(&huart4, UART4_RxBuf, sizeof(UART4_RxBuf));
+		}
 	}
 }
-
 
 /**
   * @brief  Input Capture callback in non-blocking mode

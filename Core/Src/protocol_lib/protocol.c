@@ -31,7 +31,7 @@ uint8_t es_frame_put(b_frame_class_t *pframe, uint8_t *dat, uint32_t len)
 	if (!dat || len == 0) {
 		return B_ERROR;
 	}
-	uint8_t putlen = write_ring_buf(&pframe->_frame_ring, dat, len);
+	uint32_t putlen = write_ring_buf(&pframe->_frame_ring, dat, len);
 
 	if (putlen != len) {
 		ring_buf_clr(&pframe->_frame_ring);
@@ -64,9 +64,9 @@ uint8_t es_check_head(b_frame_class_t *pframe)
 	do {
 		read_ring_buf(&pframe->_frame_ring, &tmp, 1);
 		if (tmp == pframe->frame_info.head[i]) {
-			// printf("tmp(%d) %x \n", i, tmp);
+			printf("tmp(%d) %x \n", i, tmp);
 			if (++i == pframe->frame_info.head_len) {
-				// printf("%s %d B_SUCCESS\n", __func__, __LINE__);
+				printf("%s %d B_SUCCESS\n", __func__, __LINE__);
 				return B_SUCCESS;
 			}
 		} else {

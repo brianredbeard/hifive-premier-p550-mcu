@@ -8,7 +8,7 @@
 #include "hf_common.h"
 #include "hf_i2c.h"
 /* Private typedef -----------------------------------------------------------*/
-#define AUTO_BOOT
+ #define AUTO_BOOT
 /* Private define ------------------------------------------------------------*/
 #define ATX_POWER_GOOD GPIO_PIN_RESET
 #define ATX_POWER_FAIL GPIO_PIN_SET
