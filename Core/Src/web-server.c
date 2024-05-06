@@ -14,6 +14,8 @@
 #define BUF_SIZE_64 64
 #define BUF_SIZE_128 128
 #define BUF_SIZE_256 256
+#define BUF_SIZE_512 512
+
 #define STATIC_PATH "/tmp/static"
 #define EEPROM_USERNAME_PASSWORD_ADDR 0x0100
 #define EEPROM_USERNAME_PASSWORD_BUFFER_SIZE 64
@@ -9494,6 +9496,18 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
                                             Fan Speed      :<input type=\"text\" id=\"fan_speed\" value=\"0\" style=\"width: 60px;\" disabled><br> \
                                             <button id=\"pvt-info-refresh\">refresh</button> \
                                         </div> \
+										 <div class=\"dip-switch\" > \
+                                            <h3>DIP Switch</h3> \
+                                            dip01:<input  type=\"text\" id=\"dip01\" style=\"width: 60px;\" disabled> <br> \
+											dip02:<input  type=\"text\" id=\"dip02\" style=\"width: 60px;\" disabled> <br> \
+											dip03:<input  type=\"text\" id=\"dip03\" style=\"width: 60px;\" > <br> \
+											dip04:<input  type=\"text\" id=\"dip04\" style=\"width: 60px;\" > <br> \
+											dip05:<input  type=\"text\" id=\"dip05\" style=\"width: 60px;\" > <br> \
+											dip06:<input  type=\"text\" id=\"dip06\" style=\"width: 60px;\" > <br> \
+											dip07:<input  type=\"text\" id=\"dip07\" style=\"width: 60px;\" > <br> \
+											dip08:<input  type=\"text\" id=\"dip08\" style=\"width: 60px;\" > <br> \
+                                            <button id=\"dip-switch-refresh\">refresh</button> <button id=\"dip-switch-update\">update</button> \
+                                        </div> \
                                         <div class=\"net-work\" > \
                                             <h3>Network System</h3> \
                                             IP Address :<input type=\"text\" id=\"ipaddr\" value=\"0\" style=\"width: 60px;\"> <br> \
@@ -9573,8 +9587,8 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
                                                                 // 请求失败时的回调函数\n \
                                                                 console.error('Error updating power-on-change settings:', error);\n \
                                                             }\n \
-                                                        });\n\
-                                                    });\n\
+                                                        });\n \
+                                                    });\n \
 													$('#reset').click(function() { \n \
                                                         $.ajax({ \n\
                                                             url: '/reset',\n \
@@ -9626,10 +9640,71 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
                                                             }\n \
                                                         });\n\
                                                     });\n\
+													$('#dip-switch-refresh').click(function() {\n \
+                                                        $.ajax({\n \
+                                                            url: '/dip_switch',\n \
+                                                            type: 'GET',\n \
+                                                            success: function(response) {\n \
+                                                                $('#dip01').val(response.data.dip01);\n \
+                                                                $('#dip02').val(response.data.dip02);\n \
+                                                                $('#dip03').val(response.data.dip03);\n \
+																$('#dip04').val(response.data.dip04);\n \
+																$('#dip05').val(response.data.dip05);\n \
+																$('#dip06').val(response.data.dip06);\n \
+																$('#dip07').val(response.data.dip07);\n \
+																$('#dip08').val(response.data.dip08);\n \
+                                                                console.log('dip_switch refreshed successfully.');\n \
+                                                            },\n \
+                                                            error: function(xhr, status, error) {\n \
+                                                                // 请求失败时的回调函数\n \
+                                                                console.error('Error refreshing dip_switch:', error);\n \
+                                                            }\n \
+                                                        });\n\
+                                                    });\n\
+													$('#dip-switch-update').click(function() { \n \
+                                                        var dip01 = $('#dip01').val();\n \
+                                                        var dip02 = $('#dip02').val();\n \
+                                                        var dip03 = $('#dip03').val();\n \
+														var dip04 = $('#dip04').val();\n \
+														var dip05 = $('#dip05').val();\n \
+														var dip06 = $('#dip06').val();\n \
+														var dip07 = $('#dip07').val();\n \
+														var dip08 = $('#dip08').val();\n \
+                                                        $.ajax({ \n\
+                                                            url: '/dip_switch',\n \
+                                                            type: 'POST',\n \
+                                                            contentType: 'application/x-www-form-urlencoded', // 设置Content-Type \n \
+                                                            data: {\n \
+                                                                dip01: dip01, \n \
+                                                                dip02: dip02, \n \
+                                                                dip03: dip03, \n \
+																dip04: dip04, \n \
+																dip05: dip05, \n \
+																dip06: dip06, \n \
+																dip07: dip07, \n \
+																dip08: dip08  \n \
+                                                            },\
+                                                            success: function(response) {\n \
+                                                                if(response.status===0){\n \
+                                                                    alert(\"update success!\");\n \
+                                                                }else{\n \
+                                                                    alert(response.message);\n \
+                                                                }\n \
+                                                                // 请求成功时的回调函数\n \
+                                                                console.log('Network settings updated successfully.');\n \
+                                                            },\n \
+                                                            error: function(xhr, status, error) {\n \
+                                                                alert(\"udpate failed!\");\n \
+                                                                // 请求失败时的回调函数\n \
+                                                                console.error('Error updating network settings:', error);\n \
+                                                            }\n \
+                                                        });\n \
+                                                    });\n \
 													// --------------------after load page ------------- \n \
    													// $('#net-work-refresh').click(); \n\
 													$('#power-consum-refresh').click(); \n\
 													$('#pvt-info-refresh').click(); \n\
+													$('#dip-switch-refresh').click(); \n\
 													$.ajax({ \n \
 														url: '/power_status',\n \
 														type: 'GET',\n \
@@ -10106,6 +10181,34 @@ PVTInfo get_pvt_info() {
     return pvtInfo;
 }
 
+typedef struct {
+    int dip01;
+    int dip02;
+    int dip03;
+	int dip04;
+	int dip05;
+	int dip06;
+	int dip07;
+	int dip08;
+} DIPSwitchInfo;
+
+DIPSwitchInfo get_dip_switch(){
+	printf("TODO call get_dip_switch\n");
+	DIPSwitchInfo dipSwitchInfo;
+	dipSwitchInfo.dip01 = 0;
+	dipSwitchInfo.dip02 = 0;
+	dipSwitchInfo.dip03 = 0;
+	dipSwitchInfo.dip04 = 0;
+	dipSwitchInfo.dip05 = 1;
+	dipSwitchInfo.dip06 = 1;
+	dipSwitchInfo.dip07 = 1;
+	dipSwitchInfo.dip08 = 1;
+    return dipSwitchInfo;
+}
+int set_dip_switch(DIPSwitchInfo dipSwitchInfo){
+	printf("TODO call set_dip_switch\n");
+    return 0;//0:success ,other:error
+}
 
  /** Serve one HTTP connection accepted in the http thread */
  static void
@@ -10187,7 +10290,7 @@ PVTInfo get_pvt_info() {
 
   
 
-        char resp_cookies[256] = {0};
+        char resp_cookies[BUF_SIZE_256] = {0};
 
         if (method && url && version && strcmp(method, "GET") == 0) {
             printf("GET \n");
@@ -10342,6 +10445,30 @@ PVTInfo get_pvt_info() {
 
                 netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
                 netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
+
+			}else if(strcmp(path, "/dip_switch")==0 ){ //get dip_switch
+				printf("GET location: dip_switch \n");
+				DIPSwitchInfo dipSwitchInfo= get_dip_switch();
+
+				char json_response[BUF_SIZE_256]={0};
+				 // 创建JSON格式的字符串
+                char *json_response_patt = "{\"status\":0,\"message\":\"success\",\"data\":{\"dip01\":\"%d\",\"dip02\":\"%d\",\"dip03\":\"%d\",\"dip04\":\"%d\",\"dip05\":\"%d\",\"dip06\":\"%d\",\"dip07\":\"%d\",\"dip08\":\"%d\"}}";
+                sprintf(json_response, json_response_patt,dipSwitchInfo.dip01,dipSwitchInfo.dip02,dipSwitchInfo.dip03,dipSwitchInfo.dip04,dipSwitchInfo.dip05,dipSwitchInfo.dip06,dipSwitchInfo.dip07,dipSwitchInfo.dip08);
+
+                // 发送HTTP头部
+                const char *header = "HTTP/1.1 200 OK\r\n"
+                                    "Content-Type: application/json\r\n"
+                                    "Connection: close\r\n"
+                                    "Content-Length: %d\r\n\r\n";
+
+                char response_header[BUF_SIZE_512];
+                sprintf(response_header, header, strlen(json_response));
+
+                printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
+
+                netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
+                netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
+
 
 			}else if(strcmp(path, "/network")==0 ){
 				printf("GET location: network \n");
@@ -10657,6 +10784,7 @@ PVTInfo get_pvt_info() {
                     }
                     assert( status!=NULL);
                     printf("param status: %s \n",status);
+
 					int change_status_ret=0;
 					if(status=="0"){//power on -> power off
 						change_status_ret =change_power_status(0);
@@ -10717,6 +10845,67 @@ PVTInfo get_pvt_info() {
                     netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
 
 
+				}else if(strcmp(path, "/dip_switch")==0 ){
+					printf("POST ,location: dip_switch \n");
+					
+					DIPSwitchInfo dipSwitchInfo;
+                    assert(p_params!=NULL);
+                    kv_pair *current = params.head;
+					char *endPtr;
+					long intValue =0;
+                    while (current) {
+                        if(strcmp(current->key,"dip01")==0){
+							intValue = strtol(current->value, &endPtr, 10);
+                            dipSwitchInfo.dip01= intValue>0?1:0;
+                        }else if(strcmp(current->key,"dip02")==0){
+							intValue = strtol(current->value, &endPtr, 10);
+                            dipSwitchInfo.dip02= intValue>0?1:0;
+                        }else if(strcmp(current->key,"dip03")==0){
+                            intValue = strtol(current->value, &endPtr, 10);
+                            dipSwitchInfo.dip03= intValue>0?1:0;
+                        }else if(strcmp(current->key,"dip04")==0){
+                            intValue = strtol(current->value, &endPtr, 10);
+                            dipSwitchInfo.dip04= intValue>0?1:0;
+                        }else if(strcmp(current->key,"dip05")==0){
+                            intValue = strtol(current->value, &endPtr, 10);
+                            dipSwitchInfo.dip05= intValue>0?1:0;
+                        }else if(strcmp(current->key,"dip06")==0){
+                            intValue = strtol(current->value, &endPtr, 10);
+                            dipSwitchInfo.dip06= intValue>0?1:0;
+                        }else if(strcmp(current->key,"dip07")==0){
+                            intValue = strtol(current->value, &endPtr, 10);
+                            dipSwitchInfo.dip07= intValue>0?1:0;
+                        }else if(strcmp(current->key,"dip08")==0){
+                            intValue = strtol(current->value, &endPtr, 10);
+                            dipSwitchInfo.dip08= intValue>0?1:0;
+                        }
+                        current = current->next;
+                    }
+					int set_ret=set_dip_switch(dipSwitchInfo);
+
+					// 创建JSON格式的字符串
+                    char *json_response_patt =NULL; 
+					char json_response[BUF_SIZE_64]={0};
+					if(set_ret==0){
+						json_response_patt="{\"status\":%d,\"message\":\"success!\",\"data\":{}}";//0 success, msg
+						sprintf(json_response, json_response_patt, set_ret);
+					}else{
+						json_response_patt="{\"status\":%d,\"message\":\"error retcode %d\",\"data\":{}}";//0 success, msg
+						sprintf(json_response, json_response_patt, set_ret,set_ret);
+					}
+
+                    // 发送HTTP头部
+                    const char *header = "HTTP/1.1 200 OK\r\n"
+                                        "Content-Type: application/json\r\n"
+                                        "Connection: close\r\n"
+                                        "Content-Length: %d\r\n\r\n";
+                    char response_header[256];
+                    sprintf(response_header, header, strlen(json_response));
+
+                    printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
+
+                    netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
+                    netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
 				}else if(strcmp(path, "/network")==0 ){		//post network
                     printf("POST ,location: network \n");
 
