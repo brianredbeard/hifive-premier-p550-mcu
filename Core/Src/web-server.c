@@ -9389,14 +9389,14 @@ static const unsigned char data_index_html[] = {
 	0x62, 0x6F, 0x64, 0x79, 0x3E, 0x0D, 0x0A, 0x3C, 0x2F, 0x68, 
 	0x74, 0x6D, 0x6C, 0x3E};
 
-static const char http_html_200[] =  "HTTP/1.1 200 OK\r\n"\
-             "Content-Type: text/html\r\n"\
-             "Connection: close\r\n\r\n"  ;
-const static char http_html_hdr[] = "HTTP/1.1 200 OK\r\nContent-type: text/html\r\n";
+
+
 
 
 const unsigned char Led1On_Data[] ="<HTML> \
-                                    <head><title>HTTP LED Control</title></head> \
+                                    <head><title>HTTP LED Control</title>\
+									<link rel=\"icon\" href=\"data:,\"> \
+									</head> \
                                     <body> \
                                       <center> \
                                         <font style = \"color:red\">aaabbbcccddd</font> \
@@ -9408,7 +9408,10 @@ const unsigned char Led1On_Data[] ="<HTML> \
                                     </HTML> ";
 
 const unsigned char Led1Off_Data[] =" <HTML> \
-                                    <head><title>HTTP LED Control</title></head> \
+                                    <head>\
+									<title>HTTP LED Control</title>\
+									<link rel=\"icon\" href=\"data:,\"> \
+									</head> \
                                     <body> \
                                     <center> \
                                         <font style = \"color:red\">aaabbbcccddd</font> \
@@ -9419,7 +9422,11 @@ const unsigned char Led1Off_Data[] =" <HTML> \
                                     </body> \
                                     </HTML> ";
   
-static const char http_index_html[] = "<html><head><title>Congrats!</title></head>\
+static const char http_index_html[] = "<html> \
+										<head> \
+										<title>Congrats!</title> \
+										<link rel=\"icon\" href=\"data:,\"> \
+										</head>\
                                         <body><h2 align=\"center\">Welcome to Fire lwIP HTTP Server!</h2>\
                                         <p align=\"center\">This is a small test page : http control led.</p>\
                                         <p align=\"center\"> <font size=\"6\"> ????????? </font> </a></p>\
@@ -9430,6 +9437,7 @@ const unsigned char login_html[] ="<html lang=\"zh\"> \
                                     <head> \
                                         <meta charset=\"UTF-8\"> \
                                         <title>User Login</title> \
+										<link rel=\"icon\" href=\"data:,\"> \
                                     </head> \
                                     <body> \
                                         <h2>User Login</h2> \
@@ -9455,73 +9463,15 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
                                     <head> \
                                         <meta charset=\"UTF-8\"> \
                                         <title>Machine Status</title> \
-                                            <style> \
-                                            .logout-form-wrapper { \
-                                                position: absolute; \
-                                                top: 10px; \
-                                                right: 10px; \
-                                            } \
-											.modify-account-form-wrapper { \
-                                                position: absolute; \
-                                                top: 10px; \
-                                                right: 50px; \
-                                            } \
-                                            </style> \
-                                    </head> \
-                                    <body> \
-										<div class=\"modify-account-form-wrapper\"> \
-											<button><a href=\"/modify_account.html\">ModifyAccont</a></button> \
-                                        </div> \
-                                        <div class=\"logout-form-wrapper\"> \
-											<form class=\"logout-form\" action=\"/logout\" method=\"post\"> \
-												<button type=\"submit\">Exit</button> \
-											</form> \
-                                        </div> \
-                                       <h3>Machine Status</h3> \
-										<div class=\"power-status\"> \
-											Power On/Off:<button id=\"power-on-change\" >unknow</button>   <br> \
-										</div> \
-										<div class=\"reset\"> \
-											Reset:<button id=\"reset\" >Reset</button>   <br> \
-										</div> \
-										<div> \
-											<h3>Power Consumption</h3> \
-											Power Consumption:<input type=\"text\" id=\"power_consum\" value=\"0\" style=\"width: 60px;\" disabled><br> \
-											<button id=\"power-consum-refresh\">refresh</button> <br> \
-										</div> \
-                                        <div class=\"pvt-info\" > \
-                                            <h3>PVT info</h3> \
-                                            CPU Temperature:<input type=\"text\" id=\"cpu_temp\" value=\"0\" style=\"width: 60px;\" disabled><br> \
-                                            NPU Temperature:<input type=\"text\" id=\"npu_temp\" value=\"0\" style=\"width: 60px;\" disabled><br> \
-                                            Fan Speed      :<input type=\"text\" id=\"fan_speed\" value=\"0\" style=\"width: 60px;\" disabled><br> \
-                                            <button id=\"pvt-info-refresh\">refresh</button> \
-                                        </div> \
-										 <div class=\"dip-switch\" > \
-                                            <h3>DIP Switch</h3> \
-                                            dip01:<input  type=\"text\" id=\"dip01\" style=\"width: 60px;\" disabled> <br> \
-											dip02:<input  type=\"text\" id=\"dip02\" style=\"width: 60px;\" disabled> <br> \
-											dip03:<input  type=\"text\" id=\"dip03\" style=\"width: 60px;\" > <br> \
-											dip04:<input  type=\"text\" id=\"dip04\" style=\"width: 60px;\" > <br> \
-											dip05:<input  type=\"text\" id=\"dip05\" style=\"width: 60px;\" > <br> \
-											dip06:<input  type=\"text\" id=\"dip06\" style=\"width: 60px;\" > <br> \
-											dip07:<input  type=\"text\" id=\"dip07\" style=\"width: 60px;\" > <br> \
-											dip08:<input  type=\"text\" id=\"dip08\" style=\"width: 60px;\" > <br> \
-                                            <button id=\"dip-switch-refresh\">refresh</button> <button id=\"dip-switch-update\">update</button> \
-                                        </div> \
-                                        <div class=\"net-work\" > \
-                                            <h3>Network System</h3> \
-                                            IP Address :<input type=\"text\" id=\"ipaddr\" value=\"0\" style=\"width: 60px;\"> <br> \
-                                            Gateway :<input type=\"text\" id=\"gateway\" value=\"0\" style=\"width: 60px;\"> <br> \
-                                            Subnet Mask:<input type=\"text\" id=\"subnetwork\" value=\"0\" style=\"width: 60px;\"> <br> \
-                                            <button id=\"net-work-update\">update</button> <button id=\"net-work-refresh\">refresh</button> \
-                                        </div> \
+										<link rel=\"icon\" href=\"data:,\"> \
                                          <script src=\"/jquery.min.js\"></script> \
-                                            <script> \n \
+										 <script> \n \
                                                 $(document).ready(function() { \n \
                                                     $('#net-work-update').click(function() { \n \
                                                         var ipaddr = $('#ipaddr').val();\n \
                                                         var gateway = $('#gateway').val();\n \
                                                         var subnetwork = $('#subnetwork').val();\n \
+														var macaddr = $('#macaddr').val();\n \
                                                         // 使用AJAX发送POST请求到服务器的/network路径 \n \
                                                         $.ajax({ \n\
                                                             url: '/network',\n \
@@ -9530,7 +9480,8 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
                                                             data: {\n \
                                                                 ipaddr: ipaddr,\n \
                                                                 gateway: gateway,\n \
-                                                                subnetwork: subnetwork\n \
+                                                                subnetwork: subnetwork, \n \
+																macaddr: macaddr \n \
                                                             },\
                                                             success: function(response) {\n \
                                                                 if(response.status===0){\n \
@@ -9550,12 +9501,14 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
                                                     });\n \
                                                     $('#net-work-refresh').click(function() {\n \
                                                         $.ajax({\n \
+															async: false,\n \
                                                             url: '/network',\n \
                                                             type: 'GET',\n \
                                                             success: function(response) {\n \
                                                                 $('#ipaddr').val(response.data.ipaddr);\n \
                                                                 $('#gateway').val(response.data.gateway);\n \
                                                                 $('#subnetwork').val(response.data.subnetwork);\n \
+																$('#macaddr').val(response.data.macaddr);\n \
                                                                 console.log('Network settings refreshed successfully.');\n \
                                                             },\n \
                                                             error: function(xhr, status, error) {\n \
@@ -9579,7 +9532,7 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
                                                                 }else{\n \
                                                                     alert(response.message);\n \
                                                                 }\n \
-                                                                // 请求成功时的回调函数\n \
+                                                                $('#power-on-refresh').click(); \n \
                                                                 console.log('power-on-change updated successfully.');\n \
                                                             },\n \
                                                             error: function(xhr, status, error) {\n \
@@ -9588,7 +9541,32 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
                                                                 console.error('Error updating power-on-change settings:', error);\n \
                                                             }\n \
                                                         });\n \
-                                                    });\n \
+                                                    });\n\
+													$('#power-retention-change').click(function() {\n \
+													 	var power_retention_status = $('#power-retention-change').val();\n \
+                                                        $.ajax({\n \
+                                                            url: '/power_retention_status',\n \
+                                                            type: 'POST',\n \
+                                                            contentType: 'application/x-www-form-urlencoded', // 设置Content-Type \n \
+                                                            data: {\n \
+                                                                power_retention_status: power_retention_status,\n \
+                                                            },\
+                                                            success: function(response) {\n \
+                                                                if(response.status===0){\n \
+                                                                    alert(\"update success!\");\n \
+                                                                }else{\n \
+                                                                    alert(response.message);\n \
+                                                                }\n \
+                                                                $('#power-retention-refresh').click(); \n \
+                                                                console.log('power-on-change updated successfully.');\n \
+                                                            },\n \
+                                                            error: function(xhr, status, error) {\n \
+                                                                alert(\"udpate failed!\");\n \
+                                                                // 请求失败时的回调函数\n \
+                                                                console.error('Error updating power-retention-change settings:', error);\n \
+                                                            }\n \
+                                                        });\n \
+                                                    });\n\
 													$('#reset').click(function() { \n \
                                                         $.ajax({ \n\
                                                             url: '/reset',\n \
@@ -9612,10 +9590,13 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
                                                     });\n \
 													$('#power-consum-refresh').click(function() {\n \
                                                         $.ajax({\n \
+															async: false,\n \
                                                             url: '/power_consum',\n \
                                                             type: 'GET',\n \
                                                             success: function(response) {\n \
-                                                                $('#power_consum').val(response.data.power_consum);\n \
+                                                                $('#power_consum').val(response.data.consumption);\n \
+																$('#power_cur').val(response.data.current);\n \
+																$('#power_vol').val(response.data.voltage);\n \
                                                                 console.log('power_consum refreshed successfully.');\n \
                                                             },\n \
                                                             error: function(xhr, status, error) {\n \
@@ -9626,8 +9607,10 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
                                                     });\n\
 													$('#pvt-info-refresh').click(function() {\n \
                                                         $.ajax({\n \
+															async: false,\n \
                                                             url: '/pvt_info',\n \
                                                             type: 'GET',\n \
+															contentType: 'application/x-www-form-urlencoded', \n \
                                                             success: function(response) {\n \
                                                                 $('#cpu_temp').val(response.data.cpu_temp);\n \
 																$('#npu_temp').val(response.data.npu_temp);\n \
@@ -9642,8 +9625,10 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
                                                     });\n\
 													$('#dip-switch-refresh').click(function() {\n \
                                                         $.ajax({\n \
+															async: false,\n \
                                                             url: '/dip_switch',\n \
                                                             type: 'GET',\n \
+															contentType: 'application/x-www-form-urlencoded', \n \
                                                             success: function(response) {\n \
                                                                 $('#dip01').val(response.data.dip01);\n \
                                                                 $('#dip02').val(response.data.dip02);\n \
@@ -9700,30 +9685,166 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
                                                             }\n \
                                                         });\n \
                                                     });\n \
-													// --------------------after load page ------------- \n \
-   													// $('#net-work-refresh').click(); \n\
-													$('#power-consum-refresh').click(); \n\
-													$('#pvt-info-refresh').click(); \n\
-													$('#dip-switch-refresh').click(); \n\
-													$.ajax({ \n \
-														url: '/power_status',\n \
-														type: 'GET',\n \
-														success: function(data) {\n \
-															// 假设返回的数据是{ buttonText: '新按钮文本' }\n \
-															if(data.data.power_status===\"0\"){\n \
-																$('#power-on-change').text('powerON');\n \
-																$('#power-on-change').val('1');\n \
-															}else{\n \
-																$('#power-on-change').text('powerOFF');\n \
-																$('#power-on-change').val('0');\n \
+													$('#power-on-refresh').click(function() {\n \
+                                                        $.ajax({\n \
+															async: false,\n \
+                                                            url: '/power_status',\n \
+															type: 'GET',\n \
+															contentType: 'application/x-www-form-urlencoded', \n \
+															success: function(response) {\n \
+																// 假设返回的数据是{ buttonText: '新按钮文本' }\n \
+																if(response.data.power_status===\"0\"){\n \
+																	$('#power-on-status').val('powerOFF');\n \
+																	$('#power-on-change').text('powerON');\n \
+																	$('#power-on-change').val('1');\n \
+																}else{\n \
+																	$('#power-on-status').val('powerON');\n \
+																	$('#power-on-change').text('powerOFF');\n \
+																	$('#power-on-change').val('0');\n \
+																}\n \
+															},\n \
+															error: function(xhr, status, error) {\n \
+																console.error('An error occurred:', error);\n \
 															}\n \
-														},\n \
-														error: function(xhr, status, error) {\n \
-															console.error(\"An error occurred: \" + status  + error);\n \
-														}\n \
-													});\n \
+                                                        });\n\
+                                                    });\n\
+													$('#power-retention-refresh').click(function() {\n \
+                                                        $.ajax({\n \
+															async: false,\n \
+                                                            url: '/power_retention_status',\n \
+															type: 'GET',\n \
+															contentType: 'application/x-www-form-urlencoded', \n \
+															success: function(response) {\n \
+																if(response.data.power_retention_status===\"0\"){\n \
+																	$('#power-retention-status').val('disabled');\n \
+																	$('#power-retention-change').text('enable');\n \
+																	$('#power-retention-change').val('1');\n \
+																}else{\n \
+																	$('#power-retention-status').val('enable');\n \
+																	$('#power-retention-change').text('disabled');\n \
+																	$('#power-retention-change').val('0');\n \
+																}\n \
+															},\n \
+															error: function(xhr, status, error) {\n \
+																console.error('An error occurred:', error);\n \
+															}\n \
+                                                        });\n\
+                                                    });\n\
+													// --------------------after load page ------------- \n \
+													$('#power-on-refresh').click(); \n \
+													$('#power-retention-refresh').click(); \n \
+													$('#power-consum-refresh').click(); \n \
+													$('#pvt-info-refresh').click(); \n \
+													$('#dip-switch-refresh').click(); \n \
+   													$('#net-work-refresh').click(); \n \
                                                 });\n\
                                             </script>\n \
+                                            <style> \
+                                            .logout-form-wrapper { \
+                                                position: absolute; \
+                                                top: 10px; \
+                                                right: 10px; \
+                                            } \
+											.modify-account-form-wrapper { \
+                                                position: absolute; \
+                                                top: 10px; \
+                                                right: 50px; \
+                                            } \
+											.network-row { \
+												display: flex; \
+												margin-bottom: 10px; \
+												align-items: center; \
+											} \
+											label { \
+												width: 200px; /* 设置label的固定宽度以确保对齐 */ \
+											} \
+                                            </style> \
+                                    </head> \
+                                    <body> \
+										<div class=\"modify-account-form-wrapper\"> \
+											<button><a href=\"/modify_account.html\">ModifyAccont</a></button> \
+                                        </div> \
+                                        <div class=\"logout-form-wrapper\"> \
+											<form class=\"logout-form\" action=\"/logout\" method=\"post\"> \
+												<button type=\"submit\">Exit</button> \
+											</form> \
+                                        </div> \
+                                       <h3>Machine Status</h3> \
+										<div class=\"power-status\"> \
+											<div class=\"network-row\"> \
+											<label>Power Status:</label> <input type=\"text\" id=\"power-on-status\" value=\"0\" style=\"width: 100px;\" disabled>  <br> \
+											</div> \
+											<div class=\"network-row\"> \
+											<label>Power Status Change:</label> <button id=\"power-on-change\" >unknow</button>   <br> \
+											</div> \
+											<button id=\"power-on-refresh\" style=\"display:none;\">refresh</button> \
+											<div class=\"network-row\"> \
+											<label>Power Retention:</label> <input type=\"text\" id=\"power-retention-status\" value=\"0\" style=\"width: 100px;\" disabled> <br> \
+											</div> \
+											<div class=\"network-row\"> \
+											<label>Power Retention Change:</label> <button id=\"power-retention-change\" >unknow</button> <br> \
+											</div> \
+											<button id=\"power-retention-refresh\" style=\"display:none;\">refresh</button> \
+										</div> \
+										<div class=\"reset\"> \
+											<div class=\"network-row\"> \
+												<label>Reset:</label> <button id=\"reset\" >Reset</button>   <br> \
+											</div> \
+										</div> \
+										<div> \
+											<h3>Power Consumption</h3> \
+											<div class=\"network-row\"> \
+												<label>Power Consumption:</label> <input type=\"text\" id=\"power_consum\" value=\"0\" style=\"width: 60px;\" disabled><br> \
+											</div> \
+											<div class=\"network-row\"> \
+												<label>Voltage:</label> <input type=\"text\" id=\"power_vol\" value=\"0\" style=\"width: 60px;\" disabled><br> \
+											</div> \
+											<div class=\"network-row\"> \
+												<label>Current:</label> <input type=\"text\" id=\"power_cur\" value=\"0\" style=\"width: 60px;\" disabled><br> \
+											</div> \
+											<button id=\"power-consum-refresh\">refresh</button> <br> \
+										</div> \
+                                        <div class=\"pvt-info\" > \
+                                            <h3>PVT info</h3> \
+											<div class=\"network-row\"> \
+                                            <label>CPU Temperature:</label> <input type=\"text\" id=\"cpu_temp\" value=\"0\" style=\"width: 60px;\" disabled><br> \
+											</div> \
+											<div class=\"network-row\"> \
+                                            <label>NPU Temperature:</label> <input type=\"text\" id=\"npu_temp\" value=\"0\" style=\"width: 60px;\" disabled><br> \
+											</div> \
+											<div class=\"network-row\"> \
+                                            <label>Fan Speed      :</label> <input type=\"text\" id=\"fan_speed\" value=\"0\" style=\"width: 60px;\" disabled><br> \
+											</div> \
+                                            <button id=\"pvt-info-refresh\">refresh</button> \
+                                        </div> \
+										 <div class=\"dip-switch\" > \
+                                            <h3>DIP Switch</h3> \
+                                            dip01:<input  type=\"text\" id=\"dip01\" style=\"width: 60px;\" disabled> <br> \
+											dip02:<input  type=\"text\" id=\"dip02\" style=\"width: 60px;\" disabled> <br> \
+											dip03:<input  type=\"text\" id=\"dip03\" style=\"width: 60px;\" > <br> \
+											dip04:<input  type=\"text\" id=\"dip04\" style=\"width: 60px;\" > <br> \
+											dip05:<input  type=\"text\" id=\"dip05\" style=\"width: 60px;\" > <br> \
+											dip06:<input  type=\"text\" id=\"dip06\" style=\"width: 60px;\" > <br> \
+											dip07:<input  type=\"text\" id=\"dip07\" style=\"width: 60px;\" > <br> \
+											dip08:<input  type=\"text\" id=\"dip08\" style=\"width: 60px;\" > <br> \
+                                            <button id=\"dip-switch-refresh\">refresh</button> <button id=\"dip-switch-update\">update</button> \
+                                        </div> \
+                                        <div class=\"net-work\" > \
+                                            <h3>Network System</h3> \
+											 <div class=\"network-row\"> \
+											<label>Mac Address:</label> <input type=\"text\" id=\"macaddr\" value=\"0\" style=\"width: 180px;\"> <br> \
+											</div>  \
+											 <div class=\"network-row\"> \
+                                            <label> IP Address :</label> <input type=\"text\" id=\"ipaddr\" value=\"0\" style=\"width: 180px;\"> <br> \
+											</div> \
+											 <div class=\"network-row\"> \
+                                            <label>Gateway :</label> <input type=\"text\" id=\"gateway\" value=\"0\" style=\"width: 180px;\"> <br> \
+											</div> \
+											 <div class=\"network-row\"> \
+                                            <label>Subnet Mask:</label> <input type=\"text\" id=\"subnetwork\" value=\"0\" style=\"width: 180px;\"> <br> \
+											 </div> \
+                                            <button id=\"net-work-update\">update</button> <button id=\"net-work-refresh\">refresh</button> \
+                                        </div> \
                                     </body> \
                                     </html> ";       
 
@@ -9761,7 +9882,7 @@ char* concatenate_strings(const char* str1, const char* str2) {
     char* new_str = malloc(length);
     if (new_str == NULL) {
         printf(stderr, "Memory allocation failed\n");
-        exit(1); // 终止程序http_html_200
+        exit(1); 
     }
 
     // 初始化内存区域
@@ -9790,6 +9911,7 @@ void send_redirect(struct netconn *conn, const char *location,const char* cookie
                 "Content-Length: 0\r\n"
                 "Connection: close\r\n\r\n",
                 location);
+
     }
     printf("header: %d  %s \n",strlen(header),header);
     netconn_write(conn, header, strlen(header), NETCONN_COPY);
@@ -9798,24 +9920,35 @@ void send_redirect(struct netconn *conn, const char *location,const char* cookie
 void send_response_content(struct netconn *conn,const char* cookies,const char* html_content ){
     char* header_tmp=NULL;
     char* header=NULL;
+	const char http_html_hdr_patt[] = "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: %d\r\nContent-type: text/html\r\n";
+
+	char header_full[BUF_SIZE_256]={0};
+
     if(cookies!=NULL && strlen(cookies)>0){
-        header_tmp = concatenate_strings(http_html_hdr,cookies);
+        header_tmp = concatenate_strings(http_html_hdr_patt,cookies);
         header = concatenate_strings(header_tmp,"\r\n");
         free(header_tmp);
     }else{
-        header = concatenate_strings(http_html_hdr,"\r\n");
+        header = concatenate_strings(http_html_hdr_patt,"\r\n");
     }
-    printf("header: %d %s \n",strlen(header),header);
-    printf("html_content: %d  \n",strlen(html_content));
 
-    netconn_write(conn, header, strlen(header), NETCONN_COPY);
+	sprintf(header_full, header,  strlen(html_content));
+
+    printf("header: %d %s \n",strlen(header_full),header_full);
+    printf("html_content: %d  \n",strlen(html_content));
+	
+	netconn_write(conn, header_full, strlen(header_full), NETCONN_COPY);
     netconn_write(conn, html_content, strlen(html_content), NETCONN_COPY);
-	printf("html_content:netconn_write end   \n");
+	printf("html_content:netconn_write end  \n");
+
     free(header);
 }
 void send_response_200(struct netconn *conn) {
+	const char http_html_200[] =  "HTTP/1.1 200 OK\r\n"\
+             "Content-Type: text/html\r\n"\
+			 "Content-Length: 0\r\n"\
+             "Connection: close\r\n\r\n"  ;
    netconn_write(conn, http_html_200, sizeof(http_html_200), NETCONN_COPY);
-   netconn_write(conn, "success!", strlen("success!"), NETCONN_COPY);
 }
 
 
@@ -10028,65 +10161,28 @@ void parseCredentials(const char *readBuffer, char *username, char *password) {
     }
 }
 
+//保存用户设置的用户名密码 0 succ,1 fail
+int save_sys_username_password(const char *username, const char *password){
+	assert(username!=NULL&&password!=NULL);
+    printf("TODO call save_sys_username_password  \n");
+	return 0;
+}
+//查询用户设置的用户名密码 0 succ,1 fail
+void get_sys_username_password( char *username,  char *password){
+    printf("TODO call get_sys_username_password \n");
+	return ;
+}
+
 
 int validate_credentials(const char *username, const char *password) {
-	//todo read username ,password from eeprom
-	// hf_i2c_mem_read(&hi2c1, AT24C_ADDR, EEPROM_ADDR_USERNAME_PASSWORD, ReadBuffer, BufferSize);
-	//todo verify checksum
-
-
 	assert(username!=NULL&&password!=NULL);
 	char sys_username[EEPROM_USERNAME_PASSWORD_BUFFER_SIZE]="admin";
 	char sys_password[EEPROM_USERNAME_PASSWORD_BUFFER_SIZE]="123456";
-
-    char ReadBuffer[EEPROM_USERNAME_PASSWORD_BUFFER_SIZE];
-    // uint16_t i;
-    // for(i=0; i<BufferSize; i++)
-    //   WriteBuffer[i]=i+0xf0;    /* WriteBuffer init */
-    // hf_i2c_mem_write(&hi2c1, AT24C_ADDR,
-	// 				  0, WriteBuffer, BufferSize);
-	printf("111111111111111111 \n");
-    int ret=hf_i2c_mem_read(&hi2c1, AT24C_ADDR,
-					EEPROM_USERNAME_PASSWORD_ADDR, ReadBuffer, EEPROM_USERNAME_PASSWORD_BUFFER_SIZE);
-	printf("222222222222222222 \n");
-	if(ret!=0){
-		printf("error:hf_i2c_mem_read %d\n",ret);
-		return ret;
-	}
-	//todo checksum
-	bool checksum=TRUE;//todo need function to check
-	if(checksum){
-		for(int i=0; i<EEPROM_USERNAME_PASSWORD_BUFFER_SIZE; i++)
-			printf("0x%02x %c  ",ReadBuffer[i]);
-
-		// parseCredentials(ReadBuffer, sys_username, sys_password); //todo after open checksum 
-
-		printf("sys_username: %s\n", sys_username);
-		printf("sys_password: %s\n", sys_password);
-	}
+    get_sys_username_password(sys_username,sys_password);
 	assert(sys_username!=NULL&&sys_password!=NULL);
-
     return (strcmp(username, sys_username) == 0 && strcmp(password, sys_password) == 0)?0:1;
 }
 
-//0 succ,1 fail
-int write_new_username_password(const char *username, const char *password){
-	assert(username!=NULL&&password!=NULL);
-    int total_length = strlen(username) + strlen(password) + 2; // +2 是为了逗号和字符串结束符
-	printf("##############!!!!!!!!!!!!!########### %d",total_length);
-	if(total_length>EEPROM_USERNAME_PASSWORD_BUFFER_SIZE){
-		return 1;
-	}
-
-    char combined[EEPROM_USERNAME_PASSWORD_BUFFER_SIZE];
-    sprintf(combined, "%s,%s", username, password);
-	assert(total_length<=EEPROM_USERNAME_PASSWORD_BUFFER_SIZE);
-	printf("3333333333333333333333333333333333333 \n ");
-	printf("combined:%d  %s \n",strlen(combined),combined);
-	int ret=hf_i2c_mem_write(&hi2c1, AT24C_ADDR, EEPROM_USERNAME_PASSWORD_ADDR, &combined, total_length);
-	printf("44444444444444444444444444444444444 \n");
-	return ret;
-}
 
 
 // ------------------------ eeprom username password end --------------
@@ -10142,6 +10238,15 @@ const char* process_header(const char *header) {
 static bool led_on = FALSE;
 
 
+void unescape_colon(char *str) {
+    char *pos;
+    while ((pos = strstr(str, "%3A")) != NULL) {  // 查找转义序列 "%3A"
+        *pos = ':';  // 替换为冒号
+        memmove(pos + 1, pos + 3, strlen(pos + 3) + 1);  // 移动剩余的字符串
+    }
+}
+
+
 
 
 int get_power_status(){
@@ -10154,15 +10259,79 @@ int change_power_status(int status){//status 0:power off,1:power on
 	return 0;//0 success
 }
 
+
+int get_power_retention_status(){
+	printf("TODO call get_power_retention_status \n");
+	return 1;//1:powerON,0:powerOFF
+}
+int change_power_retention_status(int status){//status 0:power off,1:power on
+	printf("TODO call change_power_retention_status %d \n",status);
+	return 0;//0 success
+}
+
+
+
+
+
+
+
 int reset(){
 	printf("TODO call reset\n");
 	return 1;//0 success
 }
 
-int get_power_consum(){
-	printf("TODO call get_power_consum\n");
-	return 100;
+
+typedef struct  {
+    int consumption;   	//功耗
+    int current;   		//电流
+    int voltage;		//电压
+} POWERInfo;
+
+POWERInfo get_power_info(){
+
+	printf("TODO call get_power_info\n");
+
+	POWERInfo example = {
+        60,5,12
+    };
+    return example;
 }
+
+int set_power_info(POWERInfo powerInfo){
+
+	printf("TODO call set_power_info\n");
+
+	
+    return 0;
+}
+
+typedef struct  {
+    char ipaddr[16];    // IP地址，假设为IPv4，足够容纳xxx.xxx.xxx.xxx
+    char macaddr[18];   // MAC地址，足够容纳xx:xx:xx:xx:xx:xx
+    char subnetwork[16]; // 子网掩码
+    char gateway[16];    // 网关地址
+} NETInfo;
+
+
+NETInfo get_net_info() {
+	printf("TODO call get_net_info\n");
+
+	NETInfo example = {
+        "192.168.1.1",
+        "01:23:45:67:89:AB",
+        "255.255.255.0",
+        "192.168.1.254"
+    };
+    return example;
+}
+
+
+int set_net_info(NETInfo netinfo) {
+	printf("TODO call set_net_info\n");
+
+    return 0;
+}
+
 
 typedef struct {
     int cpu_temp;
@@ -10232,7 +10401,7 @@ int set_dip_switch(DIPSwitchInfo dipSwitchInfo){
      {
         netbuf_data(inbuf, (void**)&buf, &buflen);
 
-        printf(" ############### buf: ############## %d %d",sizeof(buf),strlen(buf));
+        printf(" ############### buf: ############## %d %d \n",sizeof(buf),strlen(buf));
         // for (int i = 0; i < sizeof(buf)>10?10:sizeof(buf); i++) {
         //     printf("%c", buf[i]);
         // }
@@ -10321,8 +10490,7 @@ int set_dip_switch(DIPSwitchInfo dipSwitchInfo){
                 // send_response_200(conn);
                 // return ;
             }
-
-            if(strcmp(path, "/")==0  || strcmp(path, "/index.html")==0){
+ 			 if(strcmp(path, "/")==0  || strcmp(path, "/index.html")==0){
                 printf("GET location: index.html \n");
                 // strcpy(resp_cookies,"");
                 // send_200_response(conn);
@@ -10402,12 +10570,33 @@ int set_dip_switch(DIPSwitchInfo dipSwitchInfo){
 
                 netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
                 netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
-			}else if(strcmp(path, "/power_consum")==0 ){
-				int power_consum=get_power_consum();
+			}else if(strcmp(path, "/power_retention_status")==0 ){ //get 
+				printf("GET location: power_retention_status \n");
+				int power_retention_status=get_power_retention_status();
 				char json_response[BUF_SIZE_128]={0};
 				 // 创建JSON格式的字符串
-                char *json_response_patt = "{\"status\":0,\"message\":\"success\",\"data\":{\"power_consum\":\"%d\"}}";//0 success, msg
-                sprintf(json_response, json_response_patt,power_consum);
+                char *json_response_patt = "{\"status\":0,\"message\":\"success\",\"data\":{\"power_retention_status\":\"%d\"}}";//0 success, msg
+                sprintf(json_response, json_response_patt,power_retention_status);
+
+                // 发送HTTP头部
+                const char *header = "HTTP/1.1 200 OK\r\n"
+                                    "Content-Type: application/json\r\n"
+                                    "Connection: close\r\n"
+                                    "Content-Length: %d\r\n\r\n";
+
+                char response_header[BUF_SIZE_256];
+                sprintf(response_header, header, strlen(json_response));
+
+                printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
+
+                netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
+                netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
+			}else if(strcmp(path, "/power_consum")==0 ){
+				POWERInfo power_info=get_power_info();
+				char json_response[BUF_SIZE_256]={0};
+				 // 创建JSON格式的字符串
+                char *json_response_patt = "{\"status\":0,\"message\":\"success\",\"data\":{\"consumption\":\"%d\",\"voltage\":\"%d\",\"current\":\"%d\"}}";//0 success, msg
+                sprintf(json_response, json_response_patt,power_info.consumption,power_info.voltage,power_info.current);
 
                 // 发送HTTP头部
                 const char *header = "HTTP/1.1 200 OK\r\n"
@@ -10474,8 +10663,11 @@ int set_dip_switch(DIPSwitchInfo dipSwitchInfo){
 				printf("GET location: network \n");
              
                 // 创建JSON格式的字符串
-                char *json_response = "{\"status\":0,\"message\":\"success\",\"data\":{\"ipaddr\":\"1.1.10.10\",\"gateway\":\"1.2.3.4\",\"subnetwork\":\"5.5.5.5\"}}";//0 success, msg
+				char json_response[BUF_SIZE_256]={0};
+				NETInfo netinfo=get_net_info();
+                char *json_response_patt = "{\"status\":0,\"message\":\"success\",\"data\":{\"ipaddr\":\"%s\",\"gateway\":\"%s\",\"subnetwork\":\"%s\",\"macaddr\":\"%s\"}}";//0 success, msg
                
+                sprintf(json_response, json_response_patt,netinfo.ipaddr,netinfo.gateway,netinfo.subnetwork,netinfo.macaddr);
 
                 // 发送HTTP头部
                 const char *header = "HTTP/1.1 200 OK\r\n"
@@ -10493,8 +10685,8 @@ int set_dip_switch(DIPSwitchInfo dipSwitchInfo){
                 netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
 
                 // 释放JSON字符串的内存
-                free(response_header);
-                free(json_response);
+                // free(response_header);
+                // free(json_response);
             }else if(strcmp(path, "/fake_add_session")==0 ){	
                 printf("GET location: fake_add_session \n");
                 char* user_name=NULL;
@@ -10518,33 +10710,22 @@ int set_dip_switch(DIPSwitchInfo dipSwitchInfo){
                 Session *session1 = create_session(session_id, user_name);
                 add_session(session1);
 
-
-                led_on = FALSE;
-                LED1_OFF;
-                printf("LED OFF!\n");
-
             }else if(strncmp(path, "/jquery.min.js",14)==0 ){	//static file,css, js
                 printf("get ,location: /jquery.min.js \n");
-
-                printf("path: %s \n",path);
-                // handle_static_request(conn, path);
-
-                led_on = FALSE;
-                LED1_OFF;
-                printf("LED OFF!\n");
-                // send_response_content(conn,NULL, data_jquery_min_js);
-
-                // char http_html_20000[] =  "HTTP/1.1 200 OK\r\n\
-                //                             content-type: text/javascript; charset=utf-8\r\n" ;
                 
-                static const char http_jquery_200[] =  "HTTP/1.1 200 OK\r\n"\
+                static const char http_jquery_200_patt[] =  "HTTP/1.1 200 OK\r\n"\
                     "Content-Type: text/javascript\r\n"\
+					"Content-Length: %d\r\n"\
                     "Connection: close\r\n\r\n"  ;
 
-                printf("strlen(http_jquery_200) %d \n",strlen(http_jquery_200));
-                printf("strlen(data_jquery_min_js) %d \n",strlen(data_jquery_min_js));
-                netconn_write(conn, http_jquery_200, strlen(http_jquery_200), NETCONN_COPY);
-                netconn_write(conn, data_jquery_min_js, strlen(data_jquery_min_js)-15-10-12-17-9, NETCONN_COPY);
+			
+                char response_header[256];
+                sprintf(response_header, http_jquery_200_patt, strlen(data_jquery_min_js)-91);
+
+                printf("strlen(http_jquery_200) %d \n",strlen(response_header));
+                printf("strlen(data_jquery_min_js) %d \n", strlen(data_jquery_min_js)-91);
+                netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
+                netconn_write(conn, data_jquery_min_js, strlen(data_jquery_min_js)-91, NETCONN_COPY);
 
             }else{
                 printf("ERROR unsupport get path \n");
@@ -10562,11 +10743,14 @@ int set_dip_switch(DIPSwitchInfo dipSwitchInfo){
             printf("func:httpserver_serve method:POST  enter \n");
             printf("buf length:%d \n",strlen(buf));
             if(strlen(buf)>TCP_MSS){
-				char response_413[256] = {0};
-				sprintf(response_413, "HTTP/1.1 413 Request Entity Too Large %d,%d  \r\nContent-Length: 0\r\n\r\n",strlen(buf),TCP_MSS);
-
+				
+				char response_413_body[BUF_SIZE_64] = {0};
+				sprintf(response_413_body, "Request header Too Large header:%d,TCP_MSS:%d ",strlen(buf),TCP_MSS);
+				char response_413_header[BUF_SIZE_128] = {0};
+				sprintf(response_413_header, "HTTP/1.1 413  \r\nConnection: close\r\nContent-Length: %d\r\n\r\n",strlen(response_413_body));
                 // const char *response = "HTTP/1.1 413 Request Entity Too Large\r\nContent-Length: 0\r\n\r\n";
-                netconn_write(conn, response_413, strlen(response_413), NETCONN_COPY);
+                netconn_write(conn, response_413_header, strlen(response_413_header), NETCONN_COPY);
+				netconn_write(conn, response_413_body, strlen(response_413_body), NETCONN_COPY);
             }else{
                 char *path = strtok(url, "?");
                 // ---------------- query info ---------------
@@ -10744,14 +10928,14 @@ int set_dip_switch(DIPSwitchInfo dipSwitchInfo){
                     assert( password!=NULL);
                     printf("param password: %s \n",password);
 
-					int ret =write_new_username_password(found_session_user_name,password);//save new username ,password to eeprom
+					int ret =save_sys_username_password(found_session_user_name,password);//save new username ,password to eeprom
 					if(ret==0){
-						printf("write_new_username_password success,redirect to login.html \n");
+						printf("save_sys_username_password success,redirect to login.html \n");
 						sprintf(resp_cookies, "Set-Cookie: sid=;  Path=/\r\n");
                         send_redirect(conn,"/login.html",resp_cookies);
                         // send_redirect(conn,"/login.html",NULL);
 					}else{
-						printf("write_new_username_password fail,redirect to modify_account.html \n");
+						printf("save_sys_username_password fail,redirect to modify_account.html \n");
 						send_redirect(conn,"/modify_account.html",NULL);
 					}
 
@@ -10786,7 +10970,7 @@ int set_dip_switch(DIPSwitchInfo dipSwitchInfo){
                     printf("param status: %s \n",status);
 
 					int change_status_ret=0;
-					if(status=="0"){//power on -> power off
+					if(strcmp(status,"0")==0){//power on -> power off
 						change_status_ret =change_power_status(0);
 					}else {
 						change_status_ret=change_power_status(1);
@@ -10818,7 +11002,56 @@ int set_dip_switch(DIPSwitchInfo dipSwitchInfo){
                     netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
                     netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
 
+				}else if(strcmp(path, "/power_retention_status")==0 ){
+					printf("POST ,location: power_retention_status \n");
+                    char* status=NULL;
+                    assert(p_params!=NULL);
+                    kv_pair *current = params.head;
+                    while (current) {
+                        if(strcmp(current->key,"power_retention_status")==0){
+                            status= current->value;
+                                break;
+                        }
+                        current = current->next;
+                    }
+                    assert( status!=NULL);
+                    printf("param power_retention_status: %s \n",status);
+
+					int change_status_ret=0;
+					if(strcmp(status,"0")==0){//power on -> power off
+						change_status_ret =change_power_retention_status(0);
+					}else {
+						change_status_ret=change_power_retention_status(1);
+					}
+
+				
+					// 创建JSON格式的字符串
+                    char *json_response_patt =NULL; 
+					char json_response[BUF_SIZE_64]={0};
+
+					if(change_status_ret==0){
+						json_response_patt="{\"status\":%d,\"message\":\"success!\",\"data\":{}}";//0 success, msg
+						sprintf(json_response, json_response_patt, change_status_ret);
+					}else{
+						json_response_patt="{\"status\":%d,\"message\":\"error retcode %d\",\"data\":{}}";//0 success, msg
+						sprintf(json_response, json_response_patt, change_status_ret,change_status_ret);
+					}
+
+                    // 发送HTTP头部
+                    const char *header = "HTTP/1.1 200 OK\r\n"
+                                        "Content-Type: application/json\r\n"
+                                        "Connection: close\r\n"
+                                        "Content-Length: %d\r\n\r\n";
+                    char response_header[256];
+                    sprintf(response_header, header, strlen(json_response));
+
+                    printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
+
+                    netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
+                    netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
+
 				}else if(strcmp(path, "/reset")==0 ){
+					printf("POST ,location: reset \n");
 					int reset_ret=reset();
 					// 创建JSON格式的字符串
                     char *json_response_patt =NULL; 
@@ -10888,7 +11121,7 @@ int set_dip_switch(DIPSwitchInfo dipSwitchInfo){
 					char json_response[BUF_SIZE_64]={0};
 					if(set_ret==0){
 						json_response_patt="{\"status\":%d,\"message\":\"success!\",\"data\":{}}";//0 success, msg
-						sprintf(json_response, json_response_patt, set_ret);
+						sprintf(json_response, json_response_patt,  set_ret);
 					}else{
 						json_response_patt="{\"status\":%d,\"message\":\"error retcode %d\",\"data\":{}}";//0 success, msg
 						sprintf(json_response, json_response_patt, set_ret,set_ret);
@@ -10912,6 +11145,7 @@ int set_dip_switch(DIPSwitchInfo dipSwitchInfo){
                     char* ipaddr=NULL;
                     char* gateway=NULL;
                     char* subnetwork=NULL;
+					char* macaddr=NULL;
 
                     kv_pair *current = params.head;
                     while (current) {
@@ -10922,20 +11156,39 @@ int set_dip_switch(DIPSwitchInfo dipSwitchInfo){
                             gateway= current->value;
                         }else if(strcmp(current->key,"subnetwork")==0){
                             subnetwork= current->value;
+                        }else if(strcmp(current->key,"macaddr")==0){
+                            macaddr= current->value;
                         }
                         current = current->next;
                     }
-                    assert(ipaddr!=NULL&&gateway!=NULL&&subnetwork!=NULL);
+                    assert(ipaddr!=NULL&&gateway!=NULL&&subnetwork!=NULL&&macaddr!=NULL);
+
+					// printf("###############  macaddr:%d %s \n",strlen(macaddr),macaddr);
+					unescape_colon(macaddr);//转义字符，冒号:
+					// printf("############### macaddr:%d %s \n",strlen(macaddr),macaddr);
 
                     printf("param ipaddr: %s \n",ipaddr);
                     printf("param gateway: %s \n",gateway);
                     printf("param subnetwork: %s \n",subnetwork);
+					printf("param macaddr: %s \n",macaddr);
 
+					
+					assert(strlen(ipaddr)<16 && strlen(macaddr)<18 &&strlen(subnetwork)<16 && strlen(gateway)<16 );
+					
+					NETInfo netinfo;
+					strncpy(netinfo.ipaddr, ipaddr, strlen(ipaddr));
+					strncpy(netinfo.macaddr, macaddr, strlen(macaddr));
+					strncpy(netinfo.subnetwork, subnetwork, strlen(subnetwork));
+					strncpy(netinfo.gateway, gateway, strlen(gateway));
 
+					// 确保字符串以空字符'\0'结尾
+					netinfo.ipaddr[strlen(ipaddr)] = '\0';
+					netinfo.macaddr[strlen(macaddr)] = '\0';
+					netinfo.subnetwork[strlen(subnetwork)] = '\0';
+					netinfo.gateway[strlen(gateway)] = '\0';
 
-                    led_on = TRUE;
-                    LED1_ON;
-                    printf("#### FAKE modify network! #####\n");
+					set_net_info(netinfo);
+
 
                      // 创建JSON格式的字符串
                     char *json_response = "{\"status\":0,\"message\":\"success\",\"data\":{}}";//0 success, msg
@@ -10954,9 +11207,9 @@ int set_dip_switch(DIPSwitchInfo dipSwitchInfo){
                     netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
                     netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
 
-                    // 释放JSON字符串的内存
-                    free(response_header);
-                    free(json_response);
+                    // // 释放JSON字符串的内存
+                    // free(response_header);
+                    // free(json_response);
 
                     send_response_200(conn);
 
@@ -11000,7 +11253,7 @@ int set_dip_switch(DIPSwitchInfo dipSwitchInfo){
         printf("ERROR :444444444444444444444444444444 \n");
         printf("http_server_netconn_serve after else 33333333333333\n");
      }
-     netconn_close(conn); /* 关闭连接 */
+  
      /* 释放inbuf */
      netbuf_delete(inbuf);
      printf("http_server_netconn_serve after:netbuf_delete \n");
@@ -11013,47 +11266,51 @@ int set_dip_switch(DIPSwitchInfo dipSwitchInfo){
      struct netconn *conn, *newconn;
      err_t err;
      LWIP_UNUSED_ARG(arg);
+	/* 创建netconn连接结构 */
+	/* 绑定端口号与IP地址，端口号默认是80 */
+	conn = netconn_new(NETCONN_TCP);
+	
+	LWIP_ERROR("http_server: invalid conn", (conn != NULL), return;);
+	netconn_bind(conn, NULL, LOCAL_PORT);
 
-     /* 创建netconn连接结构 */
-     /* 绑定端口号与IP地址，端口号默认是80 */
-     conn = netconn_new(NETCONN_TCP);
-     
-     LWIP_ERROR("http_server: invalid conn", (conn != NULL), return;);
-     netconn_bind(conn, NULL, LOCAL_PORT);
+	/* 监听 */
+	netconn_listen(conn);
 
-     /* 监听 */
-     netconn_listen(conn);
+	led_on = TRUE;
+	printf("start http server! MEMP_NUM_TCP_PCB %d\n",MEMP_NUM_TCP_PCB );
 
-    led_on = TRUE;
-    LED1_ON;
+	do
+	{
+		//处理连接请求/jquery.min.js
+		err = netconn_accept(conn, &newconn);
+		if (err == ERR_OK)
+		{
+			//发送网页数据
+			http_server_netconn_serve(newconn);
 
-     do
-     {
-         //处理连接请求/jquery.min.js
-         err = netconn_accept(conn, &newconn);
-         if (err == ERR_OK)
-         {
-             //发送网页数据
-             http_server_netconn_serve(newconn);
-
-             //删除连接结构
-             netconn_delete(newconn);
-         }else{
-            printf("http_server_netconn_thread else 1111111111111 \n");
-         }
-     }
-     while (err == ERR_OK);
-     //关闭
-     netconn_close(conn);
-     netconn_delete(conn);
-	 printf("http_server_netconn_thread after netconn_delete \n");
+			//删除连接结构
+			// netconn_close(newconn); /* 关闭连接 */
+			netconn_delete(newconn);
+		}else{
+			printf("http_server_netconn_thread:err %d \n",err);
+			// netconn_close(newconn);
+			netconn_delete(newconn);
+		}
+	}
+	while (1);
+	//关闭
+	netconn_close(conn);
+	netconn_delete(conn);
+	printf("http_server_netconn_thread after netconn_delete \n");
+	
+	// printf("http_server_netconn_thread exit \n");
  }
 
  /** Initialize the HTTP server (start its thread) */
  void
  httpserver_init(void)
  {
- sys_thread_new("http_server_netconn", http_server_netconn_thread, NULL, 2048, 4);
+ sys_thread_new("http_server_netconn", http_server_netconn_thread, NULL, 1024*4, 4);
  }
 
  #endif
