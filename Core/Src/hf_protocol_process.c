@@ -1,11 +1,11 @@
+#include "FreeRTOS.h"
 #include "cmsis_os2.h"
 #include "hf_common.h"
+#include "list.h"
 #include "main.h"
 #include "protocol.h"
 #include "stm32f4xx.h"
 #include "stm32f4xx_hal.h"
-#include "FreeRTOS.h"
-#include "list.h"
 #include "task.h"
 
 #define head_meg "\xA5\x5A\xAA\x55"
@@ -18,7 +18,7 @@ extern uint8_t netmask_address[4];
 extern uint8_t getway_address[4];
 extern uint8_t mac_address[6];
 
-void es_send_req(b_frame_class_t *pframe, uint8_t req_cmd, int8_t *frame_data, uint8_t len)
+void es_send_req(b_frame_class_t *pframe,uint8_t req_cmd, int8_t *frame_data,uint8_t len)
 {
 	uint8_t buf[MAX_FRAME_LEN] = {0};
 	uint8_t b_len, xor = 0;
@@ -48,6 +48,7 @@ void es_send_req(b_frame_class_t *pframe, uint8_t req_cmd, int8_t *frame_data, u
 int32_t es_set_gpio(struct gpio_cmd *gpio)
 {
 	GPIO_TypeDef *gpio_group;
+	gpio->group >>= 8;
 	GPIO_InitTypeDef GPIO_InitStruct = {0};
 	if (gpio->group == 0)
 		gpio_group = GPIOA;
@@ -69,7 +70,6 @@ int32_t es_set_gpio(struct gpio_cmd *gpio)
 		gpio_group = GPIOI;
 	else
 		return HAL_ERROR;
-	// printf("%s %d\n", __func__, __LINE__);
 
 	HAL_GPIO_WritePin(gpio_group, gpio->pin_num, gpio->value);
 
@@ -89,7 +89,7 @@ int32_t es_set_eth(struct ip_t *ip, struct netmask_t *netmask, struct getway_t *
 		ip_address[2] = ip->ip_addr2;
 		ip_address[3] = ip->ip_addr3;
 		// printf("IP_ADDR0:%d IP_ADDR1: %d IP_ADDR2: %d IP_ADDR3 %d\n", \
-			// ip_address[0], ip_address[1], ip_address[2], ip_address[3]);
+		// 	ip_address[0], ip_address[1], ip_address[2], ip_address[3]);
 	}
 	if (netmask != NULL) {
 		netmask_address[0] = netmask->netmask_addr0;
@@ -105,17 +105,7 @@ int32_t es_set_eth(struct ip_t *ip, struct netmask_t *netmask, struct getway_t *
 		getway_address[2] = gw->getway_addr2;
 		getway_address[3] = gw->getway_addr3;
 		// printf("GETWAY_ADDR0:%d GETWAY_ADDR1: %dGETWAY_ADDR2: %d GETWAY_ADDR3 %d\n",
-			// getway_address[0], getway_address[1], getway_address[2], getway_address[3]);
-	}
-	if (mac != NULL) {
-		mac_address[0] = mac->eth_mac_addr0;
-		mac_address[1] = mac->eth_mac_addr1;
-		mac_address[2] = mac->eth_mac_addr2;
-		mac_address[3] = mac->eth_mac_addr3;
-		mac_address[4] = mac->eth_mac_addr4;
-		mac_address[5] = mac->eth_mac_addr5;
-		// printf("GETWAY_ADDR0:%d GETWAY_ADDR1: %dGETWAY_ADDR2: %d GETWAY_ADDR3 %d\n",
-			// getway_address[0], getway_address[1], getway_address[2], getway_address[3]);
+		// getway_address[0], getway_address[1], getway_address[2], getway_address[3]);
 	}
 	extern void dynamic_change_eth(void);
 	dynamic_change_eth();
@@ -125,13 +115,14 @@ int32_t es_set_eth(struct ip_t *ip, struct netmask_t *netmask, struct getway_t *
 int32_t es_set_rtc_date(struct rtc_date_t *sdate)
 {
 	RTC_DateTypeDef sDate = {0};
-	sDate.Year = sdate->Year - 2000;
+	uint16_t year =  (sdate->Year >> 8) | (sdate->Year && 0xff) << 8;
+	sDate.Year = year - 2000;
 	sDate.Month = sdate->Month;
 	sDate.Date = sdate->Date;
 	sDate.WeekDay = sdate->WeekDay;
 
-	// printf("yy/mm/dd  %02d/%02d/%02d\r\n", sDate.Year, sDate.Month, sDate.Date);
-	if (HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BCD) != HAL_OK)
+	// printf("yy/mm/dd  %04d/%02d/%02d %02d\r\n", sDate.Year + 2000, sDate.Month, sDate.Date,sDate.WeekDay);
+	if (HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BIN) != HAL_OK)
 		return HAL_ERROR;
 	return HAL_OK;
 }
@@ -144,7 +135,8 @@ int32_t es_set_rtc_time(struct rtc_time_t *stime)
 	sTime.Seconds = stime->Seconds;
 	sTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
 	sTime.StoreOperation = RTC_STOREOPERATION_SET;
-	if (HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BCD) != HAL_OK)
+	// printf("%s hh:mm:ss %02d:%02d:%02d\r\n", __func__, sTime.Hours, sTime.Minutes,sTime.Seconds);
+	if (HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BIN) != HAL_OK)
 		return HAL_ERROR;
 	return HAL_OK;
 }
@@ -152,7 +144,10 @@ int32_t es_set_rtc_time(struct rtc_time_t *stime)
 int32_t es_get_rtc_date(struct rtc_date_t *sdate)
 {
 	RTC_DateTypeDef GetData;
-	if (HAL_RTC_GetDate(&hrtc, &GetData, RTC_FORMAT_BCD) != HAL_OK)
+	RTC_TimeTypeDef GetTime;
+	if (HAL_RTC_GetTime(&hrtc, &GetTime, RTC_FORMAT_BIN) != HAL_OK)
+		return HAL_ERROR;
+	if (HAL_RTC_GetDate(&hrtc, &GetData, RTC_FORMAT_BIN) != HAL_OK)
 		return HAL_ERROR;
 	// printf("yy/mm/dd  %02d/%02d/%02d\r\n", 2000 + GetData.Year, GetData.Month, GetData.Date);
 	sdate->Year = 2000 + GetData.Year;
@@ -165,12 +160,16 @@ int32_t es_get_rtc_date(struct rtc_date_t *sdate)
 int32_t es_get_rtc_time(struct rtc_time_t *stime)
 {
 	RTC_TimeTypeDef GetTime;
-	if (HAL_RTC_GetTime(&hrtc, &GetTime, RTC_FORMAT_BCD) != HAL_OK)
+	RTC_DateTypeDef GetData;
+
+	if (HAL_RTC_GetTime(&hrtc, &GetTime, RTC_FORMAT_BIN) != HAL_OK)
 		return HAL_ERROR;
-	// printf(" hh:mm:ss %02d:%02d:%02d\r\n", GetTime.Hours, GetTime.Minutes, GetTime.Seconds);
+	if (HAL_RTC_GetDate(&hrtc, &GetData, RTC_FORMAT_BIN) != HAL_OK)
+		return HAL_ERROR;
 	stime->Hours = GetTime.Hours;
 	stime->Minutes = GetTime.Minutes;
 	stime->Seconds = GetTime.Seconds;
+	// printf("%s hh:mm:ss %02d:%02d:%02d\r\n", __func__, stime->Hours, stime->Minutes, stime->Seconds);
 	return HAL_OK;
 }
 
@@ -181,40 +180,40 @@ uint32_t fan1_duty = 0;
 int32_t es_set_fan_duty(struct fan_control_t *fan)
 {
 	TIM_OC_InitTypeDef sConfigOC = {0};
-	if(fan->duty > 100)
+	if (fan->duty > 100)
 		return HAL_ERROR;
 
 	if (fan->fan_num == 0) {
 		if (HAL_TIM_PWM_Stop(&htim4, TIM_CHANNEL_1) != HAL_OK)
 			return HAL_ERROR;
 
-		fan0_duty = fan->duty;
 		sConfigOC.OCMode = TIM_OCMODE_PWM1;
-		sConfigOC.Pulse = fan->duty*pwm_period/100;
+		sConfigOC.Pulse = fan->duty * pwm_period / 100;
 		sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
 		sConfigOC.OCFastMode = TIM_OCFAST_ENABLE;
 		if (HAL_TIM_PWM_ConfigChannel(&htim4, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
 			return HAL_ERROR;
-
 		if (HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1) != HAL_OK)
 			return HAL_ERROR;
+		fan0_duty = fan->duty;
 	} else if (fan->fan_num == 1) {
 		if (HAL_TIM_PWM_Stop(&htim4, TIM_CHANNEL_2) != HAL_OK)
 			return HAL_ERROR;
 
-		fan1_duty = fan->duty;
 		sConfigOC.OCMode = TIM_OCMODE_PWM1;
-		sConfigOC.Pulse = fan->duty*pwm_period/100;
+		sConfigOC.Pulse = fan->duty * pwm_period / 100;
 		sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
 		sConfigOC.OCFastMode = TIM_OCFAST_ENABLE;
 		if (HAL_TIM_PWM_ConfigChannel(&htim4, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
 			return HAL_ERROR;
-
 		if (HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_2) != HAL_OK)
 			return HAL_ERROR;
+		fan1_duty = fan->duty;
 	} else {
 		return HAL_ERROR;
 	}
+	// printf("fan0_duty %d\n",fan0_duty);
+	// printf("fan1_duty %d\n",fan1_duty);
 	return HAL_OK;
 }
 
@@ -230,90 +229,183 @@ int32_t es_get_fan_duty(struct fan_control_t *fan)
 	return HAL_OK;
 }
 
+void big2little(uint8_t *cmd, uint64_t addr, uint8_t len)
+{
+	if(len == 4)
+	{
+		cmd[3] = (addr & 0xff);
+		cmd[2] = ((addr >> 8) & 0xff);
+		cmd[1] = ((addr >> 16) & 0xff);
+		cmd[0] = ((addr >> 24) & 0xff);
+	}
+	else if(len == 8){
+		cmd[7] = (addr & 0xff);
+		cmd[6] = ((addr >> 8) & 0xff);
+		cmd[5] = ((addr >> 16) & 0xff);
+		cmd[4] = ((addr >> 24) & 0xff);
+		cmd[3] = ((addr >> 32) & 0xff);
+		cmd[2] = ((addr >> 40) & 0xff);
+		cmd[1] = ((addr >> 48) & 0xff);
+		cmd[0] = ((addr >> 56) & 0xff);
+	}
+}
 
+void little2big(uint8_t *cmd, uint64_t addr, uint8_t len)
+{
+	if(len == 4)
+	{
+		cmd[0] = (addr & 0xff);
+		cmd[1] = ((addr >> 8) & 0xff);
+		cmd[2] = ((addr >> 16) & 0xff);
+		cmd[3] = ((addr >> 24) & 0xff);
+	}
+	else if(len == 8){
+		cmd[0] = (addr & 0xff);
+		cmd[1] = ((addr >> 8) & 0xff);
+		cmd[2] = ((addr >> 16) & 0xff);
+		cmd[3] = ((addr >> 24) & 0xff);
+		cmd[4] = ((addr >> 32) & 0xff);
+		cmd[5] = ((addr >> 40) & 0xff);
+		cmd[6] = ((addr >> 48) & 0xff);
+		cmd[7] = ((addr >> 56) & 0xff);
+	}
+}
+
+int32_t es_spi_wl(struct spi_slv_w32_t *spi)
+{
+	uint32_t addr = 0;
+	uint32_t value = 0;
+	big2little(&addr, spi->addr, 4);
+	big2little(&value, spi->value, 4);
+	// printf("%s %d addr %lx val %lx\n",__func__,__LINE__, addr, value);
+	return es_spi_write(&value, addr, 4);
+}
+
+int32_t es_spi_rl32(struct spi_slv_w32_t *spi)
+{
+	uint32_t addr=0, value=0;
+	int32_t ret = 0;
+	big2little(&addr, spi->addr, 4);
+	ret = eswin_rx(&value, addr, 4);
+	little2big(&spi->value, value,4);
+	return ret;
+}
+
+
+typedef enum req_type { REQ_OK = 0x0, REQ_FAIL = 0x1, REQ_OTHER } req_type_t;
 void es_process_cmd(b_frame_class_t *pframe)
 {
 	uint8_t cmd = pframe->frame.cmd;
-	// printf("%s %d cmd %x\n", __func__, __LINE__, cmd);
+	uint8_t req_type = REQ_FAIL;
 	switch (cmd) {
 	case CMD_EEPROM_WP:
-		es_eeprom_wp(pframe->frame.data.value);
-		es_send_req(pframe, CMD_RES, req_ok, sizeof(req_ok) - 1);
+		if (pframe->frame.len == sizeof(uint8_t)) {
+			es_eeprom_wp(pframe->frame.data.value);
+			req_type = REQ_OK;
+		}
 		break;
 	case CMD_GPIO:
-		if (es_set_gpio(&pframe->frame.data.gpio) != HAL_OK)
-			es_send_req(pframe, CMD_RES, req_fail, sizeof(req_fail) - 1);
-		else
-			es_send_req(pframe, CMD_RES, req_ok, sizeof(req_ok) - 1);
+		if (pframe->frame.len == (sizeof(struct gpio_cmd))) {
+			if (es_set_gpio(&pframe->frame.data.gpio) == HAL_OK)
+				req_type = REQ_OK;
+		}
 		break;
 	case CMD_SET_IP:
-		es_set_eth(&pframe->frame.data.ip, NULL, NULL, NULL);
-		es_send_req(pframe, CMD_RES, req_ok, sizeof(req_ok) - 1);
+		if (pframe->frame.len == sizeof(struct ip_t)) {
+			es_set_eth(&pframe->frame.data.ip, NULL, NULL, NULL);
+			req_type = REQ_OK;
+		}
 		break;
 	case CMD_SET_NETMASK:
-		es_set_eth(NULL, &pframe->frame.data.netmask, NULL, NULL);
-		es_send_req(pframe, CMD_RES, req_ok, sizeof(req_ok) - 1);
+		if (pframe->frame.len == sizeof(struct netmask_t)) {
+			es_set_eth(NULL, &pframe->frame.data.netmask, NULL, NULL);
+			req_type = REQ_OK;
+		}
 		break;
 	case CMD_SET_GATWAY:
-		es_set_eth(NULL, NULL, &pframe->frame.data.getway, NULL);
-		es_send_req(pframe, CMD_RES, req_ok, sizeof(req_ok) - 1);
-		break;
-	case CMD_SET_MAC:
-		es_set_eth(NULL, NULL, NULL, &pframe->frame.data.mac);
-		es_send_req(pframe, CMD_RES, req_ok, sizeof(req_ok) - 1);
+		if (pframe->frame.len == sizeof(struct getway_t)) {
+			es_set_eth(NULL, NULL, &pframe->frame.data.getway, NULL);
+			req_type = REQ_OK;
+		}
 		break;
 	case CMD_SET_DATE:
-		if (es_set_rtc_date(&pframe->frame.data.rtc_date) != HAL_OK)
-			es_send_req(pframe, CMD_RES, req_fail, sizeof(req_fail) - 1);
-		else
-			es_send_req(pframe, CMD_RES, req_ok, sizeof(req_ok) - 1);
+		if (pframe->frame.len == (sizeof(struct rtc_date_t) - 1)) {
+			if (es_set_rtc_date(&pframe->frame.data.rtc_date) == HAL_OK)
+				req_type = REQ_OK;
+		}
 		break;
 	case CMD_SET_TIME:
-		if (es_set_rtc_time(&pframe->frame.data.rtc_date) != HAL_OK)
-			es_send_req(pframe, CMD_RES, req_fail, sizeof(req_fail) - 1);
-		else
-			es_send_req(pframe, CMD_RES, req_ok, sizeof(req_ok) - 1);
+		if (pframe->frame.len == sizeof(struct rtc_time_t)) {
+			if (es_set_rtc_time(&pframe->frame.data.rtc_date) == HAL_OK)
+				req_type = REQ_OK;
+		}
 		break;
 	case CMD_SET_FAN_DUTY:
-		if (es_set_fan_duty(&pframe->frame.data.fan) != HAL_OK)
-			es_send_req(pframe, CMD_RES, req_fail, sizeof(req_fail) - 1);
-		else
-			es_send_req(pframe, CMD_RES, req_ok, sizeof(req_ok) - 1);
+		if (pframe->frame.len == sizeof(struct fan_control_t)) {
+			if (es_set_fan_duty(&pframe->frame.data.fan) == HAL_OK)
+				req_type = REQ_OK;
+		}
+		break;
+	case CMD_SPI_SLV_WL:
+		if (pframe->frame.len == sizeof(struct spi_slv_w32_t)) {
+			if (es_spi_wl(&pframe->frame.data.spislv32) == HAL_OK)
+				req_type = REQ_OK;
+		}
 		break;
 	case CMD_GET_DATE:
-		if (es_get_rtc_date(&pframe->frame.data.rtc_date) != HAL_OK)
-			es_send_req(pframe, CMD_RES, req_fail, sizeof(req_fail) - 1);
-		else
-			es_send_req(pframe, CMD_GET_DATE, &pframe->frame.data.rtc_date, sizeof(struct rtc_date_t));
+		if (pframe->frame.len == 0) {
+			if (es_get_rtc_date(&pframe->frame.data.rtc_date) == HAL_OK)
+			{
+				es_send_req(pframe, CMD_GET_DATE, &pframe->frame.data.rtc_date, sizeof(struct rtc_date_t));
+				req_type = REQ_OTHER;
+			}
+		}
 		// printf("yy/mm/dd  %02d/%02d/%02d %02d\r\n", 2000 + pframe->frame.data.rtc_date.Year, pframe->frame.data.rtc_date.Month, \
 				pframe->frame.data.rtc_date.Date, pframe->frame.data.rtc_date.WeekDay);
 		break;
 	case CMD_GET_TIME:
-		if (es_get_rtc_time(&pframe->frame.data.rtc_time) != HAL_OK)
-			es_send_req(pframe, CMD_RES, req_fail, sizeof(req_fail) - 1);
-		else
-			es_send_req(pframe, CMD_GET_TIME, &pframe->frame.data.rtc_time, sizeof(struct rtc_time_t));
+		if (pframe->frame.len == 0) {
+			if (es_get_rtc_time(&pframe->frame.data.rtc_time) == HAL_OK) {
+				es_send_req(pframe, CMD_GET_TIME, &pframe->frame.data.rtc_time, sizeof(struct rtc_time_t));
+				req_type = REQ_OTHER;
+			}
+		}
 		// printf(" hh:mm:ss %02d:%02d:%02d\r\n", pframe->frame.data.rtc_time.Hours,\
 						pframe->frame.data.rtc_time.Minutes, pframe->frame.data.rtc_time.Seconds);
 		break;
 	case CMD_GET_FAN_DUTY:
-		if (es_get_fan_duty(&pframe->frame.data.fan) != HAL_OK)
-			es_send_req(pframe, CMD_RES, req_fail, sizeof(req_fail) - 1);
-		else
-			es_send_req(pframe, CMD_GET_FAN_DUTY, &pframe->frame.data.fan, sizeof(struct fan_control_t));
+		printf("len %xuint8_t\n",pframe->frame.len);
+		if (pframe->frame.len == sizeof(uint8_t)) {
+			if (es_get_fan_duty(&pframe->frame.data.fan) == HAL_OK){
+				es_send_req(pframe, CMD_GET_FAN_DUTY, &pframe->frame.data.fan, sizeof(struct fan_control_t));
+				req_type = REQ_OTHER;
+			}
+		}
+		break;
+	case CMD_SPI_SLV_RL:
+		if (pframe->frame.len == sizeof(uint32_t)) {
+			if (es_spi_rl32(&pframe->frame.data.spislv32) == HAL_OK) {
+				es_send_req(pframe, CMD_SPI_SLV_RL, &pframe->frame.data.spislv32.value, sizeof(uint32_t));
+				req_type = REQ_OTHER;
+			}
+		}
 		break;
 	default:;
 		break;
 	}
+	if (req_type == REQ_OK)
+		es_send_req(pframe, CMD_RES, req_ok, sizeof(req_ok) - 1);
+	else if (req_type == REQ_FAIL)
+		es_send_req(pframe, CMD_RES, req_fail, sizeof(req_fail) - 1);
 }
 
 uint32_t RxBuf_SIZE = 64;
 uint8_t RxBuf[96];
 b_frame_class_t frame_uart3;
-void deamon_test(void);
 void protocol_task(void *argument)
 {
 	// printf("%s %d\n", __func__, __LINE__);
+	uint8_t protocol_status = 0;
 	b_frame_t frame_info;
 	frame_info.head = head_meg;
 	frame_info.head_len = sizeof(head_meg) - 1;
@@ -325,8 +417,6 @@ void protocol_task(void *argument)
 	es_frame_init(&frame_uart3, &frame_info);
 	/* enable uart3 dma rx */
 	HAL_UARTEx_ReceiveToIdle_DMA(frame_uart3.uart, RxBuf, RxBuf_SIZE);
-
-	uint8_t protocol_status = 0;
 	for (;;) {
 		deamon_test();
 		switch (protocol_status) {
@@ -364,8 +454,8 @@ void protocol_task(void *argument)
 	}
 }
 
-#define FRAME_HEADER    0xA55AAA55
-#define FRAME_TAIL      0xBDBABDBA
+#define FRAME_HEADER 0xA55AAA55
+#define FRAME_TAIL 0xBDBABDBA
 
 uint8_t UART4_RxBuf[sizeof(Message)];
 b_frame_class_t frame_uart4;
@@ -381,13 +471,13 @@ typedef enum {
 
 void dump_message(Message data)
 {
-	printf("Header: 0x%lX, Cmd Type: 0x%x, Data Len: %d, Checksum: 0x%X, Tail: 0x%lx\n",
-		data.header, data.cmd_type, data.data_len, data.checksum, data.tail);
+	printf("Header: 0x%lX, Cmd Type: 0x%x, Data Len: %d, Checksum: 0x%X, Tail: 0x%lx\n", data.header, data.cmd_type,
+		   data.data_len, data.checksum, data.tail);
 }
 // Function to check message checksum
 int check_checksum(Message *msg)
 {
-	unsigned char checksum = 0;
+	uint8_t checksum = 0;
 	checksum ^= msg->msg_type;
 	checksum ^= msg->cmd_type;
 	checksum ^= msg->data_len;
@@ -399,7 +489,7 @@ int check_checksum(Message *msg)
 
 void generate_checksum(Message *msg)
 {
-	unsigned char checksum = 0;
+	uint8_t checksum = 0;
 	checksum ^= msg->msg_type;
 	checksum ^= msg->cmd_type;
 	checksum ^= msg->data_len;
@@ -415,12 +505,11 @@ BaseType_t transmit_deamon_request(Message *msg)
 
 	generate_checksum(msg);
 	// Transmit using DMA
-	HAL_StatusTypeDef status = HAL_UART_Transmit(huart, (uint8_t *)msg,
-			sizeof(Message), HAL_MAX_DELAY);
+	HAL_StatusTypeDef status = HAL_UART_Transmit(huart, (uint8_t *)msg, sizeof(Message), HAL_MAX_DELAY);
 	if (status == HAL_OK) {
 		return status; // Successful transmission
 	} else {
-		printf("[%s %d]:Failed to transmit msg, status %d!\n",__func__,__LINE__, status);
+		printf("[%s %d]:Failed to transmit msg, status %d!\n", __func__, __LINE__, status);
 		return status; // Transmission failed
 	}
 }
@@ -445,11 +534,11 @@ int web_cmd_handle(CommandType cmd, void *data, int data_len)
 	};
 
 	/*Add webcmd to waiting list*/
-		// Initialize list item
+	// Initialize list item
 	vListInitialiseItem(&(webcmd.xListItem));
-		// Set the list item owner
+	// Set the list item owner
 	listSET_LIST_ITEM_OWNER(&(webcmd.xListItem), &webcmd);
-		// Enter critical section to ensure thread safety when inserting item
+	// Enter critical section to ensure thread safety when inserting item
 	taskENTER_CRITICAL();
 	vListInsertEnd(&WebCmdList, &(webcmd.xListItem));
 	taskEXIT_CRITICAL();
@@ -484,24 +573,23 @@ void handle_deamon_mesage(Message *msg)
 		if (!listLIST_IS_EMPTY(&WebCmdList)) {
 			// Enter critical section to ensure thread safety when traversing and deleting
 			taskENTER_CRITICAL();
-			for (ListItem_t *pxItem = listGET_HEAD_ENTRY(&WebCmdList);
-				pxItem != listGET_END_MARKER(&WebCmdList);) {
-					WebCmd * pxWebCmd = (WebCmd *)listGET_LIST_ITEM_OWNER(pxItem);
-					// Get the next item before deleting the current one
-					ListItem_t *pxNextItem = listGET_NEXT(pxItem);
-					if ((uint32_t)pxWebCmd->xTaskToNotify == msg->xTaskToNotify) {
-						pxWebCmd->cmd_result = msg->cmd_result;
-						memcpy(pxWebCmd->data, msg->data, msg->data_len);
-						// Remove the current item from the list
-						uxListRemove(pxItem);
-						xTaskNotifyGive(pxWebCmd->xTaskToNotify);
-					}
-					// Move to the next item
-					pxItem = pxNextItem;
+			for (ListItem_t *pxItem = listGET_HEAD_ENTRY(&WebCmdList); pxItem != listGET_END_MARKER(&WebCmdList);) {
+				WebCmd *pxWebCmd = (WebCmd *)listGET_LIST_ITEM_OWNER(pxItem);
+				// Get the next item before deleting the current one
+				ListItem_t *pxNextItem = listGET_NEXT(pxItem);
+				if ((uint32_t)pxWebCmd->xTaskToNotify == msg->xTaskToNotify) {
+					pxWebCmd->cmd_result = msg->cmd_result;
+					memcpy(pxWebCmd->data, msg->data, msg->data_len);
+					// Remove the current item from the list
+					uxListRemove(pxItem);
+					xTaskNotifyGive(pxWebCmd->xTaskToNotify);
+				}
+				// Move to the next item
+				pxItem = pxNextItem;
 			}
 			taskEXIT_CRITICAL();
 		}
-	}else {
+	} else {
 		printf("Unsupport msg type: 0x%x\n", msg->cmd_type);
 		dump_message(*msg);
 	}
@@ -518,10 +606,10 @@ void deamon_test(void)
 
 	ret = web_cmd_handle(CMD_READ_BOARD_INFO, data, FRAME_DATA_MAX);
 
-	//pass
+	// pass
 	printf("call read borad info, result 0x%x, data %s\n", ret, data);
 	g_test_flag = 0;
-	return;//0 success,TODO call
+	return; // 0 success,TODO call
 }
 
 void uart4_protocol_task(void *argument)
@@ -539,14 +627,14 @@ void uart4_protocol_task(void *argument)
 	frame_uart4.uart = &huart4;
 	frame_uart4._in_frame_buffer_size = sizeof(UART4_RxBuf);
 
-	//Init msg ring buffer for deamon
+	// Init msg ring buffer for deamon
 	es_frame_init(&frame_uart4, &frame_info);
 	ring = &frame_uart4._frame_ring;
 
-	//Init web server msg list
+	// Init web server msg list
 	vListInitialise(&WebCmdList);
 
-	//trigger uart rx
+	// trigger uart rx
 	HAL_UARTEx_ReceiveToIdle_DMA(&huart4, UART4_RxBuf, sizeof(UART4_RxBuf));
 	for (;;) {
 		len = get_ring_buf_len(ring);
@@ -555,11 +643,9 @@ void uart4_protocol_task(void *argument)
 			continue;
 		}
 		if (len < sizeof(msg)) {
-
 		}
 		len = read_ring_buf(ring, (uint8_t *)&msg, sizeof(msg));
 		if (len != sizeof(msg)) {
-
 		}
 
 		if (msg.header == FRAME_HEADER && msg.tail == FRAME_TAIL) {

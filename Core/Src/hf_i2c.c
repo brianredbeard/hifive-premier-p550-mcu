@@ -2,8 +2,6 @@
 #include "main.h"
 #include <stdio.h>
 
-extern void MX_I2C3_Init(void);
-
 int hf_i2c_reg_write(I2C_HandleTypeDef *hi2c, uint8_t slave_addr,
 					 uint8_t reg_addr, uint8_t *data_ptr)
 {

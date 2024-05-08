@@ -7,8 +7,9 @@
 /* Private includes ----------------------------------------------------------*/
 #include "hf_common.h"
 #include "hf_i2c.h"
+#include "hf_spi_slv.h"
 /* Private typedef -----------------------------------------------------------*/
- #define AUTO_BOOT
+// #define AUTO_BOOT
 /* Private define ------------------------------------------------------------*/
 #define ATX_POWER_GOOD GPIO_PIN_RESET
 #define ATX_POWER_FAIL GPIO_PIN_SET
@@ -85,6 +86,7 @@ void hf_power_task(void *parameter)
 			// 	break;
 			// }
 			som_reset_control(pdFALSE);
+			SPI2_FLASH_CS_HIGH();
 			pmic_status_led_on(pdTRUE);
 			power_led_on(pdTRUE);
 			power_state = POWERON;
@@ -100,7 +102,6 @@ void hf_power_task(void *parameter)
 		case STOP_POWER:
 			printf("STOP_POWER\r\n");
 			i2c_deinit(I2C3);
-
 			pmic_power_on(pdFALSE);
 			atx_power_on(pdFALSE);
 			pmic_status_led_on(pdFALSE);
@@ -191,13 +192,6 @@ static void pmic_status_led_on(uint8_t turnon)
  * @param  reset pdTRUE : reset; pdFALSE : release
  * @retval None
  */
-// HAL_GPIO_WritePin(MCU_RESET_SOM_N_GPIO_Port,
-// MCU_RESET_SOM_N_Pin, GPIO_PIN_SET); GPIO_InitTypeDef
-// GPIO_InitStruct = {0}; GPIO_InitStruct.Pin =
-// MCU_RESET_SOM_N_Pin; GPIO_InitStruct.Pull = GPIO_NOPULL;
-// GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
-// GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-// HAL_GPIO_Init(MCU_RESET_SOM_N_GPIO_Port, &GPIO_InitStruct);
 static void som_reset_control(uint8_t reset)
 {
 	GPIO_InitTypeDef GPIO_InitStruct = {0};
@@ -208,6 +202,8 @@ static void som_reset_control(uint8_t reset)
 		GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
 		HAL_GPIO_Init(MCU_RESET_SOM_N_GPIO_Port, &GPIO_InitStruct);
 		HAL_GPIO_WritePin(MCU_RESET_SOM_N_GPIO_Port, MCU_RESET_SOM_N_Pin, GPIO_PIN_RESET);
+		uart_deinit(UART4);
+		uart_deinit(USART6);
 	} else {
 		HAL_GPIO_WritePin(MCU_RESET_SOM_N_GPIO_Port, MCU_RESET_SOM_N_Pin, GPIO_PIN_SET);
 		GPIO_InitStruct.Pin = MCU_RESET_SOM_N_Pin;
@@ -215,6 +211,8 @@ static void som_reset_control(uint8_t reset)
 		GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
 		GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
 		HAL_GPIO_Init(MCU_RESET_SOM_N_GPIO_Port, &GPIO_InitStruct);
+		uart_init(UART4);
+		uart_init(USART6);
 	}
 }
 

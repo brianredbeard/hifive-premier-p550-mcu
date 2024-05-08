@@ -109,6 +109,8 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 			memset(UART4_RxBuf, 0, sizeof(UART4_RxBuf) / sizeof(uint8_t));
 			HAL_UARTEx_ReceiveToIdle_DMA(&huart4, UART4_RxBuf, sizeof(UART4_RxBuf));
 		}
+	} else if (huart->Instance == USART6) {
+		printf("%s UART6\n", __func__);
 	}
 }
 

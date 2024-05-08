@@ -170,8 +170,6 @@ void hf_main_task(void *argument)
   }
 }
 
-
-#if 0
 void fan_info(void)
 {
   if (HAL_TIM_PWM_Start(&htim4,TIM_CHANNEL_1) != HAL_OK)
@@ -201,31 +199,18 @@ void get_rtc_info(void)
 {
   RTC_DateTypeDef GetData;
   RTC_TimeTypeDef GetTime;
-  HAL_RTC_GetTime(&hrtc, &GetTime, RTC_FORMAT_BCD);
+  HAL_RTC_GetTime(&hrtc, &GetTime, RTC_FORMAT_BIN);
   /* Get the RTC current Date */
-  HAL_RTC_GetDate(&hrtc, &GetData, RTC_FORMAT_BCD);
+  HAL_RTC_GetDate(&hrtc, &GetData, RTC_FORMAT_BIN);
 
   /* Display date Format : yy/mm/dd */
-  printf("yy/mm/dd  %02d/%02d/%02d\r\n",2000 + GetData.Year, GetData.Month, GetData.Date);
+  printf("%s yy/mm/dd  %02d/%02d/%02d\r\n", __func__, 2000 + GetData.Year, GetData.Month, GetData.Date);
   /* Display time Format : hh:mm:ss */
-  printf(" hh:mm:ss %02d:%02d:%02d\r\n",GetTime.Hours, GetTime.Minutes, GetTime.Seconds);
+  printf("%s hh:mm:ss %02d:%02d:%02d\r\n", __func__, GetTime.Hours, GetTime.Minutes, GetTime.Seconds);
 
-  // RTC_AlarmTypeDef alarm1;
-  // RTC_AlarmTypeDef alarm2;
-  // HAL_RTC_GetAlarm(&hrtc, &alarm1, RTC_ALARM_A, RTC_FORMAT_BCD);
-  // HAL_RTC_GetAlarm(&hrtc, &alarm2, RTC_ALARM_B, RTC_FORMAT_BCD);
-  // printf("alarm1 info :\n");
-  // printf("AlarmMask %x, AlarmSubSecondMask %x, \n AlarmDateWeekDaySel %x, AlarmDateWeekDay %x, Alarm %x:\n",
-  //       alarm1.AlarmMask, alarm1.AlarmSubSecondMask, alarm1.AlarmDateWeekDaySel, alarm1.AlarmDateWeekDay, alarm1.Alarm );
-  // printf("%02d/%02d/%02d\r\n",alarm1.AlarmTime.Hours, alarm1.AlarmTime.Minutes, alarm1.AlarmTime.Seconds);
 
-  // printf("alarm2 info :\n");
-  // printf("AlarmMask %x, AlarmSubSecondMask %x, \n AlarmDateWeekDaySel %x, AlarmDateWeekDay %x, Alarm %x:\n",
-  //       alarm2.AlarmMask, alarm2.AlarmSubSecondMask, alarm2.AlarmDateWeekDaySel, alarm2.AlarmDateWeekDay, alarm2.Alarm );
-  // printf("%02d/%02d/%02d\r\n",alarm2.AlarmTime.Hours, alarm2.AlarmTime.Minutes, alarm2.AlarmTime.Seconds);
-  // printf("\r\n");
 }
-#endif
+
 void MoniterTask(void *argument)
 {
   TaskStatus_t *StatusArray;

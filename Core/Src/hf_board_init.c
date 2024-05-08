@@ -141,7 +141,7 @@ int board_init(void)
 	MX_RNG_Init();
 	// MX_TIM5_Init();
 	/* There is leakage, the som must be released before initialization */
-	MX_UART4_Init();
+	// MX_UART4_Init();
 	// MX_USART6_UART_Init();
 
 	/* To ensure that the i2c runs properly, initialize the som after it is powered on */
@@ -302,69 +302,6 @@ static void MX_RTC_Init(void)
 	if (HAL_RTC_Init(&hrtc) != HAL_OK) {
 		Error_Handler();
 	}
-
-	/** Initialize RTC and set the Time and Date */
-	// RTC_TimeTypeDef sTime = {0};
-	// sTime.Hours = 18;
-	// sTime.Minutes = 8;
-	// sTime.Seconds = 0;
-	// sTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
-	// sTime.StoreOperation = RTC_STOREOPERATION_SET;
-	// if (HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BCD) != HAL_OK)
-	// {
-	//   Error_Handler();
-	// }
-	// RTC_DateTypeDef sDate = {0};
-	// sDate.WeekDay = RTC_WEEKDAY_WEDNESDAY;
-	// sDate.Month = RTC_MONTH_APRIL;
-	// sDate.Date = 3;
-	// sDate.Year = 24;
-
-	// if (HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BCD) != HAL_OK)
-	// {
-	//   Error_Handler();
-	// }
-
-	// /** Enable the Alarm A */
-	// RTC_AlarmTypeDef sAlarm = {0};
-	// sAlarm.AlarmTime.Hours = 0x0;
-	// sAlarm.AlarmTime.Minutes = 0x0;
-	// sAlarm.AlarmTime.Seconds = 0x30;
-	// sAlarm.AlarmTime.SubSeconds = 0x0;
-	// sAlarm.AlarmTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
-	// sAlarm.AlarmTime.StoreOperation = RTC_STOREOPERATION_RESET;
-	// sAlarm.AlarmMask = RTC_ALARMMASK_NONE;
-	// sAlarm.AlarmSubSecondMask = RTC_ALARMSUBSECONDMASK_ALL;
-	// sAlarm.AlarmDateWeekDaySel = RTC_ALARMDATEWEEKDAYSEL_DATE;
-	// sAlarm.AlarmDateWeekDay = 0x1;
-	// sAlarm.Alarm = RTC_ALARM_A;
-	// if (HAL_RTC_SetAlarm_IT(&hrtc, &sAlarm, RTC_FORMAT_BCD) != HAL_OK)
-	// {
-	//   Error_Handler();
-	// }
-
-	// /** Enable the Alarm B */
-	// sAlarm.AlarmTime.Hours = 0;
-	// sAlarm.AlarmTime.Minutes = 0x0;
-	// sAlarm.AlarmTime.Seconds = 0x40;
-	// sAlarm.AlarmTime.SubSeconds = 0x0;
-	// sAlarm.AlarmTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
-	// sAlarm.AlarmTime.StoreOperation = RTC_STOREOPERATION_RESET;
-	// sAlarm.AlarmMask = RTC_ALARMMASK_NONE;
-	// sAlarm.AlarmSubSecondMask = RTC_ALARMSUBSECONDMASK_ALL;
-	// sAlarm.AlarmDateWeekDaySel = RTC_ALARMDATEWEEKDAYSEL_DATE;
-	// sAlarm.AlarmDateWeekDay = 0x1;
-	// sAlarm.Alarm = RTC_ALARM_B;
-	// if (HAL_RTC_SetAlarm_IT(&hrtc, &sAlarm, RTC_FORMAT_BCD) != HAL_OK)
-	// {
-	//   Error_Handler();
-	// }
-
-	// /** Enable the WakeUp */
-	// if (HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, 10, RTC_WAKEUPCLOCK_RTCCLK_DIV16) != HAL_OK)
-	// {
-	//   Error_Handler();
-	// }
 }
 
 /**
@@ -407,7 +344,7 @@ static void MX_SPI2_Init(void)
 	hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
 	hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
 	hspi2.Init.NSS = SPI_NSS_SOFT;
-	hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_4;
+	hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_8;
 	hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
 	hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
 	hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -577,6 +514,8 @@ static void MX_UART4_Init(void)
 	if (HAL_UART_Init(&huart4) != HAL_OK) {
 		Error_Handler();
 	}
+	// HAL_NVIC_SetPriority(UART4_IRQn, 5, 0);
+	// HAL_NVIC_EnableIRQ(UART4_IRQn);
 }
 
 /**
@@ -619,6 +558,8 @@ static void MX_USART6_UART_Init(void)
 	if (HAL_UART_Init(&huart6) != HAL_OK) {
 		Error_Handler();
 	}
+	HAL_NVIC_SetPriority(USART6_IRQn, 5, 0);
+	HAL_NVIC_EnableIRQ(USART6_IRQn);
 }
 
 /**

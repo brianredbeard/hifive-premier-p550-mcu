@@ -50,6 +50,7 @@ Core/Src/hf_power_process.c \
 Core/Src/hf_http_process.c \
 Core/Src/hf_gpio_process.c \
 Core/Src/hf_protocol_process.c \
+Core/Src/hf_spi_slv.c \
 Core/Src/protocol_lib/ringbuffer.c \
 Core/Src/protocol_lib/protocol.c \
 Core/Src/hf_i2c.c \

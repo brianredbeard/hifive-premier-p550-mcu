@@ -1,10 +1,10 @@
 #include "protocol.h"
+#include <stdio.h>
 
 uint8_t es_frame_init(b_frame_class_t *pframe, b_frame_t *pframeinit)
 {
 	uint8_t err = 0;
 	if ((!pframeinit) || (!pframe)) {
-		// printf("\n%s-err:frame parameter error, parameter is null\r\n", pframe->frame_info.pname);
 		return B_ERROR;
 	}
 
@@ -13,16 +13,10 @@ uint8_t es_frame_init(b_frame_class_t *pframe, b_frame_t *pframeinit)
 	pframe->frame_info.head_len = pframeinit->head_len;
 	pframe->frame_info.end = pframeinit->end;
 	pframe->frame_info.end_len = pframeinit->end_len;
-	// printf("rin_addr_t %p size %d\n", &pframe->_frame_ring, pframe->_in_frame_buffer_size);
-	// printf("pname %s head_len %d end_len %d\n", pframe->frame_info.pname, pframe->frame_info.head_len, \
-		   pframe->frame_info.end_len);
 
 	err = ring_buf_init(&pframe->_frame_ring, pframe->_in_frame_buffer_size);
-	// printf("\nrhead %p tail %p write %p, read %p\n", pframe->_frame_ring.pHead, pframe->_frame_ring.pTail, \
-		   pframe->_frame_ring.pWrite, pframe->_frame_ring.pRead);
 	if (!err)
 		return B_SUCCESS;
-	// printf("\n%s-err:ring_buf_init err ring_buf init err\r\n", pframe->frame_info.pname);
 	return B_ERROR;
 }
 
@@ -64,9 +58,7 @@ uint8_t es_check_head(b_frame_class_t *pframe)
 	do {
 		read_ring_buf(&pframe->_frame_ring, &tmp, 1);
 		if (tmp == pframe->frame_info.head[i]) {
-			printf("tmp(%d) %x \n", i, tmp);
 			if (++i == pframe->frame_info.head_len) {
-				printf("%s %d B_SUCCESS\n", __func__, __LINE__);
 				return B_SUCCESS;
 			}
 		} else {
@@ -107,31 +99,26 @@ uint8_t es_check_frame(b_frame_class_t *pframe)
 	// printf("%s %d\n", __func__, __LINE__);
 	if (read_ring_buf(&pframe->_frame_ring, buf, len) != len)
 		return B_ERROR;
+	pframe->frame.len = len;
 	for (int i = 0; i < len; i++) {
 		current_xor ^= buf[i];
-		// printf("buf[%d] %x\n", i, buf[i]);
+		printf("buf[%d] %x\n", i, buf[i]);
 	}
 
-	// printf("%s %d current_xor %x\n", __func__, __LINE__, current_xor);
 	if (read_ring_buf(&pframe->_frame_ring, &xor, 1) != 1)
 		return B_ERROR;
-	// printf("%s %d\n", __func__, __LINE__);
 	if (current_xor == xor) {
-		// printf("%s %d\n", __func__, __LINE__);
 		memset(&pframe->frame.data.value, 0, sizeof(pframe->frame.data.value));
 		memcpy(&pframe->frame.data.value, buf, len);
 		return B_SUCCESS;
 	}
-	// printf("%s %d\n", __func__, __LINE__);
 	return B_ERROR;
 }
 
 uint8_t es_get_cmd_and_data(b_frame_class_t *pframe)
 {
-	// printf("%s %d\n", __func__, __LINE__);
 	if (es_get_cmd(pframe) != B_SUCCESS)
 		return B_ERROR;
-	// printf("%s %d\n", __func__, __LINE__);
 	if (es_check_frame(pframe) != B_SUCCESS)
 		return B_ERROR;
 	return B_SUCCESS;

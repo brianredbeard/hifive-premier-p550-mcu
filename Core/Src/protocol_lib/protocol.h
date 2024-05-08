@@ -19,7 +19,7 @@ typedef struct {
 } b_frame_t;
 
 struct gpio_cmd {
-	uint8_t group;
+	uint16_t group;
 	uint16_t pin_num;
 	uint8_t driection;
 	uint8_t value;
@@ -73,9 +73,15 @@ struct fan_control_t {
 	uint8_t duty;
 };
 
+struct spi_slv_w32_t {
+	uint32_t addr;
+	uint32_t value;
+};
+
 struct frame_data {
 	uint8_t is_valid;
 	uint8_t cmd;
+	uint16_t len;
 	union {
 		uint32_t value;
 		struct gpio_cmd gpio;
@@ -86,6 +92,7 @@ struct frame_data {
 		struct rtc_date_t rtc_date;
 		struct rtc_time_t rtc_time;
 		struct fan_control_t fan;
+		struct spi_slv_w32_t spislv32;
 	} data;
 };
 
@@ -117,9 +124,11 @@ typedef enum protocol_cmd_type {
 	CMD_SET_DATE = 0x96,
 	CMD_SET_TIME = 0x97,
 	CMD_SET_FAN_DUTY = 0x98,
+	CMD_SPI_SLV_WL = 0x99,
 	CMD_GET_DATE = 0xA6,
 	CMD_GET_TIME = 0xA7,
 	CMD_GET_FAN_DUTY = 0xa8,
+	CMD_SPI_SLV_RL = 0xa9,
 	CMD_RES = 0xb0
 }protocol_cmd_type_t;
 
