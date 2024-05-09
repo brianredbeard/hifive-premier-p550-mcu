@@ -5,6 +5,8 @@
 #include "hf_common.h"
 #include "main.h"
 #include "stm32f4xx_hal_iwdg.h"
+#include "FreeRTOS.h"
+#include "queue.h"
 
 /**
  * @brief  Alarm A callback.
@@ -78,23 +80,10 @@ extern DMA_HandleTypeDef hdma_uart4_rx;
 extern uint32_t RxBuf_SIZE;
 extern uint8_t RxBuf[96];
 extern b_frame_class_t frame_uart3;
-extern b_frame_class_t frame_uart4;
-
-static void buf_dump(uint8_t *data)
-{
-	int i;
-
-	for (i = 0; i < sizeof(UART4_RxBuf); i++) {
-		printf("0x%x ", UART4_RxBuf[i]);
-		if (i != 0 && i % 20 == 0) {
-			printf("\n");
-		}
-	}
-	printf("\n");
-}
-
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {
+	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+
 	if (huart->Instance == USART3) {
 		printf("%s Size %d sizeof(UART3_RxBuf) %d\n", __func__, Size, sizeof(RxBuf));
 		es_frame_put(&frame_uart3, RxBuf, Size);
@@ -102,12 +91,22 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 		HAL_UARTEx_ReceiveToIdle_DMA(&huart3, RxBuf, RxBuf_SIZE);
 		__HAL_DMA_DISABLE_IT(&hdma_usart3_rx, DMA_IT_HT);
 	} else if (huart->Instance == UART4) {
-		printf("%s Size %d sizeof(UART4_RxBuf) %d\n", __func__, Size, sizeof(UART4_RxBuf));
+		//printf("[%s %d]: Size %d sizeof(UART4_RxMsg) %d\n", __func__, __LINE__, Size, sizeof(UART4_RxMsg));
 		if (HAL_UART_RXEVENT_TC == huart->RxEventType) {
-			buf_dump(UART4_RxBuf);
-			es_frame_put(&frame_uart4, UART4_RxBuf, sizeof(UART4_RxBuf));
-			memset(UART4_RxBuf, 0, sizeof(UART4_RxBuf) / sizeof(uint8_t));
-			HAL_UARTEx_ReceiveToIdle_DMA(&huart4, UART4_RxBuf, sizeof(UART4_RxBuf));
+			if (xQueueSendFromISR(xUart4MsgQueue,
+				(void *)&UART4_RxMsg, &xHigherPriorityTaskWoken) != pdPASS) {
+				// The queue was full - handle this appropriately.
+				// This could involve waiting for space to become available
+				// or simply dropping the data if it is not critical.
+				printf("[%s %d]: xUart4MsgQueue is full, drop the msg!\n", __func__, __LINE__);
+			}
+			memset(&UART4_RxMsg, 0, sizeof(UART4_RxMsg) / sizeof(uint8_t));
+			HAL_UARTEx_ReceiveToIdle_DMA(&huart4, (int8_t *)&UART4_RxMsg, sizeof(UART4_RxMsg));
+			// If xHigherPriorityTaskWoken was set to true, there may be a higher priority task that can run now.
+			if (xHigherPriorityTaskWoken) {
+				// Force a context switch if xHigherPriorityTaskWoken is now set to pdTRUE.
+				portYIELD_FROM_ISR( xHigherPriorityTaskWoken);
+			}
 		}
 	} else if (huart->Instance == USART6) {
 		printf("%s UART6\n", __func__);

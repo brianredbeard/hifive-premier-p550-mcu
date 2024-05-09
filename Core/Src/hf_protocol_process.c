@@ -7,6 +7,7 @@
 #include "stm32f4xx.h"
 #include "stm32f4xx_hal.h"
 #include "task.h"
+#include "queue.h"
 
 #define head_meg "\xA5\x5A\xAA\x55"
 #define end_msg "\x0D\x0A\x0D\x0A"
@@ -418,7 +419,6 @@ void protocol_task(void *argument)
 	/* enable uart3 dma rx */
 	HAL_UARTEx_ReceiveToIdle_DMA(frame_uart3.uart, RxBuf, RxBuf_SIZE);
 	for (;;) {
-		deamon_test();
 		switch (protocol_status) {
 		case CHECK_HEAD:
 			if (!es_check_head(&frame_uart3))
@@ -454,30 +454,29 @@ void protocol_task(void *argument)
 	}
 }
 
-#define FRAME_HEADER 0xA55AAA55
-#define FRAME_TAIL 0xBDBABDBA
+#define FRAME_HEADER    0xA55AAA55
+#define FRAME_TAIL      0xBDBABDBA
 
-uint8_t UART4_RxBuf[sizeof(Message)];
-b_frame_class_t frame_uart4;
+Message UART4_RxMsg;
 extern DMA_HandleTypeDef hdma_uart4_rx;
-// Define a global list
 List_t WebCmdList;
+QueueHandle_t xUart4MsgQueue;
 
 // Define command types
 typedef enum {
 	MSG_REQUEST = 0x01,
-	MSG_REPLY = 0x02,
+	MSG_REPLY,
 } MsgType;
 
 void dump_message(Message data)
 {
-	printf("Header: 0x%lX, Cmd Type: 0x%x, Data Len: %d, Checksum: 0x%X, Tail: 0x%lx\n", data.header, data.cmd_type,
-		   data.data_len, data.checksum, data.tail);
+	printf("Header: 0x%lX, Cmd Type: 0x%x, Data Len: %d, Checksum: 0x%X, Tail: 0x%lx\n",
+		data.header, data.cmd_type, data.data_len, data.checksum, data.tail);
 }
 // Function to check message checksum
 int check_checksum(Message *msg)
 {
-	uint8_t checksum = 0;
+	unsigned char checksum = 0;
 	checksum ^= msg->msg_type;
 	checksum ^= msg->cmd_type;
 	checksum ^= msg->data_len;
@@ -489,7 +488,7 @@ int check_checksum(Message *msg)
 
 void generate_checksum(Message *msg)
 {
-	uint8_t checksum = 0;
+	unsigned char checksum = 0;
 	checksum ^= msg->msg_type;
 	checksum ^= msg->cmd_type;
 	checksum ^= msg->data_len;
@@ -505,19 +504,20 @@ BaseType_t transmit_deamon_request(Message *msg)
 
 	generate_checksum(msg);
 	// Transmit using DMA
-	HAL_StatusTypeDef status = HAL_UART_Transmit(huart, (uint8_t *)msg, sizeof(Message), HAL_MAX_DELAY);
+	HAL_StatusTypeDef status = HAL_UART_Transmit(huart, (uint8_t *)msg,
+			sizeof(Message), HAL_MAX_DELAY);
 	if (status == HAL_OK) {
 		return status; // Successful transmission
 	} else {
-		printf("[%s %d]:Failed to transmit msg, status %d!\n", __func__, __LINE__, status);
+		printf("[%s %d]:Failed to transmit msg, status %d!\n",__func__,__LINE__, status);
 		return status; // Transmission failed
 	}
 }
-int web_cmd_handle(CommandType cmd, void *data, int data_len)
+int web_cmd_handle(CommandType cmd, void *data, int data_len, uint32_t timeout)
 {
 	HAL_StatusTypeDef status;
 	uint32_t ulNotificationValue;
-	int ret = -HAL_ERROR;
+	int ret = HAL_ERROR;
 
 	WebCmd webcmd = {
 		.cmd_result = -1,
@@ -534,28 +534,28 @@ int web_cmd_handle(CommandType cmd, void *data, int data_len)
 	};
 
 	/*Add webcmd to waiting list*/
-	// Initialize list item
+		// Initialize list item
 	vListInitialiseItem(&(webcmd.xListItem));
-	// Set the list item owner
+		// Set the list item owner
 	listSET_LIST_ITEM_OWNER(&(webcmd.xListItem), &webcmd);
-	// Enter critical section to ensure thread safety when inserting item
+		// Enter critical section to ensure thread safety when inserting item
 	taskENTER_CRITICAL();
 	vListInsertEnd(&WebCmdList, &(webcmd.xListItem));
 	taskEXIT_CRITICAL();
 
 	msg.xTaskToNotify = (uint32_t)webcmd.xTaskToNotify;
-	dump_message(msg);
+	//dump_message(msg);
 	status = transmit_deamon_request(&msg);
 	if (HAL_OK != status) {
 		ret = status;
 		goto err_msg;
 	}
 	/*wait 100ms to get the result*/
-	if (xTaskNotifyWait(0, 0, &ulNotificationValue, pdMS_TO_TICKS(100)) == pdTRUE) {
+	if (xTaskNotifyWait(0, 0, &ulNotificationValue, pdMS_TO_TICKS(timeout)) == pdTRUE) {
 		ret = webcmd.cmd_result;
 		memcpy(data, webcmd.data, data_len);
 	} else {
-		ret = -HAL_TIMEOUT;
+		ret = HAL_TIMEOUT;
 		goto err_msg;
 	}
 	return ret;
@@ -567,100 +567,117 @@ err_msg:
 	return ret;
 }
 
+static void buf_dump(uint8_t *data, uint32_t len)
+{
+	int i;
+
+	for (i = 0; i < len; i++) {
+		printf("0x%x ", data[i]);
+		if (i != 0 && i % 20 == 0) {
+			printf("\n");
+		}
+	}
+	printf("\n");
+}
+
+deamon_stats_t som_daemon_state = SOM_DAEMON_OFF;
+void deamon_keeplive_task(void *argument)
+{
+	int ret = HAL_OK;
+	deamon_stats_t old_status;
+	static uint8_t count = 0;
+
+	printf("SOM Daemon status %s!\n", som_daemon_state == SOM_DAEMON_ON ? "on" : "off");
+	for (;;) {
+		old_status = som_daemon_state;
+		ret = web_cmd_handle(CMD_BOARD_STATUS, NULL, 0, 1000);
+		if (HAL_OK != ret) {
+			if (HAL_TIMEOUT == ret) {
+				if (count <= 5)
+					printf("SOM keeplive request timeout!\n");
+			} else {
+				if (count <=5)
+					printf("SOM keeplive request send failed!\n");
+			}
+			count++;
+			if (5 >= count) {
+				som_daemon_state = SOM_DAEMON_OFF;
+			}
+		} else {
+			som_daemon_state = SOM_DAEMON_ON;
+			count = 0;
+		}
+		if (old_status != som_daemon_state) {
+			printf("SOM Daemon status change to %s!\n",
+				som_daemon_state == SOM_DAEMON_ON ? "on" : "off");
+		}
+		/*check every 1 second*/
+		osDelay(pdMS_TO_TICKS(4000));
+	}
+}
+
 void handle_deamon_mesage(Message *msg)
 {
 	if (MSG_REPLY == msg->msg_type) {
 		if (!listLIST_IS_EMPTY(&WebCmdList)) {
 			// Enter critical section to ensure thread safety when traversing and deleting
 			taskENTER_CRITICAL();
-			for (ListItem_t *pxItem = listGET_HEAD_ENTRY(&WebCmdList); pxItem != listGET_END_MARKER(&WebCmdList);) {
-				WebCmd *pxWebCmd = (WebCmd *)listGET_LIST_ITEM_OWNER(pxItem);
-				// Get the next item before deleting the current one
-				ListItem_t *pxNextItem = listGET_NEXT(pxItem);
-				if ((uint32_t)pxWebCmd->xTaskToNotify == msg->xTaskToNotify) {
-					pxWebCmd->cmd_result = msg->cmd_result;
-					memcpy(pxWebCmd->data, msg->data, msg->data_len);
-					// Remove the current item from the list
-					uxListRemove(pxItem);
-					xTaskNotifyGive(pxWebCmd->xTaskToNotify);
-				}
-				// Move to the next item
-				pxItem = pxNextItem;
+			for (ListItem_t *pxItem = listGET_HEAD_ENTRY(&WebCmdList);
+				pxItem != listGET_END_MARKER(&WebCmdList);) {
+					WebCmd * pxWebCmd = (WebCmd *)listGET_LIST_ITEM_OWNER(pxItem);
+					// Get the next item before deleting the current one
+					ListItem_t *pxNextItem = listGET_NEXT(pxItem);
+					if ((uint32_t)pxWebCmd->xTaskToNotify == msg->xTaskToNotify) {
+						pxWebCmd->cmd_result = msg->cmd_result;
+						memcpy(pxWebCmd->data, msg->data, msg->data_len);
+						// Remove the current item from the list
+						uxListRemove(pxItem);
+						xTaskNotifyGive(pxWebCmd->xTaskToNotify);
+					}
+					// Move to the next item
+					pxItem = pxNextItem;
 			}
 			taskEXIT_CRITICAL();
 		}
 	} else {
 		printf("Unsupport msg type: 0x%x\n", msg->cmd_type);
+		buf_dump((uint8_t *)&msg, sizeof(msg));
 		dump_message(*msg);
 	}
 }
-
-volatile int g_test_flag = 0;
-void deamon_test(void)
-{
-	int ret;
-	char data[FRAME_DATA_MAX];
-
-	if (g_test_flag == 0)
-		return;
-
-	ret = web_cmd_handle(CMD_READ_BOARD_INFO, data, FRAME_DATA_MAX);
-
-	// pass
-	printf("call read borad info, result 0x%x, data %s\n", ret, data);
-	g_test_flag = 0;
-	return; // 0 success,TODO call
-}
-
+#define QUEUE_LENGTH 8
 void uart4_protocol_task(void *argument)
 {
-	b_frame_t frame_info;
-	ring_buf_t *ring;
-	int32_t len;
 	Message msg;
 
-	frame_info.head = head_meg;
-	frame_info.head_len = sizeof(head_meg) - 1;
-	frame_info.end = end_msg;
-	frame_info.end_len = sizeof(end_msg) - 1;
-	frame_info.pname = "uart4";
-	frame_uart4.uart = &huart4;
-	frame_uart4._in_frame_buffer_size = sizeof(UART4_RxBuf);
+	xUart4MsgQueue = xQueueCreate(QUEUE_LENGTH, sizeof(Message));
+	if (xUart4MsgQueue == NULL) {
+		printf("Failed to create msg queue!\n");
+		return;
+	}
 
-	// Init msg ring buffer for deamon
-	es_frame_init(&frame_uart4, &frame_info);
-	ring = &frame_uart4._frame_ring;
-
-	// Init web server msg list
+	//Init web server cmd list
 	vListInitialise(&WebCmdList);
 
-	// trigger uart rx
-	HAL_UARTEx_ReceiveToIdle_DMA(&huart4, UART4_RxBuf, sizeof(UART4_RxBuf));
+	//trigger uart rx
+	HAL_UARTEx_ReceiveToIdle_DMA(&huart4, (int8_t *)&UART4_RxMsg, sizeof(UART4_RxMsg));
 	for (;;) {
-		len = get_ring_buf_len(ring);
-		if (!len) {
-			osDelay(10);
-			continue;
-		}
-		if (len < sizeof(msg)) {
-		}
-		len = read_ring_buf(ring, (uint8_t *)&msg, sizeof(msg));
-		if (len != sizeof(msg)) {
-		}
-
-		if (msg.header == FRAME_HEADER && msg.tail == FRAME_TAIL) {
-			// Check checksum
-			if (check_checksum(&msg)) {
-				// handle command
-				handle_deamon_mesage(&msg);
+		if (xQueueReceive(xUart4MsgQueue, &(msg), portMAX_DELAY)) {
+			if (msg.header == FRAME_HEADER && msg.tail == FRAME_TAIL) {
+				// Check checksum
+				if (check_checksum(&msg)) {
+					// handle command
+					handle_deamon_mesage(&msg);
+				} else {
+					printf("[%s %d]:Checksum error!\n",__func__,__LINE__);
+					buf_dump((uint8_t *)&msg, sizeof(msg));
+					dump_message(msg);
+				}
 			} else {
-				printf("Checksum error!\n");
+				printf("[%s %d]:Invalid message format!\n",__func__,__LINE__);
+				buf_dump((uint8_t *)&msg, sizeof(msg));
 				dump_message(msg);
 			}
-		} else {
-			printf("Invalid message format!\n");
-			dump_message(msg);
 		}
-		osDelay(10);
 	}
 }

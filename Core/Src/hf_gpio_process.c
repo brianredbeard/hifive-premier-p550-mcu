@@ -23,8 +23,6 @@
 #define KEY_RELEASE GPIO_PIN_SET
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
-extern power_switch_t som_power_state;
-
 osEventFlagsId_t gpio_eventflags_id = NULL;
 
 /* Private function prototypes -----------------------------------------------*/

@@ -357,14 +357,6 @@ void USART3_IRQHandler(void)
 }
 
 /**
-  * @brief This function handles USART3 global interrupt.
-
-void UART4_IRQHandler(void)
-{
-  HAL_UART_IRQHandler(&huart4);
-}
-*/
-/**
   * @brief This function handles RTC alarms A and B interrupt through EXTI line 17.
   */
 void RTC_Alarm_IRQHandler(void)

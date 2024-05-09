@@ -12,6 +12,7 @@ extern "C" {
 #include "FreeRTOS.h"
 #include "list.h"
 #include "task.h"
+#include "queue.h"
 
 /* types ------------------------------------------------------------*/
 typedef enum {
@@ -40,14 +41,23 @@ typedef enum {
   SOM_POWER_ON
 } power_switch_t;
 
+typedef enum {
+  SOM_DAEMON_OFF,
+  SOM_DAEMON_ON,
+} deamon_stats_t;
+
 #define FRAME_DATA_MAX 250
+
+extern power_switch_t som_power_state;
 
 // Define command types
 typedef enum {
 	CMD_POWER_OFF = 0x01,
-	CMD_RESET = 0x02,
-	CMD_READ_BOARD_INFO = 0x03,
-	CMD_CONTROL_LED = 0x04,
+	CMD_RESET,
+	CMD_READ_BOARD_INFO,
+	CMD_CONTROL_LED,
+	CMD_PVT_INFO,
+	CMD_BOARD_STATUS,
 	// You can continue adding other command types
 } CommandType;
 
@@ -72,7 +82,8 @@ typedef struct {
 	uint8_t data[FRAME_DATA_MAX]; // command result Data
 } WebCmd;
 
-extern uint8_t UART4_RxBuf[sizeof(Message)];
+extern QueueHandle_t xUart4MsgQueue;
+extern Message UART4_RxMsg;
 
 /* constants --------------------------------------------------------*/
 /* macro ------------------------------------------------------------*/
@@ -82,7 +93,8 @@ extern uint8_t UART4_RxBuf[sizeof(Message)];
 
 void hf_http_task(void *argument);
 void es_eeprom_wp(uint8_t flag);
-
+void som_reset_control(uint8_t reset);
+int web_cmd_handle(CommandType cmd, void *data, int data_len, uint32_t timeout);
 
 #ifdef __cplusplus
 }

@@ -38,6 +38,14 @@ const osThreadAttr_t main_task_attributes = {
 
 osThreadId_t protocol_task_handle;
 osThreadId_t uart4_protocol_task_handle;
+osThreadId_t daemon_keelive_task_handle;
+
+const osThreadAttr_t daemon_keeplive_task_attributes = {
+  .name = "DaemonTask",
+  .stack_size = 1024,
+  .priority = (osPriority_t) osPriorityNormal,
+};
+
 const osThreadAttr_t protocol_task_attributes = {
   .name = "protocolTask",
   .stack_size = 1024*2,
@@ -77,6 +85,7 @@ void hf_main_task(void *argument);
 void MoniterTask(void *argument);
 void protocol_task(void *argument);
 void uart4_protocol_task(void *argument);
+void deamon_keeplive_task(void *argument);
 
 /* Private user code ---------------------------------------------------------*/
 
@@ -146,6 +155,7 @@ void hf_main_task(void *argument)
   // moniter_task_handle = osThreadNew(MoniterTask, NULL, &MoniterTask_attributes);
   protocol_task_handle = osThreadNew(protocol_task, NULL, &protocol_task_attributes);
   uart4_protocol_task_handle = osThreadNew(uart4_protocol_task, NULL, &protocol_task_attributes);
+  daemon_keelive_task_handle = osThreadNew(deamon_keeplive_task, NULL, &daemon_keeplive_task_attributes);
   osDelay(900);
   printf("HiFive 106SC!\n");
   // extern void MX_IWDG_Init(void);

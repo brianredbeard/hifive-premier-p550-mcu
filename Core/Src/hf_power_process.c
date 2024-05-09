@@ -24,7 +24,6 @@ power_switch_t som_power_state = SOM_POWER_OFF;
 
 static uint8_t get_dc_power_status(void);
 static void pmic_status_led_on(uint8_t turnon);
-static void som_reset_control(uint8_t reset);
 static uint8_t get_atx_power_status(void);
 static void pmic_power_on(uint8_t turnon);
 static void atx_power_on(uint8_t turnon);
@@ -102,6 +101,7 @@ void hf_power_task(void *parameter)
 		case STOP_POWER:
 			printf("STOP_POWER\r\n");
 			i2c_deinit(I2C3);
+
 			pmic_power_on(pdFALSE);
 			atx_power_on(pdFALSE);
 			pmic_status_led_on(pdFALSE);
@@ -192,7 +192,7 @@ static void pmic_status_led_on(uint8_t turnon)
  * @param  reset pdTRUE : reset; pdFALSE : release
  * @retval None
  */
-static void som_reset_control(uint8_t reset)
+void som_reset_control(uint8_t reset)
 {
 	GPIO_InitTypeDef GPIO_InitStruct = {0};
 	if (reset) {
