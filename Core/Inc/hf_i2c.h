@@ -12,7 +12,7 @@ extern "C" {
 /* types ------------------------------------------------------------*/
 /* constants --------------------------------------------------------*/
 /* macro ------------------------------------------------------------*/
-/* define
+/* define------------------------------------------------------------*/
 /* functions prototypes ---------------------------------------------*/
 int hf_i2c_reg_write(I2C_HandleTypeDef *hi2c, uint8_t slave_addr, uint8_t reg_addr, uint8_t *data_ptr);
 int hf_i2c_reg_read(I2C_HandleTypeDef *hi2c, uint8_t slave_addr, uint8_t reg_addr, uint8_t *data_ptr);

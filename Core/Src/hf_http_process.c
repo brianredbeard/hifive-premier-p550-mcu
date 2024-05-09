@@ -1,9 +1,12 @@
 /* Includes ------------------------------------------------------------------*/
+#include <string.h>
 #include "main.h"
 #include "cmsis_os.h"
 #include "lwip.h"
 #include "httpd.h"
 #include "dhcp.h"
+#include "hf_common.h"
+#include "web-server.h"
 extern struct netif gnetif;
 struct dhcp *dhcp;
 uint8_t ip_address[4] = {0};
@@ -12,35 +15,13 @@ uint8_t getway_address[4] = {0};
 uint8_t mac_address[6] = {0};
 void eth_get_address(void)
 {
-  if(!ip_address[0])
-  {
-    ip_address[0] = IP_ADDR0;
-    ip_address[1] = IP_ADDR1;
-    ip_address[2] = IP_ADDR2;
-    ip_address[3] = IP_ADDR3;
-  }
-  if(!getway_address[0])
-  {
-    getway_address[0] = GATEWAY_ADDR0;
-    getway_address[1] = GATEWAY_ADDR1;
-    getway_address[2] = GATEWAY_ADDR2;
-    getway_address[3] = GATEWAY_ADDR3;
-  }
-  if(!ip4_addr_netmask_valid(netmask_address))
-  {
-    netmask_address[0] = NETMASK_ADDR0;
-    netmask_address[1] = NETMASK_ADDR1;
-    netmask_address[2] = NETMASK_ADDR2;
-    netmask_address[3] = NETMASK_ADDR3;
-  }
-  if (!is_valid_ethaddr(mac_address)) {
-    mac_address[0] = MAC_ADDR0;
-    mac_address[1] = MAC_ADDR1;
-    mac_address[2] = MAC_ADDR2;
-    mac_address[3] = MAC_ADDR3;
-    mac_address[4] = MAC_ADDR4;
-    mac_address[5] = MAC_ADDR5;
-  }
+  es_get_mcu_ipaddr(ip_address);
+
+  es_get_mcu_gateway(getway_address);
+
+  es_get_mcu_netmask(netmask_address);
+
+  es_get_mcu_mac(mac_address);
 }
 
 extern struct netif gnetif;
@@ -67,6 +48,16 @@ void dynamic_change_eth(void)
 
 void hf_http_task(void *argument)
 {
+	printf("hf_http_task started!!!\r\n");
+  osDelay(5000);
+  /* get board info from eeprom where the MAC is stored */
+  if(es_init_info_in_eeprom()) {
+    printf("severe error: get info from eeprom failed!!!");
+    while(1);
+  }
+  #if ES_EEPROM_INFO_TEST
+  es_eeprom_info_test();
+  #endif
   /* init code for LWIP */
   eth_get_address();
   MX_LWIP_Init();

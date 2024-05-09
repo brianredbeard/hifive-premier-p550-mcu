@@ -161,6 +161,7 @@ static void som_rst_feedback_process(void)
 void hf_gpio_task(void *parameter)
 {
 	int flags = 0;
+	printf("hf_gpio_task started!!!\r\n");
 	gpio_eventflags_id = osEventFlagsNew(NULL);
 	while (1) {
 		flags = osEventFlagsWait(gpio_eventflags_id, FLAGS_ALL, osFlagsWaitAny, osWaitForever);
