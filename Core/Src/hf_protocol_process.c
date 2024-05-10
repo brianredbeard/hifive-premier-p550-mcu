@@ -701,9 +701,6 @@ void uart4_protocol_task(void *argument)
 
 	//Init web server cmd list
 	vListInitialise(&WebCmdList);
-
-	//trigger uart rx
-	HAL_UARTEx_ReceiveToIdle_DMA(&huart4, (int8_t *)&UART4_RxMsg, sizeof(UART4_RxMsg));
 	for (;;) {
 		if (xQueueReceive(xUart4MsgQueue, &(msg), portMAX_DELAY)) {
 			if (msg.header == FRAME_HEADER && msg.tail == FRAME_TAIL) {

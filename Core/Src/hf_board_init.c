@@ -102,8 +102,12 @@ void i2c_deinit(I2C_TypeDef *Instance)
 
 void uart_init(USART_TypeDef *Instance)
 {
-	if (Instance == UART4)
+	if (Instance == UART4) {
 		MX_UART4_Init();
+		//trigger uart rx
+		HAL_UARTEx_ReceiveToIdle_DMA(&huart4, (int8_t *)&UART4_RxMsg,
+			sizeof(UART4_RxMsg));
+	}
 	else if (Instance == USART6)
 		MX_USART6_UART_Init();
 	else
@@ -134,7 +138,6 @@ int board_init(void)
 	MX_DMA_Init();
 	MX_SPI2_Init();
 	MX_USART3_UART_Init();
-	MX_UART4_Init();
 	MX_RTC_Init();
 	MX_TIM4_Init();
 	MX_SPI1_Init();
