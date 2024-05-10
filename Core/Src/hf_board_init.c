@@ -134,6 +134,7 @@ int board_init(void)
 	MX_DMA_Init();
 	MX_SPI2_Init();
 	MX_USART3_UART_Init();
+	MX_UART4_Init();
 	MX_RTC_Init();
 	MX_TIM4_Init();
 	MX_SPI1_Init();

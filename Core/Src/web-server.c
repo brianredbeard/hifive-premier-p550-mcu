@@ -10332,12 +10332,10 @@ void unescape_colon(char *str) {
     }
 }
 
-
-
-
-int get_power_status(){
-	printf("TODO call get_power_status \n");
-	return 1;//1:powerON,0:powerOFF
+//1:powerON,0:powerOFF
+int get_power_status()
+{
+	return som_power_state == SOM_POWER_ON ? 1 : 0;
 }
 
 //status 0:power off,1:power on
@@ -10455,6 +10453,8 @@ PVTInfo get_pvt_info()
 {
 	int ret = HAL_OK;
 	PVTInfo pvtInfo = {
+		.cpu_temp = -1,
+		.npu_temp = -1,
 		.fan_speed = -1,
 	};
 

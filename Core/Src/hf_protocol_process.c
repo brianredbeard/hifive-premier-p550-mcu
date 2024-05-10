@@ -8,6 +8,7 @@
 #include "stm32f4xx_hal.h"
 #include "task.h"
 #include "queue.h"
+#include "semphr.h"
 
 #define head_meg "\xA5\x5A\xAA\x55"
 #define end_msg "\x0D\x0A\x0D\x0A"
@@ -473,6 +474,35 @@ void dump_message(Message data)
 	printf("Header: 0x%lX, Cmd Type: 0x%x, Data Len: %d, Checksum: 0x%X, Tail: 0x%lx\n",
 		data.header, data.cmd_type, data.data_len, data.checksum, data.tail);
 }
+// Define a mutex handle
+SemaphoreHandle_t xMutex = NULL;
+
+// Function to initialize the mutex
+void init_transmit_mutex(void) {
+    // Create the mutex
+    xMutex = xSemaphoreCreateMutex();
+    // Check if the mutex was created successfully
+    if (xMutex == NULL) {
+        // Mutex creation failed
+        // Handle the error here
+    }
+}
+
+// Function to acquire the mutex
+void acquire_transmit_mutex(void) {
+    // Attempt to take the mutex
+    if (xSemaphoreTake(xMutex, portMAX_DELAY) != pdPASS) {
+        // Failed to acquire the mutex
+        // Handle the error here
+    }
+}
+
+// Function to release the mutex
+void release_transmit_mutex(void) {
+    // Release the mutex
+    xSemaphoreGive(xMutex);
+}
+
 // Function to check message checksum
 int check_checksum(Message *msg)
 {
@@ -502,10 +532,17 @@ BaseType_t transmit_deamon_request(Message *msg)
 {
 	UART_HandleTypeDef *huart = &huart4;
 
+	// Acquire the mutex before transmitting
+	acquire_transmit_mutex();
+
 	generate_checksum(msg);
 	// Transmit using DMA
 	HAL_StatusTypeDef status = HAL_UART_Transmit(huart, (uint8_t *)msg,
 			sizeof(Message), HAL_MAX_DELAY);
+
+	// Release the mutex after transmitting
+	release_transmit_mutex();
+
 	if (status == HAL_OK) {
 		return status; // Successful transmission
 	} else {
@@ -513,6 +550,7 @@ BaseType_t transmit_deamon_request(Message *msg)
 		return status; // Transmission failed
 	}
 }
+
 int web_cmd_handle(CommandType cmd, void *data, int data_len, uint32_t timeout)
 {
 	HAL_StatusTypeDef status;
@@ -587,8 +625,11 @@ void deamon_keeplive_task(void *argument)
 	deamon_stats_t old_status;
 	static uint8_t count = 0;
 
-	printf("SOM Daemon status %s!\n", som_daemon_state == SOM_DAEMON_ON ? "on" : "off");
 	for (;;) {
+		if (SOM_POWER_ON != som_power_state) {
+			osDelay(50);
+			continue;
+		}
 		old_status = som_daemon_state;
 		ret = web_cmd_handle(CMD_BOARD_STATUS, NULL, 0, 1000);
 		if (HAL_OK != ret) {
@@ -649,6 +690,8 @@ void handle_deamon_mesage(Message *msg)
 void uart4_protocol_task(void *argument)
 {
 	Message msg;
+
+	init_transmit_mutex();
 
 	xUart4MsgQueue = xQueueCreate(QUEUE_LENGTH, sizeof(Message));
 	if (xUart4MsgQueue == NULL) {
