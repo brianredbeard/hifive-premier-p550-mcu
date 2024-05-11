@@ -22,6 +22,7 @@
 #define EEPROM_USERNAME_PASSWORD_ADDR 0x0100
 #define EEPROM_USERNAME_PASSWORD_BUFFER_SIZE 64
 #define AT24C_ADDR (0x50<<1) //todoooooooooooooooooo
+#define CHUNK_SIZE 1024
 
 #if LWIP_NETCONN
 
@@ -9676,7 +9677,6 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
                                                         });\n \
                                                     });\n \
 													$('#power-on-refresh').click(function() {\n \
-														$('#power-on-status').val('loading,,,');\n \
 														$('#power-on-change').prop(\"disabled\", true); \n \
 														$('#power-on-change').text('loading,,,');\n \
                                                         $.ajax({\n \
@@ -9688,11 +9688,11 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
 																// 假设返回的数据是{ buttonText: '新按钮文本' }\n \
 																$('#power-on-change').prop(\"disabled\", false); \n \
 																if(response.data.power_status===\"0\"){\n \
-																	$('#power-on-status').val('powerOFF');\n \
+																	$('#power-status-label').text('Power Status (OFF):');\n \
 																	$('#power-on-change').text('powerON');\n \
 																	$('#power-on-change').val('1');\n \
 																}else{\n \
-																	$('#power-on-status').val('powerON');\n \
+																	$('#power-status-label').text('Power Status (ON):');\n \
 																	$('#power-on-change').text('powerOFF');\n \
 																	$('#power-on-change').val('0');\n \
 																}\n \
@@ -9703,7 +9703,6 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
                                                         });\n\
                                                     });\n\
 													$('#power-retention-refresh').click(function() {\n \
-														$('#power-retention-status').val('loading,,,');\n \
 														$('#power-retention-change').prop(\"disabled\", true); \n \
 														$('#power-retention-change').text('loading,,,');\n \
                                                         $.ajax({\n \
@@ -9714,11 +9713,11 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
 															success: function(response) {\n \
 																$('#power-retention-change').prop(\"disabled\", false); \n \
 																if(response.data.power_retention_status===\"0\"){\n \
-																	$('#power-retention-status').val('disabled');\n \
+																	$('#power-retention-label').text('Power Retention(disabled):');\n \
 																	$('#power-retention-change').text('enable');\n \
 																	$('#power-retention-change').val('1');\n \
 																}else{\n \
-																	$('#power-retention-status').val('enable');\n \
+																	$('#power-retention-label').text('Power Retention(enabled):');\n \
 																	$('#power-retention-change').text('disabled');\n \
 																	$('#power-retention-change').val('0');\n \
 																}\n \
@@ -9831,6 +9830,25 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
                                                             }\n \
                                                         });\n \
                                                     });\n \
+													$('#soc-refresh').click(function() {\n \
+                                                        $.ajax({\n \
+															async: false,\n \
+                                                            url: '/soc-status',\n \
+                                                            type: 'GET',\n \
+                                                            success: function(response) {\n \
+																if(response.data.status===\"0\"){ \n \
+																	$('#soc-status').val(\"working\");\n \
+																}else{\n \
+																	$('#soc-status').val(\"stopped\");\n \
+																} \n \
+                                                                console.log('rtc refreshed successfully.');\n \
+                                                            },\n \
+                                                            error: function(xhr, status, error) {\n \
+                                                                // 请求失败时的回调函数\n \
+                                                                console.error('Error refreshing rtc:', error);\n \
+                                                            }\n \
+                                                        });\n \
+                                                    });\n \
 													// --------------------after load page ------------- \n \
 													$('#power-on-refresh').click(); \n \
 													$('#power-retention-refresh').click(); \n \
@@ -9841,6 +9859,7 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
 													$('#board-info-som-refresh').click(); \n \
 													$('#board-info-cb-refresh').click(); \n \
 													$('#rtc-refresh').click(); \n \
+													$('#soc-refresh').click(); \n \
                                                 });\n\
                                             </script>\n \
                                             <style> \
@@ -9913,19 +9932,16 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
                                        <h3>Machine Status</h3> \
 										<div class=\"power-status\"> \
 											<div class=\"network-row\"> \
-											<label>Power Status:</label> <input type=\"text\" id=\"power-on-status\" value=\"loading,,,\" style=\"width: 100px;\" disabled>  <br> \
-											</div> \
-											<div class=\"network-row\"> \
-											<label>Power Status Change:</label> <button id=\"power-on-change\" disabled>loading,,,</button>   <br> \
+											<label id=\"power-status-label\">Power Status :</label> <button id=\"power-on-change\" disabled>loading,,,</button>   <br> \
 											</div> \
 											<button id=\"power-on-refresh\" style=\"display:none;\">refresh</button> \
 											<div class=\"network-row\"> \
-											<label>Power Retention:</label> <input type=\"text\" id=\"power-retention-status\" value=\"loading,,,\" style=\"width: 100px;\" disabled> <br> \
-											</div> \
-											<div class=\"network-row\"> \
-											<label>Power Retention Change:</label> <button id=\"power-retention-change\" disabled>loading,,,</button> <br> \
+											<label id=\"power-retention-label\">Power Retention:</label> <button id=\"power-retention-change\" disabled>loading,,,</button> <br> \
 											</div> \
 											<button id=\"power-retention-refresh\" style=\"display:none;\">refresh</button> \
+											<div class=\"network-row\"> \
+											<label>Soc Status:</label> <input type=\"text\" id=\"soc-status\" value=\"loading,,,\" style=\"width: 100px;\" disabled> <button id=\"soc-refresh\">refresh</button>   <br> \
+											</div> \
 										</div> \
 										<div class=\"reset\"> \
 											<div class=\"network-row\"> \
@@ -10073,6 +10089,10 @@ const unsigned char modify_account_html[] ="<html lang=\"zh\"> \
                                     </body> \
                                     </html> ";
 
+const char *json_header = "HTTP/1.1 200 OK\r\n"
+						"Content-Type: application/json\r\n"
+						"Connection: close\r\n"
+						"Content-Length: %d\r\n\r\n";
 
 // 函数定义
 char* concatenate_strings(const char* str1, const char* str2) {
@@ -10118,6 +10138,31 @@ void send_redirect(struct netconn *conn, const char *location,const char* cookie
     netconn_write(conn, header, strlen(header), NETCONN_COPY);
 }
 
+err_t send_large_data(struct netconn *conn, const char *data, unsigned int length) {
+    err_t result = ERR_OK;
+    unsigned int offset = 0; // 当前发送偏移量
+
+    // 循环发送数据，直到发送完所有数据
+    while (offset < length) {
+        unsigned int chunk_size = CHUNK_SIZE;
+        if (offset + CHUNK_SIZE > length) {
+            chunk_size = length - offset; // 最后一块可能不足CHUNK_SIZE
+        }
+
+        // 发送当前块
+        result = netconn_write(conn, data + offset, chunk_size, NETCONN_COPY);
+		printf("offset:%d chunk_size:%d \n" ,offset,chunk_size);
+
+        if (result != ERR_OK) {
+            break; // 如果发送失败，则提前退出
+        }
+
+        offset += chunk_size; // 更新偏移量
+    }
+
+    return result;
+}
+
 void send_response_content(struct netconn *conn,const char* cookies,const char* html_content ){
     char* header_tmp=NULL;
     char* header=NULL;
@@ -10140,7 +10185,8 @@ void send_response_content(struct netconn *conn,const char* cookies,const char* 
 	
 	netconn_write(conn, header_full, strlen(header_full), NETCONN_COPY);
 	printf("send_response_content after header_full \n");
-    netconn_write(conn, html_content, strlen(html_content), NETCONN_COPY);
+	send_large_data(conn, html_content,  strlen(html_content));
+    // netconn_write(conn, html_content, strlen(html_content), NETCONN_COPY);
 	printf("send_response_content after html_content \n");
 
     free(header);
@@ -10692,7 +10738,25 @@ RTCInfo get_rtcinfo(){
 
 int set_rtcinfo(RTCInfo rtcInfo){
 	printf("TODO call set_rtcinfo\n");
-	return 0;
+	RTCInfo get_rtcinfo(){
+	printf("TODO call get_rtcinfo\n");
+	RTCInfo example= {
+        2024,
+        5,
+        10,
+        13,
+		33,
+		59,
+		59
+    };
+    return example;
+}
+return 0;
+}
+
+int get_soc_status(){
+	printf("TODO call get_soc_status\n");
+	return 0;//0,working,1,stopped
 }
 
  /** Serve one HTTP connection accepted in the http thread */
@@ -10873,14 +10937,8 @@ int set_rtcinfo(RTCInfo rtcInfo){
                 char *json_response_patt = "{\"status\":0,\"message\":\"success\",\"data\":{\"power_status\":\"%d\"}}";//0 success, msg
                 sprintf(json_response, json_response_patt,power_status);
 
-                // 发送HTTP头部
-                const char *header = "HTTP/1.1 200 OK\r\n"
-                                    "Content-Type: application/json\r\n"
-                                    "Connection: close\r\n"
-                                    "Content-Length: %d\r\n\r\n";
-
                 char response_header[BUF_SIZE_256];
-                sprintf(response_header, header, strlen(json_response));
+                sprintf(response_header, json_header, strlen(json_response));
 
                 printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
@@ -10894,14 +10952,8 @@ int set_rtcinfo(RTCInfo rtcInfo){
                 char *json_response_patt = "{\"status\":0,\"message\":\"success\",\"data\":{\"power_retention_status\":\"%d\"}}";//0 success, msg
                 sprintf(json_response, json_response_patt,power_retention_status);
 
-                // 发送HTTP头部
-                const char *header = "HTTP/1.1 200 OK\r\n"
-                                    "Content-Type: application/json\r\n"
-                                    "Connection: close\r\n"
-                                    "Content-Length: %d\r\n\r\n";
-
                 char response_header[BUF_SIZE_256];
-                sprintf(response_header, header, strlen(json_response));
+                sprintf(response_header, json_header, strlen(json_response));
 
                 printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
@@ -10914,14 +10966,10 @@ int set_rtcinfo(RTCInfo rtcInfo){
                 char *json_response_patt = "{\"status\":0,\"message\":\"success\",\"data\":{\"consumption\":\"%d\",\"voltage\":\"%d\",\"current\":\"%d\"}}";//0 success, msg
                 sprintf(json_response, json_response_patt,power_info.consumption,power_info.voltage,power_info.current);
 
-                // 发送HTTP头部
-                const char *header = "HTTP/1.1 200 OK\r\n"
-                                    "Content-Type: application/json\r\n"
-                                    "Connection: close\r\n"
-                                    "Content-Length: %d\r\n\r\n";
+
 
                 char response_header[BUF_SIZE_256];
-                sprintf(response_header, header, strlen(json_response));
+                sprintf(response_header, json_header, strlen(json_response));
 
                 printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
@@ -10937,14 +10985,9 @@ int set_rtcinfo(RTCInfo rtcInfo){
                 char *json_response_patt = "{\"status\":0,\"message\":\"success\",\"data\":{\"cpu_temp\":\"%d\",\"npu_temp\":\"%d\",\"fan_speed\":\"%d\"}}";
                 sprintf(json_response, json_response_patt,pvt_info.cpu_temp,pvt_info.npu_temp,pvt_info.fan_speed);
 
-                // 发送HTTP头部
-                const char *header = "HTTP/1.1 200 OK\r\n"
-                                    "Content-Type: application/json\r\n"
-                                    "Connection: close\r\n"
-                                    "Content-Length: %d\r\n\r\n";
 
                 char response_header[BUF_SIZE_256];
-                sprintf(response_header, header, strlen(json_response));
+                sprintf(response_header, json_header, strlen(json_response));
 
                 printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
@@ -10960,14 +11003,10 @@ int set_rtcinfo(RTCInfo rtcInfo){
                 char *json_response_patt = "{\"status\":0,\"message\":\"success\",\"data\":{\"dip01\":\"%d\",\"dip02\":\"%d\",\"dip03\":\"%d\",\"dip04\":\"%d\"}}";
                 sprintf(json_response, json_response_patt,dipSwitchInfo.dip01,dipSwitchInfo.dip02,dipSwitchInfo.dip03,dipSwitchInfo.dip04);
 
-                // 发送HTTP头部
-                const char *header = "HTTP/1.1 200 OK\r\n"
-                                    "Content-Type: application/json\r\n"
-                                    "Connection: close\r\n"
-                                    "Content-Length: %d\r\n\r\n";
+
 
                 char response_header[BUF_SIZE_512];
-                sprintf(response_header, header, strlen(json_response));
+                sprintf(response_header, json_header, strlen(json_response));
 
                 printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
@@ -10985,13 +11024,8 @@ int set_rtcinfo(RTCInfo rtcInfo){
 
                 sprintf(json_response, json_response_patt,netinfo.ipaddr,netinfo.gateway,netinfo.subnetwork,netinfo.macaddr);
 
-                // 发送HTTP头部
-                const char *header = "HTTP/1.1 200 OK\r\n"
-                                    "Content-Type: application/json\r\n"
-                                    "Connection: close\r\n"
-                                    "Content-Length: %d\r\n\r\n";
                 char response_header[256];
-                sprintf(response_header, header, strlen(json_response));
+                sprintf(response_header, json_header, strlen(json_response));
 
 				printf("#### FAKE query network! #####\n");
 
@@ -11056,14 +11090,10 @@ int set_rtcinfo(RTCInfo rtcInfo){
                 char *json_response_patt = "{\"status\":0,\"message\":\"success\",\"data\":{\"magicNumber\":\"%d\",\"formatVersionNumber\":\"%d\",\"productIdentifier\":\"%d\",\"pcbRevision\":\"%d\",\"boardSerialNumber\":\"%s\"}}";
                 sprintf(json_response, json_response_patt,simpleInfo.magic,simpleInfo.version,simpleInfo.id,simpleInfo.pcb,simpleInfo.sn);
 
-                // 发送HTTP头部
-                const char *header = "HTTP/1.1 200 OK\r\n"
-                                    "Content-Type: application/json\r\n"
-                                    "Connection: close\r\n"
-                                    "Content-Length: %d\r\n\r\n";
 
-                char response_header[BUF_SIZE_512];
-                sprintf(response_header, header, strlen(json_response));
+
+                char response_header[BUF_SIZE_128];
+                sprintf(response_header, json_header, strlen(json_response));
 
                 printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
@@ -11079,14 +11109,10 @@ int set_rtcinfo(RTCInfo rtcInfo){
                 char *json_response_patt = "{\"status\":0,\"message\":\"success\",\"data\":{\"magicNumber\":\"%d\",\"formatVersionNumber\":\"%d\",\"productIdentifier\":\"%d\",\"pcbRevision\":\"%d\",\"boardSerialNumber\":\"%s\"}}";
                 sprintf(json_response, json_response_patt,simpleInfo.magicNumber,simpleInfo.formatVersionNumber,simpleInfo.productIdentifier,simpleInfo.pcbRevision,simpleInfo.boardSerialNumber);
 
-                // 发送HTTP头部
-                const char *header = "HTTP/1.1 200 OK\r\n"
-                                    "Content-Type: application/json\r\n"
-                                    "Connection: close\r\n"
-                                    "Content-Length: %d\r\n\r\n";
 
-                char response_header[BUF_SIZE_512];
-                sprintf(response_header, header, strlen(json_response));
+
+                char response_header[BUF_SIZE_128];
+                sprintf(response_header, json_header, strlen(json_response));
 
                 printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
@@ -11102,21 +11128,36 @@ int set_rtcinfo(RTCInfo rtcInfo){
                 char *json_response_patt = "{\"status\":0,\"message\":\"success\",\"data\":{\"year\":\"%d\",\"month\":\"%d\",\"date\":\"%d\",\"weekday\":\"%d\",\"hours\":\"%d\",\"minutes\":\"%d\",\"seconds\":\"%d\"}}";
                 sprintf(json_response, json_response_patt,rtcInfo.year,rtcInfo.month,rtcInfo.date,rtcInfo.weekday,rtcInfo.hours,rtcInfo.minutes,rtcInfo.seconds);
 
-                // 发送HTTP头部
-                const char *header = "HTTP/1.1 200 OK\r\n"
-                                    "Content-Type: application/json\r\n"
-                                    "Connection: close\r\n"
-                                    "Content-Length: %d\r\n\r\n";
 
-                char response_header[BUF_SIZE_512];
-                sprintf(response_header, header, strlen(json_response));
+                char response_header[BUF_SIZE_128];
+                sprintf(response_header, json_header, strlen(json_response));
 
                 printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
                 netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
                 netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
 
-            }else{
+            }else if(strcmp(path, "/soc-status")==0){
+
+				printf("get ,location: /soc-status \n");
+				int ret=get_soc_status();
+
+               	char json_response[BUF_SIZE_128]={0};
+				 // 创建JSON格式的字符串
+                char *json_response_patt = "{\"status\":0,\"message\":\"success\",\"data\":{\"status\":\"%d\"}}";
+                sprintf(json_response, json_response_patt,ret);
+
+
+                char response_header[BUF_SIZE_128];
+                sprintf(response_header, json_header, strlen(json_response));
+
+                printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
+
+                netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
+                netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
+
+
+			}else{
                 printf("ERROR unsupport get path \n");
                 send_response_200(conn);
             }
@@ -11375,13 +11416,9 @@ int set_rtcinfo(RTCInfo rtcInfo){
 						sprintf(json_response, json_response_patt, change_status_ret,change_status_ret);
 					}
 
-                    // 发送HTTP头部
-                    const char *header = "HTTP/1.1 200 OK\r\n"
-                                        "Content-Type: application/json\r\n"
-                                        "Connection: close\r\n"
-                                        "Content-Length: %d\r\n\r\n";
-                    char response_header[256];
-                    sprintf(response_header, header, strlen(json_response));
+
+                    char response_header[BUF_SIZE_128];
+                    sprintf(response_header, json_header, strlen(json_response));
 
                     printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
@@ -11423,13 +11460,8 @@ int set_rtcinfo(RTCInfo rtcInfo){
 						sprintf(json_response, json_response_patt, change_status_ret,change_status_ret);
 					}
 
-                    // 发送HTTP头部
-                    const char *header = "HTTP/1.1 200 OK\r\n"
-                                        "Content-Type: application/json\r\n"
-                                        "Connection: close\r\n"
-                                        "Content-Length: %d\r\n\r\n";
-                    char response_header[256];
-                    sprintf(response_header, header, strlen(json_response));
+                    char response_header[BUF_SIZE_128];
+                    sprintf(response_header, json_header, strlen(json_response));
 
                     printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
@@ -11450,13 +11482,9 @@ int set_rtcinfo(RTCInfo rtcInfo){
 						sprintf(json_response, json_response_patt, reset_ret,reset_ret);
 					}
 
-                    // 发送HTTP头部
-                    const char *header = "HTTP/1.1 200 OK\r\n"
-                                        "Content-Type: application/json\r\n"
-                                        "Connection: close\r\n"
-                                        "Content-Length: %d\r\n\r\n";
-                    char response_header[256];
-                    sprintf(response_header, header, strlen(json_response));
+
+                    char response_header[BUF_SIZE_128];
+                    sprintf(response_header, json_header, strlen(json_response));
 
                     printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
@@ -11501,13 +11529,9 @@ int set_rtcinfo(RTCInfo rtcInfo){
 						sprintf(json_response, json_response_patt, set_ret,set_ret);
 					}
 
-                    // 发送HTTP头部
-                    const char *header = "HTTP/1.1 200 OK\r\n"
-                                        "Content-Type: application/json\r\n"
-                                        "Connection: close\r\n"
-                                        "Content-Length: %d\r\n\r\n";
-                    char response_header[256];
-                    sprintf(response_header, header, strlen(json_response));
+
+                    char response_header[BUF_SIZE_128];
+                    sprintf(response_header, json_header, strlen(json_response));
 
                     printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
@@ -11567,14 +11591,8 @@ int set_rtcinfo(RTCInfo rtcInfo){
                      // 创建JSON格式的字符串
                     char *json_response = "{\"status\":0,\"message\":\"success\",\"data\":{}}";//0 success, msg
 
-
-                    // 发送HTTP头部
-                    const char *header = "HTTP/1.1 200 OK\r\n"
-                                        "Content-Type: application/json\r\n"
-                                        "Connection: close\r\n"
-                                        "Content-Length: %d\r\n\r\n";
-                    char response_header[256];
-                    sprintf(response_header, header, strlen(json_response));
+                    char response_header[BUF_SIZE_128];
+                    sprintf(response_header, json_header, strlen(json_response));
 
                     printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
@@ -11633,13 +11651,8 @@ int set_rtcinfo(RTCInfo rtcInfo){
 						sprintf(json_response, json_response_patt, set_ret,set_ret);
 					}
 
-                    // 发送HTTP头部
-                    const char *header = "HTTP/1.1 200 OK\r\n"
-                                        "Content-Type: application/json\r\n"
-                                        "Connection: close\r\n"
-                                        "Content-Length: %d\r\n\r\n";
-                    char response_header[256];
-                    sprintf(response_header, header, strlen(json_response));
+                    char response_header[BUF_SIZE_128];
+                    sprintf(response_header, json_header, strlen(json_response));
 
                     printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
@@ -11722,11 +11735,11 @@ int set_rtcinfo(RTCInfo rtcInfo){
 			http_server_netconn_serve(newconn);
 
 			//删除连接结构
-			// netconn_close(newconn); /* 关闭连接 */
+			netconn_close(newconn); /* 关闭连接 */
 			netconn_delete(newconn);
 		}else{
 			printf("http_server_netconn_thread:err %d \n",err);
-			// netconn_close(newconn);
+			netconn_close(newconn);
 			netconn_delete(newconn);
 		}
 	}
