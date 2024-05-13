@@ -11,6 +11,7 @@ int hf_i2c_reg_write(I2C_HandleTypeDef *hi2c, uint8_t slave_addr,
 							   data_ptr, 0x1, 0xff);
 	if (status != HAL_OK) {
 		printf("I2Cx_write_Error(%x) reg %x; status %x\r\n", slave_addr, reg_addr, status);
+		return status;
 	}
 	while (HAL_I2C_GetState(hi2c) != HAL_I2C_STATE_READY);
 	while (HAL_I2C_IsDeviceReady(hi2c, slave_addr, 0xff, 0xff) == HAL_TIMEOUT);

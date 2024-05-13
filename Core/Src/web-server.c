@@ -10766,20 +10766,19 @@ typedef struct {
 	int swctrl;//0 hw,1,sw
 } DIPSwitchInfo;
 
-DIPSwitchInfo get_dip_switch(){
+int get_dip_switch(DIPSwitchInfo *dipSwitchInfo)
+{
 	uint8_t som_dip_switch_state;
-	DIPSwitchInfo dipSwitchInfo;
-
 	es_get_som_dip_switch_soft_state(&som_dip_switch_state);
-	dipSwitchInfo.dip01 = 0x1 & som_dip_switch_state;
-	dipSwitchInfo.dip02 = (0x2 & som_dip_switch_state) >> 1;
-	dipSwitchInfo.dip03 = (0x4 & som_dip_switch_state) >> 2;
-	dipSwitchInfo.dip04 = (0x8 & som_dip_switch_state) >> 3;
-	dipSwitchInfo.swctrl = 0;//todooooooooooo
-
-	return dipSwitchInfo;
+	dipSwitchInfo->dip01 = 0x1 & som_dip_switch_state;
+	dipSwitchInfo->dip02 = (0x2 & som_dip_switch_state) >> 1;
+	dipSwitchInfo->dip03 = (0x4 & som_dip_switch_state) >> 2;
+	dipSwitchInfo->dip04 = (0x8 & som_dip_switch_state) >> 3;
+	return 0;
 }
-int set_dip_switch(DIPSwitchInfo dipSwitchInfo){
+
+int set_dip_switch(DIPSwitchInfo dipSwitchInfo)
+{
 	uint8_t som_dip_switch_state;
 
 	som_dip_switch_state =  ((0x1 & dipSwitchInfo.dip04) << 3) | ((0x1 & dipSwitchInfo.dip03) << 2)
@@ -10859,36 +10858,36 @@ typedef struct {
 	int seconds;
 } RTCInfo;
 
-RTCInfo get_rtcinfo(){
-	printf("TODO call get_rtcinfo\n");
-	RTCInfo example= {
-        2024,
-        5,
-        10,
-        13,
-		33,
-		59,
-		59
-    };
-    return example;
+int get_rtcinfo(RTCInfo *rtcInfo)
+{
+	struct rtc_date_t date = {0};
+	struct rtc_time_t time = {0};
+
+	es_get_rtc_date(&date);
+	es_get_rtc_time(&time);
+	rtcInfo->year = date.Year;
+	rtcInfo->month = date.Month;
+	rtcInfo->date = date.Date;
+	rtcInfo->weekday = date.WeekDay;
+	rtcInfo->hours = time.Hours;
+	rtcInfo->minutes = time.Minutes;
+	rtcInfo->seconds = time.Seconds;
+    return 0;
 }
 
 int set_rtcinfo(RTCInfo rtcInfo){
-	printf("TODO call set_rtcinfo\n");
-	RTCInfo get_rtcinfo(){
-	printf("TODO call get_rtcinfo\n");
-	RTCInfo example= {
-        2024,
-        5,
-        10,
-        13,
-		33,
-		59,
-		59
-    };
-    return example;
-}
-return 0;
+	struct rtc_date_t date = {0};
+	struct rtc_time_t time = {0};
+	date.Year = rtcInfo.year;
+	date.Month = rtcInfo.month;
+	date.Date = rtcInfo.date;
+	date.WeekDay = rtcInfo.weekday;
+	time.Hours = rtcInfo.hours;
+	time.Minutes = rtcInfo.minutes;
+	time.Seconds = rtcInfo.seconds;
+	es_set_rtc_date(&date);
+	es_set_rtc_time(&time);
+	return 0;
 }
 
 int get_soc_status(){
@@ -11159,8 +11158,8 @@ int get_soc_status(){
 
 			}else if(strcmp(path, "/dip_switch")==0 ){ //get dip_switch
 				printf("GET location: dip_switch \n");
-				DIPSwitchInfo dipSwitchInfo= get_dip_switch();
-
+				DIPSwitchInfo dipSwitchInfo= {0};
+				get_dip_switch(&dipSwitchInfo);
 				char json_response[BUF_SIZE_128]={0};
 				 // 创建JSON格式的字符串
                 char *json_response_patt = "{\"status\":0,\"message\":\"success\",\"data\":{\"dip01\":\"%d\",\"dip02\":\"%d\",\"dip03\":\"%d\",\"dip04\":\"%d\",\"swctrl\":\"%d\"}}";
@@ -11304,7 +11303,8 @@ int get_soc_status(){
 
             }else if(strcmp(path, "/rtc")==0 ){
                 printf("get ,location: /rtc \n");
-				RTCInfo rtcInfo=get_rtcinfo();
+				RTCInfo rtcInfo = {0};
+				get_rtcinfo(&rtcInfo);
 
                	char json_response[BUF_SIZE_256]={0};
 				 // 创建JSON格式的字符串

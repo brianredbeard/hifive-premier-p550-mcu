@@ -152,7 +152,6 @@ int _write(int fd, char *ch, int len)
 	return length;
 }
 
-
 void es_eeprom_wp(uint8_t flag)
 {
 	if(flag) {
@@ -936,5 +935,112 @@ int es_eeprom_info_test(void)
 	#endif
 
 	#endif
+	return 0;
+}
+
+/**
+ * @brief  eic7700 boot sel.
+ * @param  sel 4'b, bit3:bootsel3 ,bit2:bootsel2; bit1:bootsel2; bit0:bootsel0
+ * @retval None
+ */
+void set_bootsel(uint8_t is_soft_crtl, uint8_t sel)
+{
+	GPIO_InitTypeDef GPIO_InitStruct = {0};
+	if(is_soft_crtl){
+		/*Configure GPIO pins : BOOT_SEL0_Pin BOOT_SEL1_Pin BOOT_SEL2_Pin BOOT_SEL3_Pin*/
+		GPIO_InitStruct.Pin = BOOT_SEL0_Pin | BOOT_SEL1_Pin | BOOT_SEL2_Pin | BOOT_SEL3_Pin;
+		GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+		GPIO_InitStruct.Pull = GPIO_NOPULL;
+		GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+		HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+		uint16_t pin_n = BOOT_SEL0_Pin;
+		for (int i = 0; i < 4; i++) {
+			if (sel & 0x1)
+				HAL_GPIO_WritePin(BOOT_SEL0_GPIO_Port, pin_n, GPIO_PIN_SET);
+			else
+				HAL_GPIO_WritePin(BOOT_SEL0_GPIO_Port, pin_n, GPIO_PIN_RESET);
+			sel = sel >> 1;
+			pin_n = pin_n << 1;
+		}
+	}
+	else {
+		/*Configure GPIO pins : BOOT_SEL0_Pin BOOT_SEL1_Pin BOOT_SEL2_Pin BOOT_SEL3_Pin*/
+		GPIO_InitStruct.Pin = BOOT_SEL0_Pin | BOOT_SEL1_Pin | BOOT_SEL2_Pin | BOOT_SEL3_Pin;
+		GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+		GPIO_InitStruct.Pull = GPIO_NOPULL;
+		GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+		HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+	}
+
+}
+
+int32_t es_set_rtc_date(struct rtc_date_t *sdate)
+{
+	RTC_DateTypeDef sDate = {0};
+	sDate.Year = sdate->Year - 2000;
+	sDate.Month = sdate->Month;
+	sDate.Date = sdate->Date;
+	sDate.WeekDay = sdate->WeekDay;
+
+	printf("yy/mm/dd  %04d/%02d/%02d %02d\r\n", sDate.Year + 2000, sDate.Month, sDate.Date,sDate.WeekDay);
+	if (HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BIN) != HAL_OK)
+		return HAL_ERROR;
+	return HAL_OK;
+}
+
+int32_t es_set_rtc_time(struct rtc_time_t *stime)
+{
+	RTC_TimeTypeDef sTime = {0};
+	sTime.Hours = stime->Hours;
+	sTime.Minutes = stime->Minutes;
+	sTime.Seconds = stime->Seconds;
+	sTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
+	sTime.StoreOperation = RTC_STOREOPERATION_SET;
+	// printf("%s hh:mm:ss %02d:%02d:%02d\r\n", __func__, sTime.Hours, sTime.Minutes,sTime.Seconds);
+	if (HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BIN) != HAL_OK)
+		return HAL_ERROR;
+	return HAL_OK;
+}
+
+int32_t es_get_rtc_date(struct rtc_date_t *sdate)
+{
+	RTC_DateTypeDef GetData;
+	RTC_TimeTypeDef GetTime;
+	if (HAL_RTC_GetTime(&hrtc, &GetTime, RTC_FORMAT_BIN) != HAL_OK)
+		return HAL_ERROR;
+	if (HAL_RTC_GetDate(&hrtc, &GetData, RTC_FORMAT_BIN) != HAL_OK)
+		return HAL_ERROR;
+	// printf("yy/mm/dd  %02d/%02d/%02d\r\n", 2000 + GetData.Year, GetData.Month, GetData.Date);
+	sdate->Year = 2000 + GetData.Year;
+	sdate->Month = GetData.Month;
+	sdate->Date = GetData.Date;
+	sdate->WeekDay = GetData.WeekDay;
+	return HAL_OK;
+}
+
+int32_t es_get_rtc_time(struct rtc_time_t *stime)
+{
+	RTC_TimeTypeDef GetTime;
+	RTC_DateTypeDef GetData;
+
+	if (HAL_RTC_GetTime(&hrtc, &GetTime, RTC_FORMAT_BIN) != HAL_OK)
+		return HAL_ERROR;
+	if (HAL_RTC_GetDate(&hrtc, &GetData, RTC_FORMAT_BIN) != HAL_OK)
+		return HAL_ERROR;
+	stime->Hours = GetTime.Hours;
+	stime->Minutes = GetTime.Minutes;
+	stime->Seconds = GetTime.Seconds;
+	// printf("%s hh:mm:ss %02d:%02d:%02d\r\n", __func__, stime->Hours, stime->Minutes, stime->Seconds);
+	return HAL_OK;
+}
+
+uint32_t es_autoboot(void)
+{
+	int32_t som_pwr_last_state = 0;
+	if(is_som_pwr_lost_resume() && !es_get_som_pwr_last_state(&som_pwr_last_state)) {
+		if (som_pwr_last_state){
+			return 1;
+		}
+	}
 	return 0;
 }

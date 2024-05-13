@@ -49,15 +49,7 @@ void dynamic_change_eth(void)
 void hf_http_task(void *argument)
 {
 	printf("hf_http_task started!!!\r\n");
-  osDelay(5000);
-  /* get board info from eeprom where the MAC is stored */
-  if(es_init_info_in_eeprom()) {
-    printf("severe error: get info from eeprom failed!!!");
-    while(1);
-  }
-  #if ES_EEPROM_INFO_TEST
-  es_eeprom_info_test();
-  #endif
+
   /* init code for LWIP */
   eth_get_address();
   MX_LWIP_Init();

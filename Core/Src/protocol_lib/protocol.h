@@ -5,6 +5,7 @@
 #include "stdint.h"
 #include "string.h"
 #include "stm32f4xx_hal.h"
+#include "hf_common.h"
 
 #define B_ERROR 1
 #define B_SUCCESS 0
@@ -17,66 +18,6 @@ typedef struct {
 	const char *head;
 	const char *end;
 } b_frame_t;
-
-struct gpio_cmd {
-	uint16_t group;
-	uint16_t pin_num;
-	uint8_t driection;
-	uint8_t value;
-};
-
-struct ip_t {
-	uint8_t ip_addr0;
-	uint8_t ip_addr1;
-	uint8_t ip_addr2;
-	uint8_t ip_addr3;
-};
-
-struct netmask_t {
-	uint8_t netmask_addr0;
-	uint8_t netmask_addr1;
-	uint8_t netmask_addr2;
-	uint8_t netmask_addr3;
-};
-
-struct getway_t {
-	uint8_t getway_addr0;
-	uint8_t getway_addr1;
-	uint8_t getway_addr2;
-	uint8_t getway_addr3;
-};
-
-struct eth_mac_t {
-	uint8_t eth_mac_addr0;
-	uint8_t eth_mac_addr1;
-	uint8_t eth_mac_addr2;
-	uint8_t eth_mac_addr3;
-	uint8_t eth_mac_addr4;
-	uint8_t eth_mac_addr5;
-};
-
-struct rtc_date_t {
-  uint16_t Year;
-  uint8_t Month;
-  uint8_t Date;
-  uint8_t WeekDay;
-};
-
-struct rtc_time_t {
-	uint8_t Hours;
-	uint8_t Minutes;
-	uint8_t Seconds;
-};
-
-struct fan_control_t {
-	uint8_t fan_num;
-	uint8_t duty;
-};
-
-struct spi_slv_w32_t {
-	uint32_t addr;
-	uint32_t value;
-};
 
 struct frame_data {
 	uint8_t is_valid;

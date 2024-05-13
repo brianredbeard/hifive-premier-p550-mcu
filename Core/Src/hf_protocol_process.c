@@ -115,67 +115,6 @@ int32_t es_set_eth(struct ip_t *ip, struct netmask_t *netmask, struct getway_t *
 	return HAL_OK;
 }
 
-int32_t es_set_rtc_date(struct rtc_date_t *sdate)
-{
-	RTC_DateTypeDef sDate = {0};
-	uint16_t year =  (sdate->Year >> 8) | (sdate->Year && 0xff) << 8;
-	sDate.Year = year - 2000;
-	sDate.Month = sdate->Month;
-	sDate.Date = sdate->Date;
-	sDate.WeekDay = sdate->WeekDay;
-
-	// printf("yy/mm/dd  %04d/%02d/%02d %02d\r\n", sDate.Year + 2000, sDate.Month, sDate.Date,sDate.WeekDay);
-	if (HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BIN) != HAL_OK)
-		return HAL_ERROR;
-	return HAL_OK;
-}
-
-int32_t es_set_rtc_time(struct rtc_time_t *stime)
-{
-	RTC_TimeTypeDef sTime = {0};
-	sTime.Hours = stime->Hours;
-	sTime.Minutes = stime->Minutes;
-	sTime.Seconds = stime->Seconds;
-	sTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
-	sTime.StoreOperation = RTC_STOREOPERATION_SET;
-	// printf("%s hh:mm:ss %02d:%02d:%02d\r\n", __func__, sTime.Hours, sTime.Minutes,sTime.Seconds);
-	if (HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BIN) != HAL_OK)
-		return HAL_ERROR;
-	return HAL_OK;
-}
-
-int32_t es_get_rtc_date(struct rtc_date_t *sdate)
-{
-	RTC_DateTypeDef GetData;
-	RTC_TimeTypeDef GetTime;
-	if (HAL_RTC_GetTime(&hrtc, &GetTime, RTC_FORMAT_BIN) != HAL_OK)
-		return HAL_ERROR;
-	if (HAL_RTC_GetDate(&hrtc, &GetData, RTC_FORMAT_BIN) != HAL_OK)
-		return HAL_ERROR;
-	// printf("yy/mm/dd  %02d/%02d/%02d\r\n", 2000 + GetData.Year, GetData.Month, GetData.Date);
-	sdate->Year = 2000 + GetData.Year;
-	sdate->Month = GetData.Month;
-	sdate->Date = GetData.Date;
-	sdate->WeekDay = GetData.WeekDay;
-	return HAL_OK;
-}
-
-int32_t es_get_rtc_time(struct rtc_time_t *stime)
-{
-	RTC_TimeTypeDef GetTime;
-	RTC_DateTypeDef GetData;
-
-	if (HAL_RTC_GetTime(&hrtc, &GetTime, RTC_FORMAT_BIN) != HAL_OK)
-		return HAL_ERROR;
-	if (HAL_RTC_GetDate(&hrtc, &GetData, RTC_FORMAT_BIN) != HAL_OK)
-		return HAL_ERROR;
-	stime->Hours = GetTime.Hours;
-	stime->Minutes = GetTime.Minutes;
-	stime->Seconds = GetTime.Seconds;
-	// printf("%s hh:mm:ss %02d:%02d:%02d\r\n", __func__, stime->Hours, stime->Minutes, stime->Seconds);
-	return HAL_OK;
-}
-
 extern uint32_t pwm_period;
 uint32_t fan0_duty = 0;
 uint32_t fan1_duty = 0;
@@ -333,6 +272,8 @@ void es_process_cmd(b_frame_class_t *pframe)
 		break;
 	case CMD_SET_DATE:
 		if (pframe->frame.len == (sizeof(struct rtc_date_t) - 1)) {
+			uint16_t year =  (pframe->frame.data.rtc_date.Year >> 8) | (pframe->frame.data.rtc_date.Year && 0xff) << 8;
+			pframe->frame.data.rtc_date.Year = year;
 			if (es_set_rtc_date(&pframe->frame.data.rtc_date) == HAL_OK)
 				req_type = REQ_OK;
 		}

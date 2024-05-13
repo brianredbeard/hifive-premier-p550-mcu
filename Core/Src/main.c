@@ -146,23 +146,47 @@ static void mcu_status_led_on(uint8_t turnon)
 extern void get_rtc_info(void);
 extern void hf_power_task (void* parameter);
 extern void hf_gpio_task (void* parameter);
+
+
+typedef struct {
+  int dip01;
+  int dip02;
+  int dip03;
+	int dip04;
+	int swctrl;//0 hw,1,sw
+} DIPSwitchInfo;
+
+extern int get_dip_switch(DIPSwitchInfo *dipSwitchInfo);
+extern int set_dip_switch(DIPSwitchInfo dipSwitchInfo);
+
+
 void hf_main_task(void *argument)
 {
+  printf("HiFive 106SC!\n");
+  extern void power_test_dome(void);
+  mcu_status_led_on(pdTRUE);
+  power_test_dome();
+
+  /* get board info from eeprom where the MAC is stored */
+  if(es_init_info_in_eeprom()) {
+    printf("severe error: get info from eeprom failed!!!");
+    while(1);
+  }
+  #if ES_EEPROM_INFO_TEST
+  es_eeprom_info_test();
+  #endif
 
   power_task_handle = osThreadNew(hf_power_task, NULL, &power_task_attributes);
-  key_task_handle = osThreadNew(hf_gpio_task, NULL, &gpio_task_attributes);
   http_task_handle = osThreadNew(hf_http_task, NULL, &http_task_attributes);
+  key_task_handle = osThreadNew(hf_gpio_task, NULL, &gpio_task_attributes);
   // moniter_task_handle = osThreadNew(MoniterTask, NULL, &MoniterTask_attributes);
   protocol_task_handle = osThreadNew(protocol_task, NULL, &protocol_task_attributes);
   uart4_protocol_task_handle = osThreadNew(uart4_protocol_task, NULL, &protocol_task_attributes);
   daemon_keelive_task_handle = osThreadNew(deamon_keeplive_task, NULL, &daemon_keeplive_task_attributes);
-  osDelay(900);
-  printf("HiFive 106SC!\n");
   // extern void MX_IWDG_Init(void);
-
 	// MX_IWDG_Init();
 
-  mcu_status_led_on(pdTRUE);
+  // mcu_status_led_on(pdTRUE);
   // extern uint32_t PWM2_T_Count;
   // extern uint32_t PWM2_D_Count;
   // uint32_t uiFrequency;
