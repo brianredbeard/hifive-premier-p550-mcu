@@ -10182,7 +10182,7 @@ typedef struct  {
     int voltage;		
 } POWERInfo;
 
-POWERInfo get_power_info(){
+POWERInfo get_power_info(void){
 
 	printf("TODO call get_power_info\n");
 
@@ -10195,15 +10195,8 @@ POWERInfo get_power_info(){
 }
 
 
-typedef struct  {
-    char ipaddr[16];    // IPxxx.xxx.xxx.xxx
-    char macaddr[18];   // MACxx:xx:xx:xx:xx:xx
-    char subnetwork[16];
-    char gateway[16];    
-} NETInfo;
 
-
-NETInfo get_net_info() {
+NETInfo get_net_info(void) {
 	NETInfo example;
 	ip4_addr_t ip4_addr;
 	uint8_t buf[4];
@@ -10230,7 +10223,7 @@ NETInfo get_net_info() {
 
 	es_get_mcu_mac(mac);
 	memset(example.macaddr, 0, sizeof(example.macaddr));
-	snprintf(example.macaddr, sizeof(example.macaddr), "%02x.%02x.%02x.%02x.%02x.%02x",
+	snprintf(example.macaddr, sizeof(example.macaddr), "%02x:%02x:%02x:%02x:%02x:%02x",
 			mac[0],mac[1],mac[2],mac[3],mac[4],mac[5]);
 
 	return example;
@@ -10239,23 +10232,19 @@ NETInfo get_net_info() {
 
 int set_net_info(NETInfo netinfo) {
 	u32_t naddr;
-	u32_t haddr;
 	uint8_t mac[6];
 
 	/* set ipaddr */
 	naddr = ipaddr_addr(netinfo.ipaddr);
-	haddr = PP_NTOHL(naddr);
-	es_set_mcu_ipaddr((uint8_t *)&haddr);
+	es_set_mcu_ipaddr((uint8_t *)&naddr);
 
 	/* set netmask */
 	naddr = ipaddr_addr(netinfo.subnetwork);
-	haddr = PP_NTOHL(naddr);
-	es_set_mcu_netmask((uint8_t *)&haddr);
+	es_set_mcu_netmask((uint8_t *)&naddr);
 
 	/* set gateway */
 	naddr = ipaddr_addr(netinfo.gateway);
-	haddr = PP_NTOHL(naddr);
-	es_set_mcu_gateway((uint8_t *)&haddr);
+	es_set_mcu_gateway((uint8_t *)&naddr);
 
 	/* set mac */
 	hexstr2mac(mac, netinfo.macaddr);
@@ -10264,12 +10253,6 @@ int set_net_info(NETInfo netinfo) {
 	return 0;
 }
 
-
-typedef struct {
-	int cpu_temp;
-	int npu_temp;
-	int fan_speed;
-} PVTInfo;
 
 int get_pvt_info(PVTInfo *ppvtInfo)
 {
@@ -10312,18 +10295,6 @@ int set_dip_switch(DIPSwitchInfo dipSwitchInfo)
 	return es_set_som_dip_switch_soft_state(som_dip_switch_state);
 }
 
-typedef struct {
-	uint32_t magic;
-	uint8_t version;
-	uint16_t id;
-	uint8_t pcb;
-	uint8_t bom_revision;
-	uint8_t bom_variant;
-	uint8_t sn[18];
-	uint8_t status;
-	uint32_t crc;
-} __attribute__((packed)) som_info;
-
 int get_som_info(som_info *psomInfo)
 {
 	int ret = HAL_OK;
@@ -10331,7 +10302,7 @@ int get_som_info(som_info *psomInfo)
 	if (HAL_OK != ret) {
 		printf("Faild to get som info %d\n", ret);
 	}
-	printf("web call get_som_info, magic %d, version %d, "
+	printf("web call get_som_info, magic %ld, version %d, "
 		"id %d, pcb %d, bom_revision %d, bom_variant %d, "
 		"sn %s, status %d, ret %d\n",
 		psomInfo->magic, psomInfo->version ,
@@ -11435,7 +11406,10 @@ int get_soc_status()
  {
  	int ret=sys_thread_new("http_server_netconn", http_server_netconn_thread, NULL, 1024*4, 4);
 	if (ret<=0){
-		printf("ERROR:create thread http_server_netconn_thread failt \n");
+		printf("ERROR:create thread http_server_netconn_thread failed %d\n", ret);
+	}
+	else {
+		printf("create thread http_server_netconn_thread ok!\n");
 	}
  }
 

@@ -48,7 +48,6 @@ extern DMA_HandleTypeDef hdma_spi2_tx;
 extern TIM_HandleTypeDef htim4;
 extern TIM_HandleTypeDef htim5;
 extern UART_HandleTypeDef huart4;
-extern UART_HandleTypeDef huart3;
 extern UART_HandleTypeDef huart6;
 extern WWDG_HandleTypeDef hwwdg;
 extern IWDG_HandleTypeDef hiwdg;

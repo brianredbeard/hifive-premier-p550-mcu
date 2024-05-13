@@ -19,6 +19,7 @@
 #include "cmsis_os.h"
 #include <stdio.h>
 #include "stm32f4xx_hal_iwdg.h"
+#include "console.h"
 
 /* Private includes ----------------------------------------------------------*/
 #include "hf_common.h"
@@ -32,7 +33,7 @@
 osThreadId_t main_task_handle;
 const osThreadAttr_t main_task_attributes = {
   .name = "MainTask",
-  .stack_size = 1024*4,
+  .stack_size = 1024,
   .priority = (osPriority_t) osPriorityNormal,
 };
 
@@ -180,9 +181,15 @@ void hf_main_task(void *argument)
   http_task_handle = osThreadNew(hf_http_task, NULL, &http_task_attributes);
   key_task_handle = osThreadNew(hf_gpio_task, NULL, &gpio_task_attributes);
   // moniter_task_handle = osThreadNew(MoniterTask, NULL, &MoniterTask_attributes);
-  protocol_task_handle = osThreadNew(protocol_task, NULL, &protocol_task_attributes);
   uart4_protocol_task_handle = osThreadNew(uart4_protocol_task, NULL, &protocol_task_attributes);
   daemon_keelive_task_handle = osThreadNew(deamon_keeplive_task, NULL, &daemon_keeplive_task_attributes);
+  #if ES_PRODUCTION_LINE_TEST
+  protocol_task_handle = osThreadNew(protocol_task, NULL, &protocol_task_attributes);
+  #else
+  if (pdTRUE != xbspConsoleInit(CONSOLE_STACK_SIZE, CONSOLE_TASK_PRIORITY, &consoleHandle)) {
+    printf("Err:Failed to create CLI!\n");
+  }
+  #endif
   // extern void MX_IWDG_Init(void);
 	// MX_IWDG_Init();
 

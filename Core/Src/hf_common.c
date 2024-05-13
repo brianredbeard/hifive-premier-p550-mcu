@@ -85,6 +85,7 @@ static int buf_compwith_random(void *buf, uint32_t size, uint32_t prime_seed)
 
 static void print_data(uint8_t *p_buf, int len)
 {
+	#if EEPROM_DEBUG_EN
 	int i;
 	for (i = 0; i < len; i++) {
 		printf(" %02x", p_buf[i]);
@@ -92,9 +93,8 @@ static void print_data(uint8_t *p_buf, int len)
 			printf("\n");
 	}
 	printf("\n");
+	#endif
 }
-
-
 
 static u32_t ntohl_seq(uint8_t *p_nlmask)
 {
@@ -124,7 +124,7 @@ static int hex2num(char c)
 	return -1;
 }
 
-void hexstr2mac(uint8_t *mac, char *hexstr)
+void hexstr2mac(uint8_t *mac, const char *hexstr)
 {
 	int i = 0;
 
@@ -137,6 +137,25 @@ void hexstr2mac(uint8_t *mac, char *hexstr)
 		i++;
 		hexstr += 2;
 	}
+}
+
+uint32_t atoh(const char *in, uint32_t len)
+{
+	uint32_t sum = 0;
+	unsigned int mult = 1;
+	unsigned char c;
+
+	while (len) {
+		int value;
+
+		c = in[len - 1];
+		value = hex2num(c);
+		if (value >= 0)
+			sum += mult * value;
+		mult *= 16;
+		--len;
+	}
+	return sum;
 }
 
 int _write(int fd, char *ch, int len)
@@ -1036,7 +1055,7 @@ int32_t es_get_rtc_time(struct rtc_time_t *stime)
 
 uint32_t es_autoboot(void)
 {
-	int32_t som_pwr_last_state = 0;
+	int som_pwr_last_state = 0;
 	if(is_som_pwr_lost_resume() && !es_get_som_pwr_last_state(&som_pwr_last_state)) {
 		if (som_pwr_last_state){
 			printf("pwr enable and last state is power on\n");

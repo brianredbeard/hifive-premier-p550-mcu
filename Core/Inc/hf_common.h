@@ -180,6 +180,8 @@ struct rtc_time_t {
 };
 
 /* constants --------------------------------------------------------*/
+extern UART_HandleTypeDef huart3;
+
 /* macro ------------------------------------------------------------*/
 #define __ALIGN_KERNEL(x, a)		__ALIGN_KERNEL_MASK(x, (typeof(x))(a) - 1)
 #define __ALIGN_KERNEL_MASK(x, mask)	(((x) + (mask)) & ~(mask))
@@ -188,6 +190,9 @@ struct rtc_time_t {
 #define MAX(x , y)  (((x) > (y)) ? (x) : (y))
 #define MIN(x , y)  (((x) < (y)) ? (x) : (y))
 /* define ------------------------------------------------------------*/
+#define BMC_SOFTWARE_VERSION_MAJOR                   1
+#define BMC_SOFTWARE_VERSION_MINOR                   0
+
 #define MAGIC_NUMBER	0xdeadbeaf
 
 #define AT24C_ADDR (0x50<<1)
@@ -212,9 +217,17 @@ struct rtc_time_t {
 
 
 #define ES_EEPROM_INFO_TEST 0
+/* CLI console settings */
+#define CONSOLE_INSTANCE		USART3
+#define CONSOLE_TASK_PRIORITY		1
+#define CONSOLE_STACK_SIZE		1024//3000
+#define consoleHandle			huart3
+
+#define ES_PRODUCTION_LINE_TEST		0
 
 /* functions prototypes ---------------------------------------------*/
-void hexstr2mac(uint8_t *mac, char *hexstr);
+void hexstr2mac(uint8_t *mac, const char *hexstr);
+uint32_t atoh(const char *in, uint32_t len);
 
 void hf_http_task(void *argument);
 void es_eeprom_wp(uint8_t flag);
