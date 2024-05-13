@@ -23,6 +23,7 @@
 #define EEPROM_USERNAME_PASSWORD_BUFFER_SIZE 64
 #define AT24C_ADDR (0x50<<1) //todoooooooooooooooooo
 #define CHUNK_SIZE 1024
+#define MAX_YEAR 3000
 
 #if LWIP_NETCONN
 
@@ -9502,11 +9503,14 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
                                                             }\n \
                                                         });\n \
                                                     });\n \
-                                                    $('#net-work-refresh').click(function() {\n \
+                                                    $('#net-work-refresh-hid').click(function() {\n \
                                                         $.ajax({\n \
 															async: false,\n \
                                                             url: '/network',\n \
                                                             type: 'GET',\n \
+															data: {\n \
+                                                                byhand: $('#net-work-refresh-hid').val(),\n \
+                                                            },\
                                                             success: function(response) {\n \
                                                                 $('#ipaddr').val(response.data.ipaddr);\n \
                                                                 $('#gateway').val(response.data.gateway);\n \
@@ -9520,6 +9524,11 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
                                                             }\n \
                                                         });\n\
                                                     });\n\
+													$('#net-work-refresh').click(function() { \n \
+                                                        $('#net-work-refresh-hid').val(\"1\"); \n \
+														$('#net-work-refresh-hid').click(); \n \
+														$('#net-work-refresh-hid').val(\"0\"); \n \
+                                                    }); \n \
 													$('#power-on-change').click(function() {\n \
 													 	var power_status = $('#power-on-change').val();\n \
                                                         $.ajax({\n \
@@ -9535,7 +9544,7 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
                                                                 }else{\n \
                                                                     alert(response.message);\n \
                                                                 }\n \
-                                                                $('#power-on-refresh').click(); \n \
+                                                                $('#power-on-refresh-hid').click(); \n \
                                                                 console.log('power-on-change updated successfully.');\n \
                                                             },\n \
                                                             error: function(xhr, status, error) {\n \
@@ -9545,14 +9554,14 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
                                                             }\n \
                                                         });\n \
                                                     });\n\
-													$('#power-retention-change').click(function() {\n \
-													 	var power_retention_status = $('#power-retention-change').val();\n \
+													$('#power-lostresume-change').click(function() {\n \
+													 	var power_lostresume_status = $('#power-lostresume-change').val();\n \
                                                         $.ajax({\n \
-                                                            url: '/power_retention_status',\n \
+                                                            url: '/power_lostresume_status',\n \
                                                             type: 'POST',\n \
                                                             contentType: 'application/x-www-form-urlencoded', // 设置Content-Type \n \
                                                             data: {\n \
-                                                                power_retention_status: power_retention_status,\n \
+                                                                power_lostresume_status: power_lostresume_status,\n \
                                                             },\
                                                             success: function(response) {\n \
                                                                 if(response.status===0){\n \
@@ -9560,13 +9569,13 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
                                                                 }else{\n \
                                                                     alert(response.message);\n \
                                                                 }\n \
-                                                                $('#power-retention-refresh').click(); \n \
+                                                                $('#power-lostresume-refresh-hid').click(); \n \
                                                                 console.log('power-on-change updated successfully.');\n \
                                                             },\n \
                                                             error: function(xhr, status, error) {\n \
                                                                 alert(\"udpate failed!\");\n \
                                                                 // 请求失败时的回调函数\n \
-                                                                console.error('Error updating power-retention-change settings:', error);\n \
+                                                                console.error('Error updating power-lostresume-change settings:', error);\n \
                                                             }\n \
                                                         });\n \
                                                     });\n\
@@ -9591,11 +9600,14 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
                                                             }\n \
                                                         });\n \
                                                     });\n \
-													$('#power-consum-refresh').click(function() {\n \
+													$('#power-consum-refresh-hid').click(function() {\n \
                                                         $.ajax({\n \
 															async: false,\n \
                                                             url: '/power_consum',\n \
                                                             type: 'GET',\n \
+															data: {\n \
+                                                                byhand: $('#power-consum-refresh-hid').val(),\n \
+                                                            },\
                                                             success: function(response) {\n \
                                                                 $('#power_consum').val(response.data.consumption);\n \
 																$('#power_cur').val(response.data.current);\n \
@@ -9608,11 +9620,19 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
                                                             }\n \
                                                         });\n\
                                                     });\n\
-													$('#pvt-info-refresh').click(function() {\n \
+													$('#power-consum-refresh').click(function() { \n \
+                                                        $('#power-consum-refresh-hid').val(\"1\"); \n \
+														$('#power-consum-refresh-hid').click(); \n \
+														$('#power-consum-refresh-hid').val(\"0\"); \n \
+                                                    }); \n \
+													$('#pvt-info-refresh-hid').click(function() {\n \
                                                         $.ajax({\n \
 															async: false,\n \
                                                             url: '/pvt_info',\n \
                                                             type: 'GET',\n \
+															data: {\n \
+                                                                byhand: $('#pvt-info-refresh-hid').val(),\n \
+                                                            },\
 															contentType: 'application/x-www-form-urlencoded', \n \
                                                             success: function(response) {\n \
                                                                 $('#cpu_temp').val(response.data.cpu_temp);\n \
@@ -9624,13 +9644,21 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
                                                                 // 请求失败时的回调函数\n \
                                                                 console.error('Error refreshing pvt info:', error);\n \
                                                             }\n \
-                                                        });\n\
-                                                    });\n\
-													$('#dip-switch-refresh').click(function() {\n \
+                                                        });\n \
+                                                    });\n \
+													$('#pvt-info-refresh').click(function() { \n \
+                                                        $('#pvt-info-refresh-hid').val(\"1\"); \n \
+														$('#pvt-info-refresh-hid').click(); \n \
+														$('#pvt-info-refresh-hid').val(\"0\"); \n \
+                                                    }); \n \
+													$('#dip-switch-refresh-hid').click(function() {\n \
                                                         $.ajax({\n \
 															async: false,\n \
                                                             url: '/dip_switch',\n \
                                                             type: 'GET',\n \
+															data: {\n \
+                                                                byhand: $('#dip-switch-refresh-hid').val(),\n \
+                                                            },\
 															contentType: 'application/x-www-form-urlencoded', \n \
                                                             success: function(response) {\n \
 																$('input[name=\"dip01\"][value=\"' + response.data.dip01 + '\"]').prop('checked', true);\n \
@@ -9645,6 +9673,11 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
                                                             }\n \
                                                         });\n\
                                                     });\n\
+													$('#dip-switch-refresh').click(function() { \n \
+                                                        $('#dip-switch-refresh-hid').val(\"1\"); \n \
+														$('#dip-switch-refresh-hid').click(); \n \
+														$('#dip-switch-refresh-hid').val(\"0\"); \n \
+                                                    }); \n \
 													$('#dip-switch-update').click(function() { \n \
                                                         var dip01 = $('input[name=\"dip01\"]:checked').val(); \n \
 														var dip02 = $('input[name=\"dip02\"]:checked').val(); \n \
@@ -9676,13 +9709,16 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
                                                             }\n \
                                                         });\n \
                                                     });\n \
-													$('#power-on-refresh').click(function() {\n \
+													$('#power-on-refresh-hid').click(function() {\n \
 														$('#power-on-change').prop(\"disabled\", true); \n \
 														$('#power-on-change').text('loading,,,');\n \
                                                         $.ajax({\n \
 															async: false,\n \
                                                             url: '/power_status',\n \
 															type: 'GET',\n \
+															data: {\n \
+                                                                byhand: $('#power-on-refresh-hid').val(),\n \
+                                                            },\
 															contentType: 'application/x-www-form-urlencoded', \n \
 															success: function(response) {\n \
 																// 假设返回的数据是{ buttonText: '新按钮文本' }\n \
@@ -9702,24 +9738,27 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
 															}\n \
                                                         });\n\
                                                     });\n\
-													$('#power-retention-refresh').click(function() {\n \
-														$('#power-retention-change').prop(\"disabled\", true); \n \
-														$('#power-retention-change').text('loading,,,');\n \
+													$('#power-lostresume-refresh-hid').click(function() {\n \
+														$('#power-lostresume-change').prop(\"disabled\", true); \n \
+														$('#power-lostresume-change').text('loading,,,');\n \
                                                         $.ajax({\n \
 															async: false,\n \
-                                                            url: '/power_retention_status',\n \
+                                                            url: '/power_lostresume_status',\n \
 															type: 'GET',\n \
+															data: {\n \
+                                                                byhand: $('#power-lostresume-refresh-hid').val(),\n \
+                                                            },\
 															contentType: 'application/x-www-form-urlencoded', \n \
 															success: function(response) {\n \
-																$('#power-retention-change').prop(\"disabled\", false); \n \
-																if(response.data.power_retention_status===\"0\"){\n \
-																	$('#power-retention-label').text('Power Retention(disabled):');\n \
-																	$('#power-retention-change').text('enable');\n \
-																	$('#power-retention-change').val('1');\n \
+																$('#power-lostresume-change').prop(\"disabled\", false); \n \
+																if(response.data.power_lostresume_status===\"0\"){\n \
+																	$('#power-lostresume-label').text('Power Lost Resume(disabled):');\n \
+																	$('#power-lostresume-change').text('enable');\n \
+																	$('#power-lostresume-change').val('1');\n \
 																}else{\n \
-																	$('#power-retention-label').text('Power Retention(enabled):');\n \
-																	$('#power-retention-change').text('disabled');\n \
-																	$('#power-retention-change').val('0');\n \
+																	$('#power-lostresume-label').text('Power Lost Resume(enabled):');\n \
+																	$('#power-lostresume-change').text('disabled');\n \
+																	$('#power-lostresume-change').val('0');\n \
 																}\n \
 															},\n \
 															error: function(xhr, status, error) {\n \
@@ -9765,11 +9804,14 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
                                                             }\n \
                                                         });\n \
                                                     });\n \
-													$('#rtc-refresh').click(function() {\n \
+													$('#rtc-refresh-hid').click(function() {\n \
                                                         $.ajax({\n \
 															async: false,\n \
                                                             url: '/rtc',\n \
                                                             type: 'GET',\n \
+															data: {\n \
+                                                                byhand: $('#rtc-refresh-hid').val(),\n \
+                                                            },\
                                                             success: function(response) {\n \
                                                                 $('#rtc_year').val(response.data.year);\n \
                                                                 $('#rtc_month').val(response.data.month);\n \
@@ -9793,6 +9835,11 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
                                                             }\n \
                                                         });\n \
                                                     });\n \
+													$('#rtc-refresh').click(function() { \n \
+                                                        $('#rtc-refresh-hid').val(\"1\"); \n \
+														$('#rtc-refresh-hid').click(); \n \
+														$('#rtc-refresh-hid').val(\"0\"); \n \
+                                                    }); \n \
 													$('#rtc-update').click(function() { \n \
                                                         var rtc_year = $('#rtc_year').val();\n \
 														var rtc_month = $('#rtc_month').val();\n \
@@ -9830,11 +9877,14 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
                                                             }\n \
                                                         });\n \
                                                     });\n \
-													$('#soc-refresh').click(function() {\n \
+													$('#soc-refresh-hid').click(function() {\n \
                                                         $.ajax({\n \
 															async: false,\n \
                                                             url: '/soc-status',\n \
                                                             type: 'GET',\n \
+															data: {\n \
+                                                                byhand: $('#soc-refresh-hid').val(),\n \
+                                                            },\
                                                             success: function(response) {\n \
 																if(response.data.status===\"0\"){ \n \
 																	$('#soc-status').val(\"working\");\n \
@@ -9849,17 +9899,32 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
                                                             }\n \
                                                         });\n \
                                                     });\n \
+													$('#soc-refresh').click(function() { \n \
+                                                        $('#soc-refresh-hid').val(\"1\"); \n \
+														$('#soc-refresh-hid').click(); \n \
+														$('#soc-refresh-hid').val(\"0\"); \n \
+                                                    }); \n \
 													// --------------------after load page ------------- \n \
-													$('#power-on-refresh').click(); \n \
-													$('#power-retention-refresh').click(); \n \
-													$('#power-consum-refresh').click(); \n \
-													$('#pvt-info-refresh').click(); \n \
-													$('#dip-switch-refresh').click(); \n \
-   													$('#net-work-refresh').click(); \n \
+													$('#power-on-refresh-hid').click(); \n \
+													$('#power-lostresume-refresh-hid').click(); \n \
+													$('#power-consum-refresh-hid').click(); \n \
+													$('#pvt-info-refresh-hid').click(); \n \
+													$('#dip-switch-refresh-hid').click(); \n \
+   													$('#net-work-refresh-hid').click(); \n \
 													$('#board-info-som-refresh').click(); \n \
 													$('#board-info-cb-refresh').click(); \n \
-													$('#rtc-refresh').click(); \n \
-													$('#soc-refresh').click(); \n \
+													$('#rtc-refresh-hid').click(); \n \
+													$('#soc-refresh-hid').click(); \n \
+													setInterval(function() {\n \
+														$('#power-consum-refresh-hid').click(); \n \
+														$('#rtc-refresh-hid').click(); \n \
+														$('#soc-refresh-hid').click(); \n \
+													}, 30*1000); \n \
+													setInterval(function() {\n \
+														$('#pvt-info-refresh-hid').click(); \n \
+														$('#dip-switch-refresh-hid').click(); \n \
+   														$('#net-work-refresh-hid').click(); \n \
+													}, 3*60*1000); \n \
                                                 });\n\
                                             </script>\n \
                                             <style> \
@@ -9934,13 +9999,14 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
 											<div class=\"network-row\"> \
 											<label id=\"power-status-label\">Power Status :</label> <button id=\"power-on-change\" disabled>loading,,,</button>   <br> \
 											</div> \
-											<button id=\"power-on-refresh\" style=\"display:none;\">refresh</button> \
+											<button id=\"power-on-refresh-hid\" value=\"0\" style=\"display:none;\" >refresh</button> \
 											<div class=\"network-row\"> \
-											<label id=\"power-retention-label\">Power Retention:</label> <button id=\"power-retention-change\" disabled>loading,,,</button> <br> \
+											<label id=\"power-lostresume-label\">Power Lost Resume:</label> <button id=\"power-lostresume-change\" disabled>loading,,,</button> <br> \
 											</div> \
-											<button id=\"power-retention-refresh\" style=\"display:none;\">refresh</button> \
+											<button id=\"power-lostresume-refresh-hid\" value=\"0\"  style=\"display:none;\">refresh</button> \
 											<div class=\"network-row\"> \
 											<label>Soc Status:</label> <input type=\"text\" id=\"soc-status\" value=\"loading,,,\" style=\"width: 100px;\" disabled> <button id=\"soc-refresh\">refresh</button>   <br> \
+											<button id=\"soc-refresh-hid\" value=\"0\" style=\"display:none;\" >refresh</button> \
 											</div> \
 										</div> \
 										<div class=\"reset\"> \
@@ -9960,6 +10026,7 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
 												<label>Current:</label> <input type=\"text\" id=\"power_cur\" value=\"0\" style=\"width: 60px;\" disabled><br> \
 											</div> \
 											<button id=\"power-consum-refresh\">refresh</button> <br> \
+											<button id=\"power-consum-refresh-hid\" value=\"0\" style=\"display:none;\" >refresh</button> \
 										</div> \
                                         <div class=\"pvt-info\" > \
                                             <h3>PVT info</h3> \
@@ -9972,7 +10039,8 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
 											<div class=\"network-row\"> \
                                             <label>Fan Speed      :</label> <input type=\"text\" id=\"fan_speed\" value=\"0\" style=\"width: 60px;\" disabled><br> \
 											</div> \
-                                            <button id=\"pvt-info-refresh\">refresh</button> \
+                                            <button id=\"pvt-info-refresh\" >refresh</button> \
+											<button id=\"pvt-info-refresh-hid\" value=\"0\" style=\"display:none;\">refresh</button> \
                                         </div> \
 										 <div class=\"dip-switch\" > \
                                             <h3>DIP Switch</h3> \
@@ -9997,6 +10065,7 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
 												<input type=\"radio\" name=\"dip04\" value=\"1\" id=\"dip04-true\"><label for=\"dip04-true\">ON</label> \
 											</div> \
                                             <button id=\"dip-switch-refresh\">refresh</button> <button id=\"dip-switch-update\">update</button> \
+											<button id=\"dip-switch-refresh-hid\" value=\"0\" style=\"display:none;\">refresh</button> \
                                         </div> \
                                         <div class=\"net-work\" > \
                                             <h3>Network System</h3> \
@@ -10013,6 +10082,7 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
                                             <label>Subnet Mask:</label> <input type=\"text\" id=\"subnetwork\" value=\"0\" style=\"width: 180px;\"> <br> \
 											 </div> \
                                             <button id=\"net-work-refresh\">refresh</button> <button id=\"net-work-update\">update</button> \
+											<button id=\"net-work-refresh-hid\" value=\"0\" style=\"display:none;\">refresh</button> \
                                         </div> \
 										<div class=\"rtc\" > \
                                             <h3>RTC System</h3> \
@@ -10041,6 +10111,7 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
                                             	<label>Seconds:</label> <input type=\"text\" id=\"rtc_seconds\" value=\"0\" style=\"width: 100px;\"> <br> \
 											</div> \
                                             <button id=\"rtc-refresh\">refresh</button> <button id=\"rtc-update\">update</button> \
+											<button id=\"rtc-refresh-hid\" value=\"0\" style=\"display:none;\">refresh</button> \
                                         </div> \
                                     </body> \
                                     </html> ";
@@ -10093,7 +10164,11 @@ const char *json_header = "HTTP/1.1 200 OK\r\n"
 						"Content-Type: application/json\r\n"
 						"Connection: close\r\n"
 						"Content-Length: %d\r\n\r\n";
-
+const char *json_header_withcookie = "HTTP/1.1 200 OK\r\n"
+						"Content-Type: application/json\r\n"
+						"Connection: close\r\n"
+						"%.80s"
+						"Content-Length: %d\r\n\r\n";
 // 函数定义
 char* concatenate_strings(const char* str1, const char* str2) {
     // 计算新字符串需要的总长度
@@ -10531,12 +10606,12 @@ static int change_power_status(int status)
 	return ret;
 }
 
-int get_power_retention_status(){
-	printf("TODO call get_power_retention_status \n");
+int get_power_lost_resume_attr(){
+	printf("TODO call get_power_lost_resume_attr \n");
 	return 1;//1:powerON,0:powerOFF
 }
-int change_power_retention_status(int status){//status 0:power off,1:power on
-	printf("TODO call change_power_retention_status %d \n",status);
+int change_power_lost_resume_attr(int status){//status 0:power off,1:power on
+	printf("TODO call change_power_lost_resume_attr %d \n",status);
 	return 0;//0 success
 }
 
@@ -10900,6 +10975,9 @@ int get_soc_status(){
             char *query = strtok(NULL, "?");
 
             printf("GET path:%s \n",path);
+			int byhand=0;//todoooooooooooooooooooooooooooo
+
+
 
 
             kv_map params={NULL,0};
@@ -10914,6 +10992,9 @@ int get_soc_status(){
                 kv_pair *current = params.head;
                 while (current) {
                     printf("\t %s = %s\n", current->key, current->value);
+					if(strcmp(current->key,"byhand")==0){
+                        byhand = strcmp(current->value,"0")==0?0:1;
+                    }
                     current = current->next;
                 }
             }else{
@@ -10922,7 +11003,7 @@ int get_soc_status(){
                 // send_response_200(conn);
                 // return ;
             }
- 			 if(strcmp(path, "/")==0  || strcmp(path, "/index.html")==0){
+ 			if(strcmp(path, "/")==0  || strcmp(path, "/index.html")==0){
                 printf("GET location: index.html \n");
                 // strcpy(resp_cookies,"");
                 // send_200_response(conn);
@@ -10989,23 +11070,33 @@ int get_soc_status(){
                 char *json_response_patt = "{\"status\":0,\"message\":\"success\",\"data\":{\"power_status\":\"%d\"}}";//0 success, msg
                 sprintf(json_response, json_response_patt,power_status);
 
-                char response_header[BUF_SIZE_256];
-                sprintf(response_header, json_header, strlen(json_response));
+				char response_header[BUF_SIZE_256];
+				if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 && byhand ){
+					sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",sidValue,MAX_AGE);
+					sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
+				}else{
+					sprintf(response_header, json_header, strlen(json_response));
+				}
 
                 printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
                 netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
                 netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
-			}else if(strcmp(path, "/power_retention_status")==0 ){ //get
-				printf("GET location: power_retention_status \n");
-				int power_retention_status=get_power_retention_status();
+			}else if(strcmp(path, "/power_lostresume_status")==0 ){ //get
+				printf("GET location: power_lostresume_status \n");
+				int power_lostresume_status=get_power_lost_resume_attr();
 				char json_response[BUF_SIZE_128]={0};
 				 // 创建JSON格式的字符串
-                char *json_response_patt = "{\"status\":0,\"message\":\"success\",\"data\":{\"power_retention_status\":\"%d\"}}";//0 success, msg
-                sprintf(json_response, json_response_patt,power_retention_status);
+                char *json_response_patt = "{\"status\":0,\"message\":\"success\",\"data\":{\"power_lostresume_status\":\"%d\"}}";//0 success, msg
+                sprintf(json_response, json_response_patt,power_lostresume_status);
 
                 char response_header[BUF_SIZE_256];
-                sprintf(response_header, json_header, strlen(json_response));
+                if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 && byhand ){
+					sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",sidValue,MAX_AGE);
+					sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
+				}else{
+					sprintf(response_header, json_header, strlen(json_response));
+				}
 
                 printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
@@ -11021,7 +11112,12 @@ int get_soc_status(){
 
 
                 char response_header[BUF_SIZE_256];
-                sprintf(response_header, json_header, strlen(json_response));
+                if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 && byhand ){
+					sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",sidValue,MAX_AGE);
+					sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
+				}else{
+					sprintf(response_header, json_header, strlen(json_response));
+				}
 
                 printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
@@ -11039,7 +11135,12 @@ int get_soc_status(){
 
 
                 char response_header[BUF_SIZE_256];
-                sprintf(response_header, json_header, strlen(json_response));
+                if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 && byhand ){
+					sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",sidValue,MAX_AGE);
+					sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
+				}else{
+					sprintf(response_header, json_header, strlen(json_response));
+				}
 
                 printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
@@ -11057,8 +11158,13 @@ int get_soc_status(){
 
 
 
-                char response_header[BUF_SIZE_512];
-                sprintf(response_header, json_header, strlen(json_response));
+                char response_header[BUF_SIZE_256];
+                if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 && byhand ){
+					sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",sidValue,MAX_AGE);
+					sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
+				}else{
+					sprintf(response_header, json_header, strlen(json_response));
+				}
 
                 printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
@@ -11076,8 +11182,13 @@ int get_soc_status(){
 
                 sprintf(json_response, json_response_patt,netinfo.ipaddr,netinfo.gateway,netinfo.subnetwork,netinfo.macaddr);
 
-                char response_header[256];
-                sprintf(response_header, json_header, strlen(json_response));
+                char response_header[BUF_SIZE_256];
+                if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 && byhand ){
+					sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",sidValue,MAX_AGE);
+					sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
+				}else{
+					sprintf(response_header, json_header, strlen(json_response));
+				}
 
 				printf("#### FAKE query network! #####\n");
 
@@ -11144,8 +11255,13 @@ int get_soc_status(){
 
 
 
-                char response_header[BUF_SIZE_128];
-                sprintf(response_header, json_header, strlen(json_response));
+                char response_header[BUF_SIZE_256];
+                if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 && byhand ){
+					sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",sidValue,MAX_AGE);
+					sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
+				}else{
+					sprintf(response_header, json_header, strlen(json_response));
+				}
 
                 printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
@@ -11163,8 +11279,13 @@ int get_soc_status(){
 
 
 
-                char response_header[BUF_SIZE_128];
-                sprintf(response_header, json_header, strlen(json_response));
+                char response_header[BUF_SIZE_256];
+                if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 && byhand ){
+					sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",sidValue,MAX_AGE);
+					sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
+				}else{
+					sprintf(response_header, json_header, strlen(json_response));
+				}
 
                 printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
@@ -11181,8 +11302,13 @@ int get_soc_status(){
                 sprintf(json_response, json_response_patt,rtcInfo.year,rtcInfo.month,rtcInfo.date,rtcInfo.weekday,rtcInfo.hours,rtcInfo.minutes,rtcInfo.seconds);
 
 
-                char response_header[BUF_SIZE_128];
-                sprintf(response_header, json_header, strlen(json_response));
+                char response_header[BUF_SIZE_256];
+                if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 && byhand ){
+					sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",sidValue,MAX_AGE);
+					sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
+				}else{
+					sprintf(response_header, json_header, strlen(json_response));
+				}
 
                 printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
@@ -11200,8 +11326,13 @@ int get_soc_status(){
                 sprintf(json_response, json_response_patt,ret);
 
 
-                char response_header[BUF_SIZE_128];
-                sprintf(response_header, json_header, strlen(json_response));
+                char response_header[BUF_SIZE_256];
+                if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 && byhand ){
+					sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",sidValue,MAX_AGE);
+					sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
+				}else{
+					sprintf(response_header, json_header, strlen(json_response));
+				}
 
                 printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
@@ -11469,34 +11600,39 @@ int get_soc_status(){
 					}
 
 
-                    char response_header[BUF_SIZE_128];
-                    sprintf(response_header, json_header, strlen(json_response));
+                    char response_header[BUF_SIZE_256];
+					if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 ){
+						sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",sidValue,MAX_AGE);
+						sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
+					}else{
+						sprintf(response_header, json_header, strlen(json_response));
+					}
 
                     printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
                     netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
                     netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
 
-				}else if(strcmp(path, "/power_retention_status")==0 ){
-					printf("POST ,location: power_retention_status \n");
+				}else if(strcmp(path, "/power_lostresume_status")==0 ){
+					printf("POST ,location: power_lostresume_status \n");
                     char* status=NULL;
                     assert(p_params!=NULL);
                     kv_pair *current = params.head;
                     while (current) {
-                        if(strcmp(current->key,"power_retention_status")==0){
+                        if(strcmp(current->key,"power_lostresume_status")==0){
                             status= current->value;
                                 break;
                         }
                         current = current->next;
                     }
                     assert( status!=NULL);
-                    printf("param power_retention_status: %s \n",status);
+                    printf("param power_lostresume_status: %s \n",status);
 
 					int change_status_ret=0;
 					if(strcmp(status,"0")==0){//power on -> power off
-						change_status_ret =change_power_retention_status(0);
+						change_status_ret =change_power_lost_resume_attr(0);
 					}else {
-						change_status_ret=change_power_retention_status(1);
+						change_status_ret=change_power_lost_resume_attr(1);
 					}
 
 
@@ -11512,8 +11648,13 @@ int get_soc_status(){
 						sprintf(json_response, json_response_patt, change_status_ret,change_status_ret);
 					}
 
-                    char response_header[BUF_SIZE_128];
-                    sprintf(response_header, json_header, strlen(json_response));
+                    char response_header[BUF_SIZE_256];
+					if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 ){
+						sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",sidValue,MAX_AGE);
+						sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
+					}else{
+						sprintf(response_header, json_header, strlen(json_response));
+					}
 
                     printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
@@ -11535,8 +11676,13 @@ int get_soc_status(){
 					}
 
 
-                    char response_header[BUF_SIZE_128];
-                    sprintf(response_header, json_header, strlen(json_response));
+                    char response_header[BUF_SIZE_256];
+					if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 ){
+						sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",sidValue,MAX_AGE);
+						sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
+					}else{
+						sprintf(response_header, json_header, strlen(json_response));
+					}
 
                     printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
@@ -11582,8 +11728,13 @@ int get_soc_status(){
 					}
 
 
-                    char response_header[BUF_SIZE_128];
-                    sprintf(response_header, json_header, strlen(json_response));
+                    char response_header[BUF_SIZE_256];
+                    if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 ){
+						sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",sidValue,MAX_AGE);
+						sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
+					}else{
+						sprintf(response_header, json_header, strlen(json_response));
+					}
 
                     printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
@@ -11643,8 +11794,13 @@ int get_soc_status(){
                      // 创建JSON格式的字符串
                     char *json_response = "{\"status\":0,\"message\":\"success\",\"data\":{}}";//0 success, msg
 
-                    char response_header[BUF_SIZE_128];
-                    sprintf(response_header, json_header, strlen(json_response));
+                    char response_header[BUF_SIZE_256];
+					if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 ){
+						sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",sidValue,MAX_AGE);
+						sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
+					}else{
+						sprintf(response_header, json_header, strlen(json_response));
+					}
 
                     printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
@@ -11668,28 +11824,30 @@ int get_soc_status(){
                     while (current) {
                         if(strcmp(current->key,"year")==0){
 							intValue = strtol(current->value, &endPtr, 10);
-                            rtcInfo.year= intValue>0?1:0;
+                            rtcInfo.year= intValue>=0&&intValue<=MAX_YEAR?intValue:-1;
                         }else if(strcmp(current->key,"month")==0){
 							intValue = strtol(current->value, &endPtr, 10);
-                            rtcInfo.month= intValue>0?1:0;
+                            rtcInfo.month= intValue>=0&&intValue<=12?intValue:-1;
                         }else if(strcmp(current->key,"date")==0){
                             intValue = strtol(current->value, &endPtr, 10);
-                            rtcInfo.date= intValue>0?1:0;
+                            rtcInfo.date= intValue>=0&&intValue<=31?intValue:-1;
                         }else if(strcmp(current->key,"weekday")==0){
                             intValue = strtol(current->value, &endPtr, 10);
-                            rtcInfo.weekday= intValue>0?1:0;
+                            rtcInfo.weekday=  intValue>=0&&intValue<=6?intValue:-1;
                         }else if(strcmp(current->key,"hours")==0){
                             intValue = strtol(current->value, &endPtr, 10);
-                            rtcInfo.hours= intValue>0?1:0;
+                            rtcInfo.hours= intValue>=0&&intValue<=23?intValue:-1;
                         }else if(strcmp(current->key,"minutes")==0){
                             intValue = strtol(current->value, &endPtr, 10);
-                            rtcInfo.minutes= intValue>0?1:0;
+                            rtcInfo.minutes= intValue>=0&&intValue<=59?intValue:-1;
                         }else if(strcmp(current->key,"seconds")==0){
                             intValue = strtol(current->value, &endPtr, 10);
-                            rtcInfo.seconds= intValue>0?1:0;
+                            rtcInfo.seconds= intValue>=0&&intValue<=59?intValue:-1;
                         }
                         current = current->next;
                     }
+					assert(rtcInfo.year>=0&&rtcInfo.month>=0&&rtcInfo.date>=0&&rtcInfo.weekday>=0&&rtcInfo.hours>=0&&rtcInfo.minutes>=0&& rtcInfo.seconds>=0);
+					
 					int set_ret=set_rtcinfo(rtcInfo);
 
 					// 创建JSON格式的字符串
@@ -11703,8 +11861,13 @@ int get_soc_status(){
 						sprintf(json_response, json_response_patt, set_ret,set_ret);
 					}
 
-                    char response_header[BUF_SIZE_128];
-                    sprintf(response_header, json_header, strlen(json_response));
+                    char response_header[BUF_SIZE_256];
+					if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 ){
+						sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",sidValue,MAX_AGE);
+						sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
+					}else{
+						sprintf(response_header, json_header, strlen(json_response));
+					}
 
                     printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
