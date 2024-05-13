@@ -9665,6 +9665,7 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
 																$('input[name=\"dip02\"][value=\"' + response.data.dip02 + '\"]').prop('checked', true);\n \
 																$('input[name=\"dip03\"][value=\"' + response.data.dip03 + '\"]').prop('checked', true);\n \
 																$('input[name=\"dip04\"][value=\"' + response.data.dip04 + '\"]').prop('checked', true);\n \
+																$('input[name=\"swctrl\"][value=\"' + response.data.swctrl + '\"]').prop('checked', true);\n \
                                                                 console.log('dip_switch refreshed successfully.');\n \
                                                             },\n \
                                                             error: function(xhr, status, error) {\n \
@@ -9683,6 +9684,7 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
 														var dip02 = $('input[name=\"dip02\"]:checked').val(); \n \
 														var dip03 = $('input[name=\"dip03\"]:checked').val(); \n \
 														var dip04 = $('input[name=\"dip04\"]:checked').val(); \n \
+														var swctrl = $('input[name=\"swctrl\"]:checked').val(); \n \
                                                         $.ajax({ \n\
                                                             url: '/dip_switch',\n \
                                                             type: 'POST',\n \
@@ -9691,7 +9693,8 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
                                                                 dip01: dip01, \n \
                                                                 dip02: dip02, \n \
                                                                 dip03: dip03, \n \
-																dip04: dip04 \n \
+																dip04: dip04, \n \
+																swctrl: swctrl \n \
                                                             },\
                                                             success: function(response) {\n \
                                                                 if(response.status===0){\n \
@@ -10017,13 +10020,13 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
 										<div> \
 											<h3>Power Consumption</h3> \
 											<div class=\"network-row\"> \
-												<label>Power Consumption:</label> <input type=\"text\" id=\"power_consum\" value=\"0\" style=\"width: 60px;\" disabled><br> \
+												<label>Power Consumption:</label> <input type=\"text\" id=\"power_consum\" value=\"0\" style=\"width: 60px;\" disabled><span>mW</span><br> \
 											</div> \
 											<div class=\"network-row\"> \
-												<label>Voltage:</label> <input type=\"text\" id=\"power_vol\" value=\"0\" style=\"width: 60px;\" disabled><br> \
+												<label>Voltage:</label> <input type=\"text\" id=\"power_vol\" value=\"0\" style=\"width: 60px;\" disabled><span>mV</span><br> \
 											</div> \
 											<div class=\"network-row\"> \
-												<label>Current:</label> <input type=\"text\" id=\"power_cur\" value=\"0\" style=\"width: 60px;\" disabled><br> \
+												<label>Current:</label> <input type=\"text\" id=\"power_cur\" value=\"0\" style=\"width: 60px;\" disabled><span>mA</span><br> \
 											</div> \
 											<button id=\"power-consum-refresh\">refresh</button> <br> \
 											<button id=\"power-consum-refresh-hid\" value=\"0\" style=\"display:none;\" >refresh</button> \
@@ -10063,6 +10066,11 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
 												<label>dip04:</label> \
 												<input type=\"radio\" name=\"dip04\" value=\"0\" id=\"dip04-false\"><label for=\"dip04-false\">OFF</label> \
 												<input type=\"radio\" name=\"dip04\" value=\"1\" id=\"dip04-true\"><label for=\"dip04-true\">ON</label> \
+											</div> \
+											<div  class=\"network-row\"> \
+												<label>Software/Hardware Ctrl:</label> \
+												<input type=\"radio\" name=\"swctrl\" value=\"0\" id=\"swctrl-false\"><label for=\"swctrl-false\">HardWare</label> \
+												<input type=\"radio\" name=\"swctrl\" value=\"1\" id=\"swctrl-true\"><label for=\"swctrl-true\">SoftWare</label> \
 											</div> \
                                             <button id=\"dip-switch-refresh\">refresh</button> <button id=\"dip-switch-update\">update</button> \
 											<button id=\"dip-switch-refresh-hid\" value=\"0\" style=\"display:none;\">refresh</button> \
@@ -10755,6 +10763,7 @@ typedef struct {
     int dip02;
     int dip03;
 	int dip04;
+	int swctrl;//0 hw,1,sw
 } DIPSwitchInfo;
 
 DIPSwitchInfo get_dip_switch(){
@@ -10766,6 +10775,7 @@ DIPSwitchInfo get_dip_switch(){
 	dipSwitchInfo.dip02 = (0x2 & som_dip_switch_state) >> 1;
 	dipSwitchInfo.dip03 = (0x4 & som_dip_switch_state) >> 2;
 	dipSwitchInfo.dip04 = (0x8 & som_dip_switch_state) >> 3;
+	dipSwitchInfo.swctrl = 0;//todooooooooooo
 
 	return dipSwitchInfo;
 }
@@ -11153,8 +11163,8 @@ int get_soc_status(){
 
 				char json_response[BUF_SIZE_128]={0};
 				 // 创建JSON格式的字符串
-                char *json_response_patt = "{\"status\":0,\"message\":\"success\",\"data\":{\"dip01\":\"%d\",\"dip02\":\"%d\",\"dip03\":\"%d\",\"dip04\":\"%d\"}}";
-                sprintf(json_response, json_response_patt,dipSwitchInfo.dip01,dipSwitchInfo.dip02,dipSwitchInfo.dip03,dipSwitchInfo.dip04);
+                char *json_response_patt = "{\"status\":0,\"message\":\"success\",\"data\":{\"dip01\":\"%d\",\"dip02\":\"%d\",\"dip03\":\"%d\",\"dip04\":\"%d\",\"swctrl\":\"%d\"}}";
+                sprintf(json_response, json_response_patt,dipSwitchInfo.dip01,dipSwitchInfo.dip02,dipSwitchInfo.dip03,dipSwitchInfo.dip04,dipSwitchInfo.swctrl);
 
 
 
@@ -11711,6 +11721,9 @@ int get_soc_status(){
                         }else if(strcmp(current->key,"dip04")==0){
                             intValue = strtol(current->value, &endPtr, 10);
                             dipSwitchInfo.dip04= intValue>0?1:0;
+                        }else if(strcmp(current->key,"swctrl")==0){
+                            intValue = strtol(current->value, &endPtr, 10);
+                            dipSwitchInfo.swctrl= intValue>0?1:0;
                         }
                         current = current->next;
                     }
