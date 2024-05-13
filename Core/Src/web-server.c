@@ -10412,12 +10412,13 @@ void parseCredentials(const char *readBuffer, char *username, char *password) {
 //保存用户设置的用户名密码 0 succ,1 fail
 int save_sys_username_password(const char *username, const char *password){
 	assert(username!=NULL&&password!=NULL);
-    printf("TODO call save_sys_username_password  \n");
-	return 0;
+
+	return es_set_username_password(username, password);
 }
 //查询用户设置的用户名密码 0 succ,1 fail
 void get_sys_username_password( char *username,  char *password){
-    printf("TODO call get_sys_username_password \n");
+
+	es_get_username_password(username, password);
 	return ;
 }
 
@@ -10589,22 +10590,64 @@ typedef struct  {
 
 
 NETInfo get_net_info() {
-	printf("TODO call get_net_info\n");
+	NETInfo example;
+	ip4_addr_t ip4_addr;
+	uint8_t buf[4];
+	char *p_addr;
+	uint8_t mac[6];
 
-	NETInfo example = {
-        "192.168.1.1",
-        "01:23:45:67:89:AB",
-        "255.255.255.0",
-        "192.168.1.254"
-    };
-    return example;
+	/* get ipaddr */
+	es_get_mcu_ipaddr(buf);
+	IP4_ADDR(&ip4_addr, buf[0], buf[1], buf[2], buf[3]);
+	p_addr = ip4addr_ntoa(&ip4_addr);
+	strcpy(example.ipaddr, p_addr);
+
+	/* get netmask */
+	es_get_mcu_netmask(buf);
+	IP4_ADDR(&ip4_addr, buf[0], buf[1], buf[2], buf[3]);
+	p_addr = ip4addr_ntoa(&ip4_addr);
+	strcpy(example.subnetwork, p_addr);
+
+	/* get gateway */
+	es_get_mcu_gateway(buf);
+	IP4_ADDR(&ip4_addr, buf[0], buf[1], buf[2], buf[3]);
+	p_addr = ip4addr_ntoa(&ip4_addr);
+	strcpy(example.gateway, p_addr);
+
+	es_get_mcu_mac(mac);
+	memset(example.macaddr, 0, sizeof(example.macaddr));
+	snprintf(example.macaddr, sizeof(example.macaddr), "%02x.%02x.%02x.%02x.%02x.%02x",
+			mac[0],mac[1],mac[2],mac[3],mac[4],mac[5]);
+
+	return example;
 }
 
 
 int set_net_info(NETInfo netinfo) {
-	printf("TODO call set_net_info\n");
+	u32_t naddr;
+	u32_t haddr;
+	uint8_t mac[6];
 
-    return 0;
+	/* set ipaddr */
+	naddr = ipaddr_addr(netinfo.ipaddr);
+	haddr = PP_NTOHL(naddr);
+	es_set_mcu_ipaddr((uint8_t *)&haddr);
+
+	/* set netmask */
+	naddr = ipaddr_addr(netinfo.subnetwork);
+	haddr = PP_NTOHL(naddr);
+	es_set_mcu_netmask((uint8_t *)&haddr);
+
+	/* set gateway */
+	naddr = ipaddr_addr(netinfo.gateway);
+	haddr = PP_NTOHL(naddr);
+	es_set_mcu_gateway((uint8_t *)&haddr);
+
+	/* set mac */
+	hexstr2mac(mac, netinfo.macaddr);
+	es_set_mcu_mac(mac);
+
+	return 0;
 }
 
 
@@ -10640,17 +10683,24 @@ typedef struct {
 } DIPSwitchInfo;
 
 DIPSwitchInfo get_dip_switch(){
-	printf("TODO call get_dip_switch\n");
+	uint8_t som_dip_switch_state;
 	DIPSwitchInfo dipSwitchInfo;
-	dipSwitchInfo.dip01 = 0;
-	dipSwitchInfo.dip02 = 0;
-	dipSwitchInfo.dip03 = 1;
-	dipSwitchInfo.dip04 = 1;
-    return dipSwitchInfo;
+
+	es_get_som_dip_switch_soft_state(&som_dip_switch_state);
+	dipSwitchInfo.dip01 = 0x1 & som_dip_switch_state;
+	dipSwitchInfo.dip02 = (0x2 & som_dip_switch_state) >> 1;
+	dipSwitchInfo.dip03 = (0x4 & som_dip_switch_state) >> 2;
+	dipSwitchInfo.dip04 = (0x8 & som_dip_switch_state) >> 3;
+
+	return dipSwitchInfo;
 }
 int set_dip_switch(DIPSwitchInfo dipSwitchInfo){
-	printf("TODO call set_dip_switch\n");
-    return 0;//0:success ,other:error
+	uint8_t som_dip_switch_state;
+
+	som_dip_switch_state =  ((0x1 & dipSwitchInfo.dip04) << 3) | ((0x1 & dipSwitchInfo.dip03) << 2)
+				| ((0x1 & dipSwitchInfo.dip02) << 1)| (0x1 & dipSwitchInfo.dip01);
+
+	return es_set_som_dip_switch_soft_state(som_dip_switch_state);
 }
 
 typedef struct {
@@ -10702,15 +10752,17 @@ typedef struct {
 } CBSimpleInfo;//carrie board
 
 CBSimpleInfo get_cb_info(){
-	printf("TODO call get_cb_info\n");
-	CBSimpleInfo example= {
-        0,
-        1,
-        2,
-        3,
-		"v1.10.1"
-    };
-    return example;
+	CarrierBoardInfo carrierBoardInfo;
+	CBSimpleInfo example;
+
+	es_get_carrier_borad_info(&carrierBoardInfo);
+	example.magicNumber = carrierBoardInfo.magicNumber;
+	example.formatVersionNumber = carrierBoardInfo.formatVersionNumber;
+	example.productIdentifier = carrierBoardInfo.productIdentifier;
+	example.pcbRevision = carrierBoardInfo.pcbRevision;
+	memcpy(example.boardSerialNumber, carrierBoardInfo.boardSerialNumber, sizeof(example.boardSerialNumber));
+
+	return example;
 }
 typedef struct {
 	int year;

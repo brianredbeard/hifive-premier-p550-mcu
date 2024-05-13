@@ -152,6 +152,7 @@ typedef struct {
 #define ES_EEPROM_INFO_TEST 0
 
 /* functions prototypes ---------------------------------------------*/
+void hexstr2mac(uint8_t *mac, char *hexstr);
 
 void hf_http_task(void *argument);
 void es_eeprom_wp(uint8_t flag);
@@ -174,8 +175,8 @@ int es_set_mcu_netmask(uint8_t *p_netmask_address);
 int es_get_mcu_gateway(uint8_t *p_gateway_address);
 int es_set_mcu_gateway(uint8_t *p_gateway_address);
 
-int es_get_admin_info(char *p_admin_name, char *p_admin_password);
-int es_set_admin_info(char *p_admin_name, char *p_admin_password);
+int es_get_username_password(char *p_admin_name, char *p_admin_password);
+int es_set_username_password(const char *p_admin_name, const char *p_admin_password);
 
 int is_som_pwr_lost_resume(void);
 int es_set_som_pwr_lost_resume_attr(int isResumePwrLost);

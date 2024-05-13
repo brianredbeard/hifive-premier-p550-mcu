@@ -113,6 +113,32 @@ static u32_t ntohl_seq(uint8_t *p_nlmask)
 	return hlmask;
 }
 
+static int hex2num(char c)
+{
+	if (c >= '0' && c <= '9')
+		return c - '0';
+	if (c >= 'a' && c <= 'f')
+		return c - 'a' + 10;
+	if (c >= 'A' && c <= 'F')
+		return c - 'A' + 10;
+	return -1;
+}
+
+void hexstr2mac(uint8_t *mac, char *hexstr)
+{
+	int i = 0;
+
+	while (i < 6) {
+		if (' ' == *hexstr || ':' == *hexstr || '"' == *hexstr || '\'' == *hexstr) {
+			hexstr++;
+			continue;
+		}
+		*(mac + i) = (hex2num(*hexstr) <<4) | hex2num(*(hexstr + 1));
+		i++;
+		hexstr += 2;
+	}
+}
+#if 0
 int _write(int fd, char *ch, int len)
 {
 	uint8_t val = '\r';
@@ -125,6 +151,7 @@ int _write(int fd, char *ch, int len)
 	}
 	return length;
 }
+#endif
 
 
 void es_eeprom_wp(uint8_t flag)
@@ -522,7 +549,7 @@ int es_set_mcu_gateway(uint8_t *p_gateway_address)
 }
 
 // get and set admin info
-int es_get_admin_info(char *p_admin_name, char *p_admin_password)
+int es_get_username_password(char *p_admin_name, char *p_admin_password)
 {
 	if (NULL == p_admin_name)
 		return -1;
@@ -538,7 +565,7 @@ int es_get_admin_info(char *p_admin_name, char *p_admin_password)
 	return 0;
 }
 
-int es_set_admin_info(char *p_admin_name, char *p_admin_password)
+int es_set_username_password(const char *p_admin_name, const char *p_admin_password)
 {
 	if (NULL == p_admin_name)
 		return -1;
@@ -806,7 +833,7 @@ int es_eeprom_info_test(void)
 	eeprom_debug("Get magicNumber:0x%lx\n", carrier_board_info.magicNumber);
 
 	/* admin info test */
-	es_get_admin_info(admin_name, admin_password);
+	es_get_username_password(admin_name, admin_password);
 	eeprom_debug("Get admin_name:%s, admin_password:%s\n", admin_name, admin_password);
 
 	/* mac test */
