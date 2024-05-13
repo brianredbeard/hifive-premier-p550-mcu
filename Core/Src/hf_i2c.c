@@ -26,8 +26,10 @@ int hf_i2c_reg_read(I2C_HandleTypeDef *hi2c, uint8_t slave_addr,
 	while (HAL_I2C_GetState(hi2c) != HAL_I2C_STATE_READY);
 	status = HAL_I2C_Mem_Read(hi2c, slave_addr, reg_addr, I2C_MEMADD_SIZE_8BIT,
 							  data_ptr, 0x1, 0xff);
-	if (status != HAL_OK)
+	if (status != HAL_OK){
 		printf("I2Cx_read_Error(%x) reg %x; status %x\r\n", slave_addr, reg_addr, status);
+		return status;
+	}
 	while (HAL_I2C_GetState(hi2c) != HAL_I2C_STATE_READY);
 	while (HAL_I2C_IsDeviceReady(hi2c, slave_addr, 0xff, 0xff) == HAL_TIMEOUT);
 	while (HAL_I2C_GetState(hi2c) != HAL_I2C_STATE_READY);
@@ -43,7 +45,10 @@ int hf_i2c_mem_read(I2C_HandleTypeDef *hi2c, uint8_t slave_addr,
 	status = HAL_I2C_Mem_Read(hi2c, slave_addr, reg_addr, I2C_MEMADD_SIZE_8BIT,
 					data_ptr, len, 1000);
 	if (status != HAL_OK)
-		printf("I2Cx_read_Error(%x);\r\n", slave_addr);
+	{
+		printf("I2Cx_read_Error(%x) reg %x; status %x\r\n", slave_addr, reg_addr, status);
+		return status;
+	}
 	while (HAL_I2C_GetState(hi2c) != HAL_I2C_STATE_READY);
 	while (HAL_I2C_IsDeviceReady(hi2c, slave_addr, 0xff, 0xff) == HAL_TIMEOUT);
 	return status;

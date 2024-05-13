@@ -1039,6 +1039,7 @@ uint32_t es_autoboot(void)
 	int32_t som_pwr_last_state = 0;
 	if(is_som_pwr_lost_resume() && !es_get_som_pwr_last_state(&som_pwr_last_state)) {
 		if (som_pwr_last_state){
+			printf("pwr enable and last state is power on\n");
 			return 1;
 		}
 	}
