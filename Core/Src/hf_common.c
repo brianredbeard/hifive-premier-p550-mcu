@@ -138,7 +138,7 @@ void hexstr2mac(uint8_t *mac, char *hexstr)
 		hexstr += 2;
 	}
 }
-#if 0
+
 int _write(int fd, char *ch, int len)
 {
 	uint8_t val = '\r';
@@ -151,7 +151,6 @@ int _write(int fd, char *ch, int len)
 	}
 	return length;
 }
-#endif
 
 
 void es_eeprom_wp(uint8_t flag)
