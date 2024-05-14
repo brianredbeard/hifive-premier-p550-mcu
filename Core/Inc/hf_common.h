@@ -258,7 +258,9 @@ void change_som_power_state(power_switch_t newState);
 deamon_stats_t get_som_daemon_state(void);
 void change_som_daemon_state(deamon_stats_t newState);
 
-void TriggerSomTimer(void);
+void TriggerSomPowerOffTimer(void);
+void TriggerSomRebootTimer(void);
+void StopSomRebootTimer(void);
 
 void set_bootsel(uint8_t is_soft_crtl, uint8_t sel);
 

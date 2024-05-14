@@ -8,7 +8,7 @@
 #include "string.h"
 #include "hf_common.h"
 #include <assert.h>
-
+#include "hf_power_process.h"
 
 #define SESSION_ID_LENGTH 32
 #define BUF_SIZE 1024
@@ -10599,7 +10599,7 @@ static int change_power_status(int status)
 				return ret;
 			}
 			// Trigger the Som timer to enusre SOM could poweroff in 5 senconds
-			TriggerSomTimer();
+			TriggerSomPowerOffTimer();
 		} else {
 			printf("SOM already power off!\n");
 		}
@@ -10632,9 +10632,11 @@ int reset()
 		som_reset_control(pdTRUE);
 		osDelay(10);
 		som_reset_control(pdFALSE);
+		printf("Faild to reboot SOM(ret %d), force reset SOM!\n", ret);
 		ret = HAL_OK;
-		printf("Faild to reboot SOM, force reset SOM %d\n", ret);
 	}
+	// Trigger the Som timer to enusre SOM could reboot in 5 senconds
+	TriggerSomRebootTimer();
 	printf("web call reset, ret %d\n", ret);
 	return ret;
 }
@@ -10653,6 +10655,8 @@ POWERInfo get_power_info(){
 	POWERInfo example = {
         60,5,12
     };
+	get_board_power(&example.voltage,&example.current,&example.consumption);
+	//get_som_power(&example.voltage,&example.current,&example.consumption);
     return example;
 }
 
@@ -10890,9 +10894,10 @@ int set_rtcinfo(RTCInfo rtcInfo){
 	return 0;
 }
 
-int get_soc_status(){
-	printf("TODO call get_soc_status\n");
-	return 0;//0,working,1,stopped
+//0,working,1,stopped
+int get_soc_status()
+{
+	return SOM_DAEMON_ON == get_som_daemon_state() ? 0 : 1;
 }
 
  /** Serve one HTTP connection accepted in the http thread */

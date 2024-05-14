@@ -138,6 +138,7 @@ static void key_process(void)
 static void mcu_reset_som_process(void)
 {
 	printf("%s %d mcu reset som\n", __func__, __LINE__);
+	StopSomRebootTimer();
 }
 
 static void som_rst_feedback_process(void)

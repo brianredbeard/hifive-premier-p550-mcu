@@ -419,7 +419,8 @@ void dump_message(Message data)
 }
 // Define a mutex handle
 SemaphoreHandle_t xMutex = NULL;
-TimerHandle_t xSomTimer;
+TimerHandle_t xSomPowerOffTimer;
+TimerHandle_t xSomRebootTimer;
 
 // Function to initialize the mutex
 void init_transmit_mutex(void) {
@@ -472,7 +473,7 @@ void generate_checksum(Message *msg)
 	msg->checksum = checksum;
 }
 
-BaseType_t transmit_deamon_request(Message *msg)
+static BaseType_t xTransmitRequestToSOM(Message *msg)
 {
 	UART_HandleTypeDef *huart = &huart4;
 
@@ -514,7 +515,10 @@ int web_cmd_handle(CommandType cmd, void *data, int data_len, uint32_t timeout)
 		.data_len = data_len,
 		.tail = FRAME_TAIL,
 	};
-
+	if (SOM_POWER_ON != get_som_power_state()) {
+		ret = HAL_ERROR;
+		return ret;
+	}
 	/*Add webcmd to waiting list*/
 		// Initialize list item
 	vListInitialiseItem(&(webcmd.xListItem));
@@ -527,14 +531,17 @@ int web_cmd_handle(CommandType cmd, void *data, int data_len, uint32_t timeout)
 
 	msg.xTaskToNotify = (uint32_t)webcmd.xTaskToNotify;
 	//dump_message(msg);
-	status = transmit_deamon_request(&msg);
+	status = xTransmitRequestToSOM(&msg);
 	if (HAL_OK != status) {
 		ret = status;
 		goto err_msg;
 	}
-	/*wait 100ms to get the result*/
+	/*wait to get the result*/
 	if (xTaskNotifyWait(0, 0, &ulNotificationValue, pdMS_TO_TICKS(timeout)) == pdTRUE) {
 		ret = webcmd.cmd_result;
+		if (HAL_OK != ret) {
+			printf("[%s %d]:Som process cmd %d failed, ret %d\n",__func__,__LINE__, cmd, ret);
+		}
 		memcpy(data, webcmd.data, data_len);
 	} else {
 		ret = HAL_TIMEOUT;
@@ -664,7 +671,7 @@ void handle_som_mesage(Message *msg)
 	}
 }
 
-void vSomTimerCallback(TimerHandle_t xSomTimer)
+void vSomPowerOffTimerCallback(TimerHandle_t xSomPowerOffTimer)
 {
 	if (SOM_POWER_OFF != get_som_power_state()) {
 		change_som_power_state(SOM_POWER_OFF);
@@ -672,9 +679,30 @@ void vSomTimerCallback(TimerHandle_t xSomTimer)
 	}
 }
 
-void TriggerSomTimer(void)
+void TriggerSomPowerOffTimer(void)
 {
-	if (xTimerStart(xSomTimer, 0) != pdPASS) {
+	if (xTimerStart(xSomPowerOffTimer, 0) != pdPASS) {
+		printf("Failed to trigger Som timer!\n");
+	}
+}
+
+void vSomRebootTimerCallback(TimerHandle_t xSomRebootTimer)
+{
+	som_reset_control(pdTRUE);
+	osDelay(10);
+	som_reset_control(pdFALSE);
+	printf("reboot SOM timeout, force reset SOM!\n");
+}
+
+void TriggerSomRebootTimer(void)
+{
+	if (xTimerStart(xSomRebootTimer, 0) != pdPASS) {
+		printf("Failed to trigger Som timer!\n");
+	}
+}
+void StopSomRebootTimer(void)
+{
+	if (xTimerStop(xSomRebootTimer, 0) != pdPASS) {
 		printf("Failed to trigger Som timer!\n");
 	}
 }
@@ -697,14 +725,22 @@ void uart4_protocol_task(void *argument)
 	vListInitialise(&WebCmdList);
 
 	/* Create a timer with a timeout set to 5 seconds */
-	xSomTimer = xTimerCreate( "SomTimer", (5000 / portTICK_PERIOD_MS),
-			pdFALSE, (void *)0, vSomTimerCallback);
+	xSomPowerOffTimer = xTimerCreate( "SomPowerOffTimer", pdMS_TO_TICKS(5000),
+			pdFALSE, (void *)0, vSomPowerOffTimerCallback);
 
-	if (xSomTimer == NULL) {
-		printf("[%s %d]:Failed to create SOM Timer!\n",__func__,__LINE__);
+	if (xSomPowerOffTimer == NULL) {
+		printf("[%s %d]:Failed to create SOM poweroff timer!\n",__func__,__LINE__);
 		return;
 	}
 
+	/* Create a timer with a timeout set to 5 seconds */
+	xSomRebootTimer = xTimerCreate( "SomRebootTimer", pdMS_TO_TICKS(5000),
+			pdFALSE, (void *)0, vSomRebootTimerCallback);
+
+	if (xSomRebootTimer == NULL) {
+		printf("[%s %d]:Failed to create SOM reboot timer!\n",__func__,__LINE__);
+		return;
+	}
 	for (;;) {
 		if (xQueueReceive(xUart4MsgQueue, &(msg), portMAX_DELAY)) {
 			if (msg.header == FRAME_HEADER && msg.tail == FRAME_TAIL) {
