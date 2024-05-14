@@ -10783,7 +10783,7 @@ int set_dip_switch(DIPSwitchInfo dipSwitchInfo)
 
 	som_dip_switch_state =  ((0x1 & dipSwitchInfo.dip04) << 3) | ((0x1 & dipSwitchInfo.dip03) << 2)
 				| ((0x1 & dipSwitchInfo.dip02) << 1)| (0x1 & dipSwitchInfo.dip01);
-
+	es_set_som_dip_switch_soft_ctl_attr(dipSwitchInfo.swctrl);
 	return es_set_som_dip_switch_soft_state(som_dip_switch_state);
 }
 
