@@ -9160,6 +9160,9 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
                                                         });\n \
                                                     });\n \
 													$('#power-consum-refresh-hid').click(function() {\n \
+														if($('#power-on-change').val()===1){ //off status \n \
+															return; \n \
+														}\n \
                                                         $.ajax({\n \
 															async: false,\n \
                                                             url: '/power_consum',\n \
@@ -9280,6 +9283,7 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
                                                     });\n \
 													$('#power-on-refresh-hid').click(function() {\n \
 														$('#power-on-change').prop(\"disabled\", true); \n \
+														$('#power-consum-refresh').prop(\"disabled\", true); \n \
 														$('#power-on-change').text('loading,,,');\n \
                                                         $.ajax({\n \
 															async: false,\n \
@@ -9296,10 +9300,12 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
 																		$('#power-status-label').text('Power Status (OFF):');\n \
 																		$('#power-on-change').text('powerON');\n \
 																		$('#power-on-change').val('1');\n \
+																		$('#power-consum-refresh').prop(\"disabled\", true); \n \
 																	}else{\n \
 																		$('#power-status-label').text('Power Status (ON):');\n \
 																		$('#power-on-change').text('powerOFF');\n \
 																		$('#power-on-change').val('0');\n \
+																		$('#power-consum-refresh').prop(\"disabled\", false); \n \
 																	}\n \
 																}\n \
 															},\n \
@@ -9495,13 +9501,16 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
 													setInterval(function() {\n \
 														$('#power-consum-refresh-hid').click(); \n \
 														$('#rtc-refresh-hid').click(); \n \
-														$('#soc-refresh-hid').click(); \n \
 													}, 30*1000); \n \
 													setInterval(function() {\n \
 														$('#pvt-info-refresh-hid').click(); \n \
 														$('#dip-switch-refresh-hid').click(); \n \
    														$('#net-work-refresh-hid').click(); \n \
 													}, 3*60*1000); \n \
+													setInterval(function() {\n \
+														$('#power-on-refresh-hid').click(); \n \
+														$('#soc-refresh-hid').click(); \n \
+													}, 1000); \n \
                                                 });\n\
                                             </script>\n \
                                             <style> \
@@ -9523,6 +9532,18 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
 											label { \
 												width: 200px; \
 											} \
+											.network-roww {\
+												display: flex;\
+												justify-content: space-between;\
+												width: 400px;\
+												margin-bottom: 10px;\
+											}\
+											.option-row input[type=\"radio\"] {\
+												margin-right: 5px;\
+											}\
+											.option-row label {\
+												margin-right: 20px;\
+											}\
                                             </style> \
                                     </head> \
                                     <body> \
@@ -9621,26 +9642,32 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
                                         </div> \
 										 <div class=\"dip-switch\" > \
                                             <h3>DIP Switch</h3> \
-                                           <div  class=\"network-row\"> \
-												<label>dip01:</label> \
-												<input type=\"radio\" name=\"dip01\" value=\"0\" id=\"dip01-false\"><label for=\"dip01-false\">OFF</label> \
-												<input type=\"radio\" name=\"dip01\" value=\"1\" id=\"dip01-true\"><label for=\"dip01-true\">ON</label> \
-											</div> \
-											<div  class=\"network-row\"> \
-												<label>dip02:</label> \
-												<input type=\"radio\" name=\"dip02\" value=\"0\" id=\"dip02-false\"><label for=\"dip02-false\">OFF</label> \
-												<input type=\"radio\" name=\"dip02\" value=\"1\" id=\"dip02-true\"><label for=\"dip02-true\">ON</label> \
-											</div> \
-											<div  class=\"network-row\"> \
-												<label>dip03:</label> \
-												<input type=\"radio\" name=\"dip03\" value=\"0\" id=\"dip03-false\"><label for=\"dip03-false\">OFF</label> \
-												<input type=\"radio\" name=\"dip03\" value=\"1\" id=\"dip03-true\"><label for=\"dip03-true\">ON</label> \
-											</div> \
-											<div  class=\"network-row\"> \
-												<label>dip04:</label> \
-												<input type=\"radio\" name=\"dip04\" value=\"0\" id=\"dip04-false\"><label for=\"dip04-false\">OFF</label> \
-												<input type=\"radio\" name=\"dip04\" value=\"1\" id=\"dip04-true\"><label for=\"dip04-true\">ON</label> \
-											</div> \
+											<div class=\"network-roww label-row\">\
+												<label>dip0</label>\
+												<label>dip1</label>\
+												<label>dip2</label>\
+												<label>dip3</label>\
+											</div>\
+											<div class=\"network-roww option-row on-row\">\
+												<input type=\"radio\" name=\"dip01\" value=\"0\" id=\"dip01-true\">\
+												<label for=\"dip01-true\">ON</label>\
+												<input type=\"radio\" name=\"dip02\" value=\"0\" id=\"dip02-true\">\
+												<label for=\"dip02-true\">ON</label>\
+												<input type=\"radio\" name=\"dip03\" value=\"0\" id=\"dip03-true\">\
+												<label for=\"dip03-true\">ON</label>\
+												<input type=\"radio\" name=\"dip04\" value=\"0\" id=\"dip04-true\">\
+												<label for=\"dip04-true\">ON</label>\
+											</div>\
+											<div class=\"network-roww option-row off-row\">\
+												<input type=\"radio\" name=\"dip01\" value=\"1\" id=\"dip01-false\">\
+												<label for=\"dip01-false\">OFF</label>\
+												<input type=\"radio\" name=\"dip02\" value=\"1\" id=\"dip02-false\">\
+												<label for=\"dip02-false\">OFF</label>\
+												<input type=\"radio\" name=\"dip03\" value=\"1\" id=\"dip03-false\">\
+												<label for=\"dip03-false\">OFF</label>\
+												<input type=\"radio\" name=\"dip04\" value=\"1\" id=\"dip04-false\">\
+												<label for=\"dip04-false\">OFF</label>\
+											</div>\
 											<div  class=\"network-row\"> \
 												<label>Software/Hardware Ctrl:</label> \
 												<input type=\"radio\" name=\"swctrl\" value=\"0\" id=\"swctrl-false\"><label for=\"swctrl-false\">HardWare</label> \
@@ -9839,14 +9866,11 @@ void send_response_content(struct netconn *conn,const char* cookies,const char* 
 
 	sprintf(header_full, header,  strlen(html_content));
 
-    printf("send_response_content header: %d %s \n",strlen(header_full),header_full);
-    printf("send_response_content html_content: %d  \n",strlen(html_content));
-	
+    printf("send_response header size: %d \n",strlen(header_full));
 	netconn_write(conn, header_full, strlen(header_full), NETCONN_COPY);
-	printf("send_response_content after header_full \n");
+	// printf("send_response html_content size: %d \n",strlen(html_content));
 	send_large_data(conn, html_content,  strlen(html_content));
-    // netconn_write(conn, html_content, strlen(html_content), NETCONN_COPY);
-	printf("send_response_content after html_content \n");
+	printf("send_response html_content end \n");
 
     free(header);
 }
@@ -10086,17 +10110,17 @@ const char* process_header(const char *header) {
         if (len > sizeof(line) - 1) len = sizeof(line) - 1;
         memcpy(line, pos, len);
         line[len] = '\0'; 
-        printf("Header line :pos:%d strlen:%d line:%c%c%c%c%c\n",pos-header,strlen(line), line[0],line[1],line[2],line[3],line[4]);
+        // printf("Header line :pos:%d strlen:%d line:%c%c%c%c%c\n",pos-header,strlen(line), line[0],line[1],line[2],line[3],line[4]);
 
         pos = end + 2; // skip "\r\n"
 
         // check header（即"\r\n\r\n"）
         if (*pos == '\r' && *(pos + 1) == '\n') {
-            printf("End of header.\n");
+            // printf("End of header.\n");
             return pos + 2;
         }
     }
-	printf("can't find rnrn pos-header:%d .\n",pos-header);
+	// printf("can't find rnrn pos-header:%d .\n",pos-header);
     return NULL; // not found "\r\n\r\n"，return NULL
 }
 
@@ -10184,7 +10208,6 @@ typedef struct  {
 
 POWERInfo get_power_info(void){
 
-	printf("TODO call get_power_info\n");
 
 	POWERInfo example = {
         60,5,12
@@ -10391,12 +10414,12 @@ int get_soc_status()
      bool isLogin=FALSE;
 
      err = netconn_recv(conn, &inbuf);
-     printf("http_server_netconn_serve after:netconn_recv \n");
+    //  printf("http_server_netconn_serve after:netconn_recv \n");
      if (err == ERR_OK)
      {
         netbuf_data(inbuf, (void**)&buf, &buflen);
 
-        printf(" ############### buf: ############## %d %d \n",sizeof(buf),strlen(buf));
+        // printf(" ############### buf: ############## %d %d \n",sizeof(buf),strlen(buf));
         // for (int i = 0; i < sizeof(buf)>10?10:sizeof(buf); i++) {
         //     printf("%c", buf[i]);
         // }
@@ -10412,14 +10435,14 @@ int get_soc_status()
 
         char cookies[256] = {0};
         parse_cookies(buf, cookies);
-        printf("parse header cookies: %s \n",cookies);
+        // printf("parse header cookies: %s \n",cookies);
 
         // parse cookie ,session sid
         char *found_session_user_name=NULL;
         char *sidValue = NULL;
         if (cookies != NULL) {
 
-            printf("\t session \n");
+            // printf("\t session \n");
             Session *current = session_list;
             while (current != NULL) {
                 printf("%s %s\n",current->session_id,current->session_data);
@@ -10438,25 +10461,23 @@ int get_soc_status()
             }
 
             if (sidValue != NULL) {
-                printf("sidValue : %s\n", sidValue);
+                // printf("sidValue : %s\n", sidValue);
                 Session *found_session = find_session(sidValue);
                 if (found_session) {
-                    printf("\t Found session: ID=%s, Data=%s\n", found_session->session_id, found_session->session_data);
+                    // printf("\t Found session: ID=%s, Data=%s\n", found_session->session_id, found_session->session_data);
                     found_session_user_name=strdup(found_session->session_data);
                 }
             }
         }
 
-
-
         char resp_cookies[BUF_SIZE_256] = {0};
 
         if (method && url && version && strcmp(method, "GET") == 0) {
-            printf("GET \n");
+            // printf("GET \n");
             char *path = strtok(url, "?");
             char *query = strtok(NULL, "?");
 
-            printf("GET path:%s \n",path);
+            // printf("GET path:%s \n",path);
 			int byhand=0;
 
 
@@ -10465,14 +10486,14 @@ int get_soc_status()
             kv_map params={NULL,0};
             kv_map* p_params=NULL;
             if(query!=NULL && strlen(query)>0){
-                printf("query: %d %s \n",strlen(query),query);
+                // printf("query: %d %s \n",strlen(query),query);
 
                 params = parse_get_params(query);
                 p_params= &params;
 
                 kv_pair *current = params.head;
                 while (current) {
-                    printf("\t %s = %s\n", current->key, current->value);
+                    // printf("\t %s = %s\n", current->key, current->value);
 					if(strcmp(current->key,"byhand")==0){
                         byhand = strcmp(current->value,"0")==0?0:1;
                     }
@@ -10485,12 +10506,12 @@ int get_soc_status()
                 printf("GET location: index.html \n");
 
                 if(found_session_user_name!=NULL && strlen(found_session_user_name)>0){
-                    printf("redirect to info.html (%s)\n",found_session_user_name);
+                    // printf("redirect to info.html (%s)\n",found_session_user_name);
                     send_redirect(conn,"/info.html",NULL);
 
                 }else{
                    // send_response_content(conn,NULL, login_html);
-                    printf("redirect to login.html \n");
+                    // printf("redirect to login.html \n");
 					sprintf(resp_cookies, "Set-Cookie: sid=; Max-Age=0; Path=/\r\n");
                     send_redirect(conn,"/login.html",resp_cookies);
                     // send_redirect(conn,"/login.html",NULL);
@@ -10508,11 +10529,11 @@ int get_soc_status()
                 printf("GET location: info.html \n");
 
 				if(found_session_user_name!=NULL && strlen(found_session_user_name)>0){
-					printf("response info.html%s \n",found_session_user_name);
+					// printf("response info.html%s \n",found_session_user_name);
 					sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",sidValue,MAX_AGE);
                		send_response_content(conn,resp_cookies, info_html);
 				}else{
-					printf("redirect to login.html \n");
+					// printf("redirect to login.html \n");
 					sprintf(resp_cookies, "Set-Cookie: sid=; Max-Age=0; Path=/\r\n");
                     send_redirect(conn,"/login.html",resp_cookies);
 				}
@@ -10520,7 +10541,7 @@ int get_soc_status()
             }else if(strcmp(path,"/modify_account.html")==0){
 				printf("GET location: modify_account.html \n");
 				if(found_session_user_name!=NULL && strlen(found_session_user_name)>0){
-					printf("response modify_account_html.html%s \n",found_session_user_name);
+					// printf("response modify_account_html.html%s \n",found_session_user_name);
 					assert(strlen(found_session_user_name)<BUF_SIZE_64);
 					char modify_account_html_resp[strlen(modify_account_html)+BUF_SIZE_64];
 					sprintf(modify_account_html_resp, modify_account_html, found_session_user_name);
@@ -10528,7 +10549,7 @@ int get_soc_status()
 					sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",sidValue,MAX_AGE);
                		send_response_content(conn,resp_cookies, modify_account_html_resp);
 				}else{
-					printf("redirect to login.html \n");
+					// printf("redirect to login.html \n");
 					sprintf(resp_cookies, "Set-Cookie: sid=; Max-Age=0; Path=/\r\n");
                     send_redirect(conn,"/login.html",resp_cookies);
                     // send_redirect(conn,"/login.html",NULL);
@@ -10550,7 +10571,7 @@ int get_soc_status()
 					sprintf(response_header, json_header, strlen(json_response));
 				}
 
-                printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
+                // printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
                 netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
                 netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
@@ -10569,7 +10590,7 @@ int get_soc_status()
 					sprintf(response_header, json_header, strlen(json_response));
 				}
 
-                printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
+                // printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
                 netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
                 netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
@@ -10589,7 +10610,7 @@ int get_soc_status()
 					sprintf(response_header, json_header, strlen(json_response));
 				}
 
-                printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
+                // printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
                 netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
                 netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
@@ -10619,7 +10640,7 @@ int get_soc_status()
 					sprintf(response_header, json_header, strlen(json_response));
 				}
 
-                printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
+                // printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
                 netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
                 netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
@@ -10642,7 +10663,7 @@ int get_soc_status()
 					sprintf(response_header, json_header, strlen(json_response));
 				}
 
-                printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
+                // printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
                 netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
                 netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
@@ -10664,9 +10685,9 @@ int get_soc_status()
 					sprintf(response_header, json_header, strlen(json_response));
 				}
 
-				printf("#### FAKE query network! #####\n");
+				// printf("#### FAKE query network! #####\n");
 
-                printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
+                // printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
                 netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
                 netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
@@ -10686,12 +10707,12 @@ int get_soc_status()
                     current = current->next;
                 }
                 assert(user_name!=NULL);
-                printf("param user_name: %s \n",user_name);
+                // printf("param user_name: %s \n",user_name);
 
                 //add sessions
                 char session_id[SESSION_ID_LENGTH + 1];
                 generate_session_id(session_id, SESSION_ID_LENGTH);
-                printf("session add user,sessionId:%s \n",session_id);
+                // printf("session add user,sessionId:%s \n",session_id);
 
                 Session *session1 = create_session(session_id, user_name);
                 add_session(session1);
@@ -10736,7 +10757,7 @@ int get_soc_status()
 					sprintf(response_header, json_header, strlen(json_response));
 				}
 
-                printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
+                // printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
                 netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
                 netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
@@ -10757,7 +10778,7 @@ int get_soc_status()
 					sprintf(response_header, json_header, strlen(json_response));
 				}
 
-                printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
+                // printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
                 netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
                 netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
@@ -10781,7 +10802,7 @@ int get_soc_status()
 					sprintf(response_header, json_header, strlen(json_response));
 				}
 
-                printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
+                // printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
                 netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
                 netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
@@ -10804,7 +10825,7 @@ int get_soc_status()
 					sprintf(response_header, json_header, strlen(json_response));
 				}
 
-                printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
+                // printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
                 netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
                 netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
@@ -10822,7 +10843,7 @@ int get_soc_status()
         }else if(method && url && version && strcmp(method, "POST") == 0)
         {
             printf("func:httpserver_serve method:POST  enter \n");
-            printf("buf length:%d \n",strlen(buf));
+            // printf("buf length:%d \n",strlen(buf));
             if(strlen(buf)>TCP_MSS){
 
 				char response_413_body[BUF_SIZE_64] = {0};
@@ -10847,23 +10868,23 @@ int get_soc_status()
                         content_length = atoi(len_str);
                     }
                 }
-                printf("content_length:%d \n",content_length);
+                // printf("content_length:%d \n",content_length);
 
-                printf("########### buf hex##############\n");
-                for (int i = 0; i < strlen(buf); i++) {
-                    printf("%02X ", buf[i]);
-                    if(i%16==15){
-                        printf("\n");
-                    }
-                }
-                printf("\n");
+                // printf("########### buf hex##############\n");
+                // for (int i = 0; i < strlen(buf); i++) {
+                //     printf("%02X ", buf[i]);
+                //     if(i%16==15){
+                //         printf("\n");
+                //     }
+                // }
+                // printf("\n");
 
                 char *body_start = strstr(buf, "\r\n\r\n");
                 // const char *body_start = process_header(buf);
 
                 if (body_start) {
                     body_start += 4; 
-                    printf("find the body of the POST request. \n body_start posabs:%d strlen():%d \n",body_start-buf,strlen(body_start));
+                    // printf("find the body of the POST request. \n body_start posabs:%d strlen():%d \n",body_start-buf,strlen(body_start));
                 } else {
                     // printf("Could not find the body of the POST request. \n");
                     printf("Could not find the body of the POST request. \n body_start strlen() %d \n",strlen(body_start));
@@ -10878,16 +10899,16 @@ int get_soc_status()
                 // printf("query %d %s.\n",strlen(query),query);
                 // ------- end query info ---------------
 
-               printf("########### query hex##############\n");
-    			for (int i = 0; i < strlen(query); i++) {
-    				printf("%02X,%c ", query[i],query[i]);
-    				if(i%16==15){
-    					printf("\n");
-    				}
-    			}
-    			printf("\n");
-                printf("POST path:%s query:%s \n",path,query);
-                printf("start parse post query \n");
+            //    printf("########### query hex##############\n");
+    		// 	for (int i = 0; i < strlen(query); i++) {
+    		// 		printf("%02X,%c ", query[i],query[i]);
+    		// 		if(i%16==15){
+    		// 			printf("\n");
+    		// 		}
+    		// 	}
+    		// 	printf("\n");
+            //     printf("POST path:%s query:%s \n",path,query);
+            //     printf("start parse post query \n");
                 kv_map params={NULL,0};
                 kv_map* p_params=NULL;
                 if(strlen(query)>0){
@@ -10900,11 +10921,11 @@ int get_soc_status()
                         current = current->next;
                     }
                 }
-                printf("end parse post query \n");
+                // printf("end parse post query \n");
 				free(query);
 
                 if(strcmp(path, "/testpost")==0 ){		//testpost
-                    printf("POST ,location: testpost \n");
+                    // printf("POST ,location: testpost \n");
 
                     char* a=NULL;
                     kv_pair *current = params.head;
@@ -10916,7 +10937,7 @@ int get_soc_status()
                         }
                         current = current->next;
                     }
-                    printf("param a: %s \n",a);
+                    // printf("param a: %s \n",a);
 
                 }else if(strcmp(path, "/login")==0 ){		//login
                     printf("POST ,location: login \n");
@@ -10941,11 +10962,8 @@ int get_soc_status()
                         current = current->next;
                     }
                     assert(username!=NULL && password!=NULL);
-                    printf("param username: %s \n",username);
-                    printf("param password: %s \n",password);
-
-
-
+                    // printf("param username: %s \n",username);
+                    // printf("param password: %s \n",password);
 
                     bool loginSuccess = validate_credentials(username,password)==0?TRUE:FALSE;
 
@@ -10955,7 +10973,7 @@ int get_soc_status()
                         //add sessions
                         char session_id[SESSION_ID_LENGTH + 1];
                         generate_session_id(session_id, SESSION_ID_LENGTH);
-                        printf("session add user,sessionId:%s \n",session_id);
+                        // printf("session add user,sessionId:%s \n",session_id);
 
                         Session *session1 = create_session(session_id, username);
                         add_session(session1);
@@ -10985,16 +11003,16 @@ int get_soc_status()
                         current = current->next;
                     }
                     assert( password!=NULL);
-                    printf("param password: %s \n",password);
+                    // printf("param password: %s \n",password);
 
 					int ret =save_sys_username_password(found_session_user_name,password);//save new username ,password to eeprom
 					if(ret==0){
-						printf("save_sys_username_password success,redirect to login.html \n");
+						// printf("save_sys_username_password success,redirect to login.html \n");
 						sprintf(resp_cookies, "Set-Cookie: sid=; Max-Age=0; Path=/\r\n");
                         send_redirect(conn,"/login.html",resp_cookies);
                         // send_redirect(conn,"/login.html",NULL);
 					}else{
-						printf("save_sys_username_password fail,redirect to modify_account.html \n");
+						// printf("save_sys_username_password fail,redirect to modify_account.html \n");
 						send_redirect(conn,"/modify_account.html",NULL);
 					}
 
@@ -11003,10 +11021,10 @@ int get_soc_status()
                     //todo:verify current user is username
                     if(found_session_user_name!=NULL && strlen(found_session_user_name)>0){//todo verify user_name in txt config(valid)
                         // send_response_content(conn,NULL, login_html);
-                        printf("redirect to login.html \n");
+                        // printf("redirect to login.html \n");
                         if(sidValue!=NULL){
                             int ret=delete_session(sidValue);
-                            printf("delete sidValue:%s\n",sidValue);
+                            // printf("delete sidValue:%s\n",sidValue);
                             assert(ret>0);//make sure delete ok
                         }
                     }
@@ -11026,7 +11044,7 @@ int get_soc_status()
                         current = current->next;
                     }
                     assert( status!=NULL);
-                    printf("param status: %s \n",status);
+                    // printf("param status: %s \n",status);
 
 					int change_status_ret=0;
 					if(strcmp(status,"0")==0){//power on -> power off
@@ -11055,7 +11073,7 @@ int get_soc_status()
 						sprintf(response_header, json_header, strlen(json_response));
 					}
 
-                    printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
+                    // printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
                     netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
                     netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
@@ -11073,7 +11091,7 @@ int get_soc_status()
                         current = current->next;
                     }
                     assert( status!=NULL);
-                    printf("param power_lostresume_status: %s \n",status);
+                    // printf("param power_lostresume_status: %s \n",status);
 
 					int change_status_ret=0;
 					if(strcmp(status,"0")==0){//power on -> power off
@@ -11101,7 +11119,7 @@ int get_soc_status()
 						sprintf(response_header, json_header, strlen(json_response));
 					}
 
-                    printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
+                    // printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
                     netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
                     netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
@@ -11128,7 +11146,7 @@ int get_soc_status()
 						sprintf(response_header, json_header, strlen(json_response));
 					}
 
-                    printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
+                    // printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
                     netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
                     netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
@@ -11182,7 +11200,7 @@ int get_soc_status()
 						sprintf(response_header, json_header, strlen(json_response));
 					}
 
-                    printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
+                    // printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
                     netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
                     netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
@@ -11214,10 +11232,10 @@ int get_soc_status()
 					unescape_colon(macaddr);
 					// printf("############### macaddr:%d %s \n",strlen(macaddr),macaddr);
 
-                    printf("param ipaddr: %s \n",ipaddr);
-                    printf("param gateway: %s \n",gateway);
-                    printf("param subnetwork: %s \n",subnetwork);
-					printf("param macaddr: %s \n",macaddr);
+                    // printf("param ipaddr: %s \n",ipaddr);
+                    // printf("param gateway: %s \n",gateway);
+                    // printf("param subnetwork: %s \n",subnetwork);
+					// printf("param macaddr: %s \n",macaddr);
 
 
 					assert(strlen(ipaddr)<16 && strlen(macaddr)<18 &&strlen(subnetwork)<16 && strlen(gateway)<16 );
@@ -11245,7 +11263,7 @@ int get_soc_status()
 						sprintf(response_header, json_header, strlen(json_response));
 					}
 
-                    printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
+                    // printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
                     netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
                     netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
@@ -11310,7 +11328,7 @@ int get_soc_status()
 						sprintf(response_header, json_header, strlen(json_response));
 					}
 
-                    printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
+                    // printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
                     netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
                     netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
@@ -11328,15 +11346,13 @@ int get_soc_status()
                         }
                         current = current->next;
                     }
-                    printf("param c: %s \n",c);
+                    // printf("param c: %s \n",c);
 
-                    led_on = FALSE;
-                    LED1_OFF;
-                    printf("LED OFF!\n");
+               
                     send_response_200(conn);
 
                 }else{
-                    printf("func:httpserver_serve else 111111111111111 \n");
+                    // printf("func:httpserver_serve else 111111111111111 \n");
                     send_response_200(conn);
                 }
 
@@ -11344,7 +11360,7 @@ int get_soc_status()
                     free_kv_map(&params);
                     p_params=NULL;
                 }
-                printf("func:httpserver_serve method:POST  exit \n");
+                // printf("func:httpserver_serve method:POST  exit \n");
             }
         }else{
             printf("ERROR unsupport methoc(only support GET,POST) %S \n",method);
