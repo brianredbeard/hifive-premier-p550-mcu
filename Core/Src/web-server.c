@@ -10172,12 +10172,10 @@ static int change_power_status(int status)
 }
 
 int get_power_lost_resume_attr(){
-	printf("TODO call get_power_lost_resume_attr \n");
-	return 1;//1:powerON,0:powerOFF
+	return is_som_pwr_lost_resume();
 }
 int change_power_lost_resume_attr(int status){//status 0:power off,1:power on
-	printf("TODO call change_power_lost_resume_attr %d \n",status);
-	return 0;//0 success
+	return es_set_som_pwr_lost_resume_attr(status);
 }
 
 int reset()
