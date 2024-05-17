@@ -9011,6 +9011,37 @@ const unsigned char login_html[] ="<html lang=\"zh\"> \
                                         <meta charset=\"UTF-8\"> \
                                         <title>User Login</title> \
 										<link rel=\"icon\" href=\"data:,\"> \
+										<script src=\"/jquery.min.js\"></script> \
+ 										<script> \n \
+											$(document).ready(function() { \n \
+												$('#loginForm').submit(function(event) { \n \
+													event.preventDefault();  \n \
+													var username = $('#username').val(); \n \
+													var password = $('#password').val(); \n \
+													$.ajax({ \n \
+														url: '/login', \n \
+														method: 'POST', \n \
+														contentType: 'application/x-www-form-urlencoded', \n \
+														data: { \n \
+															username: username, \n \
+															password: password \n \
+														}, \n \
+														success: function(response) {\n \
+															if(response.status===0){\n \
+																window.location.href = '/info.html';  \n \
+															}else{\n \
+																alert('username or password not right!') \n \
+																window.location.href = '/login.html';  \n \
+															}\n \
+															console.log('Network settings updated successfully.');\n \
+														},\n \
+														error: function() { \n \
+															alert('request failt,try again！'); \n \
+														} \n \
+													}); \n \
+												}); \n \
+											}); \n \
+										</script> \n \
 										<style> \
 										.network-row { \
 											display: flex; \
@@ -9025,7 +9056,7 @@ const unsigned char login_html[] ="<html lang=\"zh\"> \
                                     <body > \
 									<div style=\"display: flex; flex-direction: column; align-items: center;\"> \
                                         <h2>User Login</h2> \
-                                        <form action=\"/login\" method=\"POST\"  > \
+                                        <form action=\"/login\"  id=\"loginForm\" method=\"POST\"  > \
 												<div class=\"network-row\"> \
 													<label for=\"username\">Username:</label> <input type=\"text\" id=\"username\" name=\"username\" required> \
 												</div> \
@@ -10774,7 +10805,7 @@ int get_soc_status()
                 netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
 
             }else if(strcmp(path, "/board_info_cb")==0 ){
-                web_debug("get ,location: /board_info_cb \n");
+                web_debug("GET location: board_info_cb \n");
 				CBSimpleInfo simpleInfo=get_cb_info();
 
                	char json_response[BUF_SIZE_256]={0};
@@ -10795,7 +10826,7 @@ int get_soc_status()
                 netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
 
             }else if(strcmp(path, "/rtc")==0 ){
-                web_debug("get ,location: /rtc \n");
+                web_debug("GET location: rtc \n");
 				RTCInfo rtcInfo = {0};
 				get_rtcinfo(&rtcInfo);
 
@@ -10820,7 +10851,7 @@ int get_soc_status()
 
             }else if(strcmp(path, "/soc-status")==0){
 
-				web_debug("get ,location: /soc-status \n");
+				web_debug("GET location: soc-status \n");
 				int ret=get_soc_status();
 
                	char json_response[BUF_SIZE_128]={0};
@@ -10936,7 +10967,7 @@ int get_soc_status()
 				free(query);
 
                 if(strcmp(path, "/testpost")==0 ){		//testpost
-                    // web_debug("POST ,location: testpost \n");
+                    // web_debug("POST location: testpost \n");
 
                     char* a=NULL;
                     kv_pair *current = params.head;
@@ -10951,7 +10982,7 @@ int get_soc_status()
                     // web_debug("param a: %s \n",a);
 
                 }else if(strcmp(path, "/login")==0 ){		//login
-                    web_debug("POST ,location: login \n");
+                    web_debug("POST location: login \n");
                     char* username=NULL;
                     char* password=NULL;
                     assert(p_params!=NULL);
@@ -10977,9 +11008,10 @@ int get_soc_status()
                     // web_debug("param password: %s \n",password);
 
                     bool loginSuccess = validate_credentials(username,password)==0?TRUE:FALSE;
-
+						char *json_response=NULL;
+						char response_header[BUF_SIZE_256];
                     if(loginSuccess){
-                        web_debug("login success!\n");
+							json_response="{\"status\":0,\"message\":\"success!\",\"data\":{}}";
 
                         //add sessions
                         char session_id[SESSION_ID_LENGTH + 1];
@@ -10990,17 +11022,43 @@ int get_soc_status()
                         add_session(session1);
                         assert(find_session(session_id)!=NULL);
 
-                        sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=30; Path=/\r\n",session_id);
-
-                        send_redirect(conn,"/info.html",resp_cookies);
+							sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",session_id,MAX_AGE);
+							sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
                     }else{
+							json_response="{\"status\":1,\"message\":\"failt\",\"data\":{}}";
+
 						sprintf(resp_cookies, "Set-Cookie: sid=; Max-Age=0; Path=/\r\n");
-                        send_redirect(conn,"/login.html",resp_cookies);
-                        // send_redirect(conn,"/login.html",NULL);
+							sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
                     }
 
+						netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
+						netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
+
+
+
+                    // if(loginSuccess){
+                    //     printf("login success!\n");
+
+                    //     //add sessions
+                    //     char session_id[SESSION_ID_LENGTH + 1];
+                    //     generate_session_id(session_id, SESSION_ID_LENGTH);
+                    //     // printf("session add user,sessionId:%s \n",session_id);
+
+                    //     Session *session1 = create_session(session_id, username);
+                    //     add_session(session1);
+                    //     assert(find_session(session_id)!=NULL);
+
+                    //     sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=30; Path=/\r\n",session_id);
+
+                    //     send_redirect(conn,"/info.html",resp_cookies);
+                    // }else{
+					// 	sprintf(resp_cookies, "Set-Cookie: sid=; Max-Age=0; Path=/\r\n");
+                    //     send_redirect(conn,"/login.html",resp_cookies);
+                    //     // send_redirect(conn,"/login.html",NULL);
+                    // }
+
                 }else if(strcmp(path,"/modify_account")==0){
-					web_debug("POST ,location: modify_account \n");
+					web_debug("POST location: modify_account \n");
 
 
                     char* password=NULL;
@@ -11028,7 +11086,7 @@ int get_soc_status()
 					}
 
 				}else if(strcmp(path, "/logout")==0 ){		//login_out
-                    web_debug("POST ,location: logout \n");
+                    web_debug("POST location: logout \n");
                     //todo:verify current user is username
                     if(found_session_user_name!=NULL && strlen(found_session_user_name)>0){//todo verify user_name in txt config(valid)
                         // send_response_content(conn,NULL, login_html);
@@ -11043,7 +11101,7 @@ int get_soc_status()
                     send_redirect(conn,"/login.html",resp_cookies);
 
                 }else if(strcmp(path, "/power_status")==0 ){
-					web_debug("POST ,location: power_status \n");
+					web_debug("POST location: power_status \n");
                     char* status=NULL;
                     assert(p_params!=NULL);
                     kv_pair *current = params.head;
@@ -11090,7 +11148,7 @@ int get_soc_status()
                     netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
 
 				}else if(strcmp(path, "/power_lostresume_status")==0 ){
-					web_debug("POST ,location: power_lostresume_status \n");
+					web_debug("POST location: power_lostresume_status \n");
                     char* status=NULL;
                     assert(p_params!=NULL);
                     kv_pair *current = params.head;
@@ -11136,7 +11194,7 @@ int get_soc_status()
                     netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
 
 				}else if(strcmp(path, "/reset")==0 ){
-					web_debug("POST ,location: reset \n");
+					web_debug("POST location: reset \n");
 					int reset_ret=reset();
                     char *json_response_patt =NULL;
 					char json_response[BUF_SIZE_64]={0};
@@ -11164,7 +11222,7 @@ int get_soc_status()
 
 
 				}else if(strcmp(path, "/dip_switch")==0 ){
-					web_debug("POST ,location: dip_switch \n");
+					web_debug("POST location: dip_switch \n");
 
 					DIPSwitchInfo dipSwitchInfo;
                     assert(p_params!=NULL);
@@ -11216,7 +11274,7 @@ int get_soc_status()
                     netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
                     netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
 				}else if(strcmp(path, "/network")==0 ){		//post network
-                    web_debug("POST ,location: network \n");
+                    web_debug("POST location: network \n");
 
                     char* ipaddr=NULL;
                     char* gateway=NULL;
@@ -11282,10 +11340,10 @@ int get_soc_status()
                     // free(response_header);
                     // free(json_response);
 
-                    send_response_200(conn);
+                    // send_response_200(conn);
 
                 }else if(strcmp(path, "/rtc")==0 ){	//rtc
-                    web_debug("POST ,location: rtc \n");
+                    web_debug("POST location: rtc \n");
 
 					RTCInfo rtcInfo;
                     assert(p_params!=NULL);
@@ -11345,7 +11403,7 @@ int get_soc_status()
                     netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
 
                 }else if(strcmp(path, "/off")==0 ){	//off
-                    web_debug("POST ,location: off \n");
+                    web_debug("POST location: off \n");
 
                     char* c=NULL;
                     kv_pair *current = params.head;
@@ -11402,7 +11460,7 @@ int get_soc_status()
 	netconn_listen(conn);
 
 	led_on = TRUE;
-	web_debug("start http server! MEMP_NUM_TCP_PCB %d\n",MEMP_NUM_TCP_PCB );
+	printf("start http server! MEMP_NUM_TCP_PCB %d\n",MEMP_NUM_TCP_PCB );
 
 	do
 	{
