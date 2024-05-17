@@ -491,7 +491,9 @@ static BaseType_t xTransmitRequestToSOM(Message *msg)
 	if (status == HAL_OK) {
 		return status; // Successful transmission
 	} else {
-		printf("[%s %d]:Failed to transmit msg, status %d!\n",__func__,__LINE__, status);
+		if (SOM_DAEMON_ON == get_som_daemon_state()) {
+			printf("[%s %d]:Failed to transmit msg, status %d!\n",__func__,__LINE__, status);
+		}
 		return status; // Transmission failed
 	}
 }
@@ -607,10 +609,10 @@ void deamon_keeplive_task(void *argument)
 		ret = web_cmd_handle(CMD_BOARD_STATUS, NULL, 0, 1000);
 		if (HAL_OK != ret) {
 			if (HAL_TIMEOUT == ret) {
-				if (count <= 5)
+				if (count <= 5 && SOM_DAEMON_ON == get_som_daemon_state())
 					printf("SOM keeplive request timeout!\n");
 			} else {
-				if (count <=5)
+				if (count <=5 && SOM_DAEMON_ON == get_som_daemon_state())
 					printf("SOM keeplive request send failed!\n");
 			}
 			count++;

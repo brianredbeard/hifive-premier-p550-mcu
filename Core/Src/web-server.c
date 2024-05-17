@@ -9794,9 +9794,9 @@ char* concatenate_strings(const char* str1, const char* str2) {
         exit(1);
     }
 
-    strcpy(new_str, str1);   
-    strcat(new_str, str2);  
-    return new_str; 
+    strcpy(new_str, str1);
+    strcat(new_str, str2);
+    return new_str;
 }
 
 void send_redirect(struct netconn *conn, const char *location,const char* cookies) {
@@ -9826,23 +9826,23 @@ void send_redirect(struct netconn *conn, const char *location,const char* cookie
 
 err_t send_large_data(struct netconn *conn, const char *data, unsigned int length) {
     err_t result = ERR_OK;
-    unsigned int offset = 0; 
+    unsigned int offset = 0;
 
     while (offset < length) {
         unsigned int chunk_size = CHUNK_SIZE;
         if (offset + CHUNK_SIZE > length) {
-            chunk_size = length - offset; 
+            chunk_size = length - offset;
         }
 
-  
+
         result = netconn_write(conn, data + offset, chunk_size, NETCONN_COPY);
 		printf("offset:%d chunk_size:%d \n" ,offset,chunk_size);
 
         if (result != ERR_OK) {
-            break; 
+            break;
         }
 
-        offset += chunk_size; 
+        offset += chunk_size;
     }
 
     return result;
@@ -9922,13 +9922,13 @@ void free_kv_map(kv_map *map) {
 
 kv_map parse_get_params(const char *query) {
     kv_map params = {NULL, 0};
-    char *query_dup = strdup(query); 
+    char *query_dup = strdup(query);
     char *token = strtok(query_dup, "&");
 
     while (token) {
         char *equal_sign = strchr(token, '=');
         if (equal_sign) {
-            *equal_sign = '\0'; 
+            *equal_sign = '\0';
             kv_pair *new_pair = create_kv_pair(token, equal_sign + 1);
             if (new_pair) {
                 new_pair->next = params.head;
@@ -9975,15 +9975,15 @@ void generate_session_id(char *session_id, int length) {
             int key = rand() % (int)(sizeof(charset) - 1);
             session_id[i] = charset[key];
         }
-        session_id[length - 1] = '\0';  
+        session_id[length - 1] = '\0';
     }
 }
 
 
 typedef struct Session {
-    char session_id[256];  
-    char session_data[256]; 
-    struct Session *next; 
+    char session_id[256];
+    char session_data[256];
+    struct Session *next;
 } Session;
 
 
@@ -10026,7 +10026,7 @@ int update_session(const char *id, const char *data) {
         session->session_data[sizeof(session->session_data) - 1] = '\0';
         return 1;
     }
-    return 0; 
+    return 0;
 }
 
 int delete_session(const char *id) {
@@ -10036,11 +10036,11 @@ int delete_session(const char *id) {
             Session *to_delete = *current;
             *current = (*current)->next;
             free(to_delete);
-            return 1; 
+            return 1;
         }
         current = &(*current)->next;
     }
-    return 0; 
+    return 0;
 }
 
 void clear_sessions() {
@@ -10059,12 +10059,12 @@ void clear_sessions() {
 
 void parseCredentials(const char *readBuffer, char *username, char *password) {
     char buffer[EEPROM_USERNAME_PASSWORD_BUFFER_SIZE];
-    strncpy(buffer, readBuffer, EEPROM_USERNAME_PASSWORD_BUFFER_SIZE); 
-    buffer[EEPROM_USERNAME_PASSWORD_BUFFER_SIZE - 1] = '\0'; 
+    strncpy(buffer, readBuffer, EEPROM_USERNAME_PASSWORD_BUFFER_SIZE);
+    buffer[EEPROM_USERNAME_PASSWORD_BUFFER_SIZE - 1] = '\0';
 
     char *token = strtok(buffer, ",");
     if (token != NULL) {
-        strncpy(username, token, EEPROM_USERNAME_PASSWORD_BUFFER_SIZE); 
+        strncpy(username, token, EEPROM_USERNAME_PASSWORD_BUFFER_SIZE);
         token = strtok(NULL, ",");
         if (token != NULL) {
             strncpy(password, token, EEPROM_USERNAME_PASSWORD_BUFFER_SIZE);
@@ -10108,7 +10108,7 @@ const char* process_header(const char *header) {
         size_t len = end - pos;
         if (len > sizeof(line) - 1) len = sizeof(line) - 1;
         memcpy(line, pos, len);
-        line[len] = '\0'; 
+        line[len] = '\0';
         // printf("Header line :pos:%d strlen:%d line:%c%c%c%c%c\n",pos-header,strlen(line), line[0],line[1],line[2],line[3],line[4]);
 
         pos = end + 2; // skip "\r\n"
@@ -10129,9 +10129,9 @@ static bool led_on = FALSE;
 
 void unescape_colon(char *str) {
     char *pos;
-    while ((pos = strstr(str, "%3A")) != NULL) {  
-        *pos = ':';  
-        memmove(pos + 1, pos + 3, strlen(pos + 3) + 1);  
+    while ((pos = strstr(str, "%3A")) != NULL) {
+        *pos = ':';
+        memmove(pos + 1, pos + 3, strlen(pos + 3) + 1);
     }
 }
 
@@ -10152,7 +10152,7 @@ static int change_power_status(int status)
 			if (HAL_OK != ret) {
 				change_som_power_state(SOM_POWER_OFF);
 				printf("Poweroff SOM error(ret %d), force shutdown it!\n", ret);
-				// ret = HAL_OK;
+				ret = HAL_OK;
 				return ret;
 			}
 			// Trigger the Som timer to enusre SOM could poweroff in 5 senconds
@@ -10198,9 +10198,9 @@ int reset()
 
 
 typedef struct  {
-    int consumption;   	
-    int current;   		
-    int voltage;		
+    int consumption;
+    int current;
+    int voltage;
 } POWERInfo;
 
 POWERInfo get_power_info(void){
@@ -10420,7 +10420,7 @@ int get_soc_status()
         // for (int i = 0; i < sizeof(buf)>10?10:sizeof(buf); i++) {
         //     printf("%c", buf[i]);
         // }
-        // printf("\n"); 
+        // printf("\n");
 
         char *buf_copy;
         buf_copy = strdup(buf);
@@ -10614,7 +10614,7 @@ int get_soc_status()
 
 			}else if(strcmp(path, "/pvt_info")==0 ){
 				printf("GET location: pvt_info \n");
-				
+
 
 				PVTInfo pvtInfo = {
 					.cpu_temp = -1,
@@ -10880,7 +10880,7 @@ int get_soc_status()
                 // const char *body_start = process_header(buf);
 
                 if (body_start) {
-                    body_start += 4; 
+                    body_start += 4;
                     // printf("find the body of the POST request. \n body_start posabs:%d strlen():%d \n",body_start-buf,strlen(body_start));
                 } else {
                     // printf("Could not find the body of the POST request. \n");
@@ -11304,7 +11304,7 @@ int get_soc_status()
                         current = current->next;
                     }
 					assert(rtcInfo.year>=0&&rtcInfo.month>=0&&rtcInfo.date>=0&&rtcInfo.weekday>=0&&rtcInfo.hours>=0&&rtcInfo.minutes>=0&& rtcInfo.seconds>=0);
-					
+
 					int set_ret=set_rtcinfo(rtcInfo);
 
                     char *json_response_patt =NULL;
@@ -11345,7 +11345,7 @@ int get_soc_status()
                     }
                     // printf("param c: %s \n",c);
 
-               
+
                     send_response_200(conn);
 
                 }else{
@@ -11397,7 +11397,7 @@ int get_soc_status()
 		{
 			http_server_netconn_serve(newconn);
 
-			netconn_close(newconn); 
+			netconn_close(newconn);
 			netconn_delete(newconn);
 		}else{
 			printf("http_server_netconn_thread:err %d \n",err);

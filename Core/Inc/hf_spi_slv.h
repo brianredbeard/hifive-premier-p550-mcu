@@ -15,8 +15,8 @@
 		HAL_GPIO_WritePin(SPI2_NSS_GPIO_Port, SPI2_NSS_Pin, GPIO_PIN_SET); \
 	} while (0);
 
-int es_spi_write(unsigned char *buf, unsigned long addr, int len);
-int es_spi_read(unsigned char *dst, unsigned long src, int len);
+int es_spi_write(uint8_t *buf, uint64_t addr, int len);
+int es_spi_read(uint8_t *dst, uint64_t src, int len);
 
 #ifdef __cplusplus
 }
