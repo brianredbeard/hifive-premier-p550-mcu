@@ -139,10 +139,10 @@ void hexstr2mac(uint8_t *mac, const char *hexstr)
 	}
 }
 
-uint32_t atoh(const char *in, uint32_t len)
+uint64_t atoh(const char *in, uint32_t len)
 {
-	uint32_t sum = 0;
-	unsigned int mult = 1;
+	uint64_t sum = 0;
+	uint64_t mult = 1;
 	unsigned char c;
 
 	while (len) {

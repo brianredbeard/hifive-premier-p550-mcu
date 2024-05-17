@@ -29,6 +29,20 @@
 #ifndef HTTPD_DEBUG
 #define HTTPD_DEBUG         LWIP_DBG_OFF
 #endif
+/* define ------------------------------------------------------------*/
+#define WEB_DEBUG_EN	0
+#define web_fmt(fmt)	"[%s-WEB]: " fmt
+#define dbg_web_fmt(fmt)	web_fmt("%s[%d]: " fmt), "DEBUG",	\
+		        __func__, __LINE__
+#if WEB_DEBUG_EN
+#define web_debug(fmt, args...) \
+	do {							\
+		printf(dbg_web_fmt(fmt), ##args);	\
+	} while (0)
+#else
+#define web_debug(fmt, args...)
+#endif
+
 static const unsigned char data_jquery_min_js[] = {
 	/* here starts the data */
 	0x2F, 0x2A, 0x21, 0x20, 0x6A, 0x51, 0x75, 0x65, 0x72, 0x79,
@@ -9790,7 +9804,7 @@ char* concatenate_strings(const char* str1, const char* str2) {
     int length = strlen(str1) + strlen(str2) + 1; // +1 for the null terminator
     char* new_str = malloc(length);
     if (new_str == NULL) {
-        printf(stderr, "Memory allocation failed\n");
+        web_debug(stderr, "Memory allocation failed\n");
         exit(1);
     }
 
@@ -9820,7 +9834,7 @@ void send_redirect(struct netconn *conn, const char *location,const char* cookie
                 location);
 
     }
-    printf("header: %d  %s \n",strlen(header),header);
+    web_debug("header: %d  %s \n",strlen(header),header);
     netconn_write(conn, header, strlen(header), NETCONN_COPY);
 }
 
@@ -9836,7 +9850,7 @@ err_t send_large_data(struct netconn *conn, const char *data, unsigned int lengt
 
 
         result = netconn_write(conn, data + offset, chunk_size, NETCONN_COPY);
-		printf("offset:%d chunk_size:%d \n" ,offset,chunk_size);
+		web_debug("offset:%d chunk_size:%d \n" ,offset,chunk_size);
 
         if (result != ERR_OK) {
             break;
@@ -9865,11 +9879,11 @@ void send_response_content(struct netconn *conn,const char* cookies,const char* 
 
 	sprintf(header_full, header,  strlen(html_content));
 
-    printf("send_response header size: %d \n",strlen(header_full));
+    web_debug("send_response header size: %d \n",strlen(header_full));
 	netconn_write(conn, header_full, strlen(header_full), NETCONN_COPY);
-	// printf("send_response html_content size: %d \n",strlen(html_content));
+	// web_debug("send_response html_content size: %d \n",strlen(html_content));
 	send_large_data(conn, html_content,  strlen(html_content));
-	printf("send_response html_content end \n");
+	web_debug("send_response html_content end \n");
 
     free(header);
 }
@@ -10109,17 +10123,17 @@ const char* process_header(const char *header) {
         if (len > sizeof(line) - 1) len = sizeof(line) - 1;
         memcpy(line, pos, len);
         line[len] = '\0';
-        // printf("Header line :pos:%d strlen:%d line:%c%c%c%c%c\n",pos-header,strlen(line), line[0],line[1],line[2],line[3],line[4]);
+        // web_debug("Header line :pos:%d strlen:%d line:%c%c%c%c%c\n",pos-header,strlen(line), line[0],line[1],line[2],line[3],line[4]);
 
         pos = end + 2; // skip "\r\n"
 
         // check header（即"\r\n\r\n"）
         if (*pos == '\r' && *(pos + 1) == '\n') {
-            // printf("End of header.\n");
+            // web_debug("End of header.\n");
             return pos + 2;
         }
     }
-	// printf("can't find rnrn pos-header:%d .\n",pos-header);
+	// web_debug("can't find rnrn pos-header:%d .\n",pos-header);
     return NULL; // not found "\r\n\r\n"，return NULL
 }
 
@@ -10151,23 +10165,23 @@ static int change_power_status(int status)
 			ret = web_cmd_handle(CMD_POWER_OFF, NULL, 0, 1000);
 			if (HAL_OK != ret) {
 				change_som_power_state(SOM_POWER_OFF);
-				printf("Poweroff SOM error(ret %d), force shutdown it!\n", ret);
+				web_debug("Poweroff SOM error(ret %d), force shutdown it!\n", ret);
 				ret = HAL_OK;
 				return ret;
 			}
 			// Trigger the Som timer to enusre SOM could poweroff in 5 senconds
 			TriggerSomPowerOffTimer();
 		} else {
-			printf("SOM already power off!\n");
+			web_debug("SOM already power off!\n");
 		}
 	} else {
 		if (SOM_POWER_OFF == get_som_power_state()) {
 			change_som_power_state(SOM_POWER_ON);
 		} else {
-			printf("SOM already power on!\n");
+			web_debug("SOM already power on!\n");
 		}
 	}
-	printf("web call change_power_status, status 0x%x, ret %d\n", status, ret);
+	web_debug("web call change_power_status, status 0x%x, ret %d\n", status, ret);
 	return ret;
 }
 
@@ -10187,12 +10201,12 @@ int reset()
 		som_reset_control(pdTRUE);
 		osDelay(10);
 		som_reset_control(pdFALSE);
-		printf("Faild to reboot SOM(ret %d), force reset SOM!\n", ret);
+		web_debug("Faild to reboot SOM(ret %d), force reset SOM!\n", ret);
 		ret = HAL_OK;
 	}
 	// Trigger the Som timer to enusre SOM could reboot in 5 senconds
 	TriggerSomRebootTimer();
-	printf("web call reset, ret %d\n", ret);
+	web_debug("web call reset, ret %d\n", ret);
 	return ret;
 }
 
@@ -10279,9 +10293,9 @@ int get_pvt_info(PVTInfo *ppvtInfo)
 	int ret = HAL_OK;
 	ret = web_cmd_handle(CMD_PVT_INFO, ppvtInfo, sizeof(PVTInfo), 1000);
 	if (HAL_OK != ret) {
-		printf("Faild to get PVT info %d\n", ret);
+		web_debug("Faild to get PVT info %d\n", ret);
 	}
-	printf("web call get_pvt_info, cpu_temp %d, npu_temp %d, fan_speed %d, ret %d\n",
+	web_debug("web call get_pvt_info, cpu_temp %d, npu_temp %d, fan_speed %d, ret %d\n",
 		ppvtInfo->cpu_temp, ppvtInfo->npu_temp,ppvtInfo->fan_speed, ret);
 	return ret;
 }
@@ -10320,9 +10334,9 @@ int get_som_info(som_info *psomInfo)
 	int ret = HAL_OK;
 	ret = web_cmd_handle(CMD_READ_BOARD_INFO, psomInfo, sizeof(som_info), 1000);
 	if (HAL_OK != ret) {
-		printf("Faild to get som info %d\n", ret);
+		web_debug("Faild to get som info %d\n", ret);
 	}
-	printf("web call get_som_info, magic %ld, version %d, "
+	web_debug("web call get_som_info, magic %ld, version %d, "
 		"id %d, pcb %d, bom_revision %d, bom_variant %d, "
 		"sn %s, status %d, ret %d\n",
 		psomInfo->magic, psomInfo->version ,
@@ -10411,16 +10425,16 @@ int get_soc_status()
      bool isLogin=FALSE;
 
      err = netconn_recv(conn, &inbuf);
-    //  printf("http_server_netconn_serve after:netconn_recv \n");
+    //  web_debug("http_server_netconn_serve after:netconn_recv \n");
      if (err == ERR_OK)
      {
         netbuf_data(inbuf, (void**)&buf, &buflen);
 
-        // printf(" ############### buf: ############## %d %d \n",sizeof(buf),strlen(buf));
+        // web_debug(" ############### buf: ############## %d %d \n",sizeof(buf),strlen(buf));
         // for (int i = 0; i < sizeof(buf)>10?10:sizeof(buf); i++) {
-        //     printf("%c", buf[i]);
+        //     web_debug("%c", buf[i]);
         // }
-        // printf("\n");
+        // web_debug("\n");
 
         char *buf_copy;
         buf_copy = strdup(buf);
@@ -10432,17 +10446,17 @@ int get_soc_status()
 
         char cookies[256] = {0};
         parse_cookies(buf, cookies);
-        // printf("parse header cookies: %s \n",cookies);
+        // web_debug("parse header cookies: %s \n",cookies);
 
         // parse cookie ,session sid
         char *found_session_user_name=NULL;
         char *sidValue = NULL;
         if (cookies != NULL) {
 
-            // printf("\t session \n");
+            // web_debug("\t session \n");
             Session *current = session_list;
             while (current != NULL) {
-                printf("%s %s\n",current->session_id,current->session_data);
+                web_debug("%s %s\n",current->session_id,current->session_data);
                 current = current->next;
             }
 
@@ -10458,10 +10472,10 @@ int get_soc_status()
             }
 
             if (sidValue != NULL) {
-                // printf("sidValue : %s\n", sidValue);
+                // web_debug("sidValue : %s\n", sidValue);
                 Session *found_session = find_session(sidValue);
                 if (found_session) {
-                    // printf("\t Found session: ID=%s, Data=%s\n", found_session->session_id, found_session->session_data);
+                    // web_debug("\t Found session: ID=%s, Data=%s\n", found_session->session_id, found_session->session_data);
                     found_session_user_name=strdup(found_session->session_data);
                 }
             }
@@ -10470,11 +10484,11 @@ int get_soc_status()
         char resp_cookies[BUF_SIZE_256] = {0};
 
         if (method && url && version && strcmp(method, "GET") == 0) {
-            // printf("GET \n");
+            // web_debug("GET \n");
             char *path = strtok(url, "?");
             char *query = strtok(NULL, "?");
 
-            // printf("GET path:%s \n",path);
+            // web_debug("GET path:%s \n",path);
 			int byhand=0;
 
 
@@ -10483,32 +10497,32 @@ int get_soc_status()
             kv_map params={NULL,0};
             kv_map* p_params=NULL;
             if(query!=NULL && strlen(query)>0){
-                // printf("query: %d %s \n",strlen(query),query);
+                // web_debug("query: %d %s \n",strlen(query),query);
 
                 params = parse_get_params(query);
                 p_params= &params;
 
                 kv_pair *current = params.head;
                 while (current) {
-                    // printf("\t %s = %s\n", current->key, current->value);
+                    // web_debug("\t %s = %s\n", current->key, current->value);
 					if(strcmp(current->key,"byhand")==0){
                         byhand = strcmp(current->value,"0")==0?0:1;
                     }
                     current = current->next;
                 }
             }else{
-                printf("\t query is empty ;\n");
+                web_debug("\t query is empty ;\n");
             }
  			if(strcmp(path, "/")==0  || strcmp(path, "/index.html")==0){
-                printf("GET location: index.html \n");
+                web_debug("GET location: index.html \n");
 
                 if(found_session_user_name!=NULL && strlen(found_session_user_name)>0){
-                    // printf("redirect to info.html (%s)\n",found_session_user_name);
+                    // web_debug("redirect to info.html (%s)\n",found_session_user_name);
                     send_redirect(conn,"/info.html",NULL);
 
                 }else{
                    // send_response_content(conn,NULL, login_html);
-                    // printf("redirect to login.html \n");
+                    // web_debug("redirect to login.html \n");
 					sprintf(resp_cookies, "Set-Cookie: sid=; Max-Age=0; Path=/\r\n");
                     send_redirect(conn,"/login.html",resp_cookies);
                     // send_redirect(conn,"/login.html",NULL);
@@ -10516,37 +10530,37 @@ int get_soc_status()
 
 
             }else if(strcmp(path, "/login.html")==0){
-                printf("GET location: login.html \n");
+                web_debug("GET location: login.html \n");
                 // strcpy(resp_cookies,"Set-Cookie: user=zhansan; Max-Age=3600; Path=/\r\n");
                 // strcpy(resp_cookies,"");
                 // send_200_response(conn);
                 send_response_content(conn,NULL, login_html);
 
             }else if(strcmp(path, "/info.html")==0){
-                printf("GET location: info.html \n");
+                web_debug("GET location: info.html \n");
 
 				if(found_session_user_name!=NULL && strlen(found_session_user_name)>0){
-					// printf("response info.html%s \n",found_session_user_name);
+					// web_debug("response info.html%s \n",found_session_user_name);
 					sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",sidValue,MAX_AGE);
                		send_response_content(conn,resp_cookies, info_html);
 				}else{
-					// printf("redirect to login.html \n");
+					// web_debug("redirect to login.html \n");
 					sprintf(resp_cookies, "Set-Cookie: sid=; Max-Age=0; Path=/\r\n");
                     send_redirect(conn,"/login.html",resp_cookies);
 				}
 
             }else if(strcmp(path,"/modify_account.html")==0){
-				printf("GET location: modify_account.html \n");
+				web_debug("GET location: modify_account.html \n");
 				if(found_session_user_name!=NULL && strlen(found_session_user_name)>0){
-					// printf("response modify_account_html.html%s \n",found_session_user_name);
+					// web_debug("response modify_account_html.html%s \n",found_session_user_name);
 					assert(strlen(found_session_user_name)<BUF_SIZE_64);
 					char modify_account_html_resp[strlen(modify_account_html)+BUF_SIZE_64];
 					sprintf(modify_account_html_resp, modify_account_html, found_session_user_name);
-					// printf("modify_account_html_resp sizeof: %d ,strlen:%d \n",sizeof(modify_account_html_resp),strlen(modify_account_html_resp));
+					// web_debug("modify_account_html_resp sizeof: %d ,strlen:%d \n",sizeof(modify_account_html_resp),strlen(modify_account_html_resp));
 					sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",sidValue,MAX_AGE);
                		send_response_content(conn,resp_cookies, modify_account_html_resp);
 				}else{
-					// printf("redirect to login.html \n");
+					// web_debug("redirect to login.html \n");
 					sprintf(resp_cookies, "Set-Cookie: sid=; Max-Age=0; Path=/\r\n");
                     send_redirect(conn,"/login.html",resp_cookies);
                     // send_redirect(conn,"/login.html",NULL);
@@ -10554,7 +10568,7 @@ int get_soc_status()
 
 
 			}else if(strcmp(path, "/power_status")==0 ){ //get
-				printf("GET location: power_status \n");
+				web_debug("GET location: power_status \n");
 				int power_status=get_power_status();
 				char json_response[BUF_SIZE_128]={0};
                 char *json_response_patt = "{\"status\":0,\"message\":\"success\",\"data\":{\"power_status\":\"%d\"}}";//0 success, msg
@@ -10568,12 +10582,12 @@ int get_soc_status()
 					sprintf(response_header, json_header, strlen(json_response));
 				}
 
-                // printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
+                // web_debug("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
                 netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
                 netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
 			}else if(strcmp(path, "/power_lostresume_status")==0 ){ //get
-				printf("GET location: power_lostresume_status \n");
+				web_debug("GET location: power_lostresume_status \n");
 				int power_lostresume_status=get_power_lost_resume_attr();
 				char json_response[BUF_SIZE_128]={0};
                 char *json_response_patt = "{\"status\":0,\"message\":\"success\",\"data\":{\"power_lostresume_status\":\"%d\"}}";//0 success, msg
@@ -10587,7 +10601,7 @@ int get_soc_status()
 					sprintf(response_header, json_header, strlen(json_response));
 				}
 
-                // printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
+                // web_debug("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
                 netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
                 netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
@@ -10607,13 +10621,13 @@ int get_soc_status()
 					sprintf(response_header, json_header, strlen(json_response));
 				}
 
-                // printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
+                // web_debug("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
                 netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
                 netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
 
 			}else if(strcmp(path, "/pvt_info")==0 ){
-				printf("GET location: pvt_info \n");
+				web_debug("GET location: pvt_info \n");
 
 
 				PVTInfo pvtInfo = {
@@ -10637,13 +10651,13 @@ int get_soc_status()
 					sprintf(response_header, json_header, strlen(json_response));
 				}
 
-                // printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
+                // web_debug("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
                 netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
                 netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
 
 			}else if(strcmp(path, "/dip_switch")==0 ){ //get dip_switch
-				printf("GET location: dip_switch \n");
+				web_debug("GET location: dip_switch \n");
 				DIPSwitchInfo dipSwitchInfo= {0};
 				get_dip_switch(&dipSwitchInfo);
 				char json_response[BUF_SIZE_128]={0};
@@ -10660,14 +10674,14 @@ int get_soc_status()
 					sprintf(response_header, json_header, strlen(json_response));
 				}
 
-                // printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
+                // web_debug("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
                 netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
                 netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
 
 
 			}else if(strcmp(path, "/network")==0 ){
-				printf("GET location: network \n");
+				web_debug("GET location: network \n");
 				char json_response[BUF_SIZE_256]={0};
 				NETInfo netinfo=get_net_info();
                 char *json_response_patt = "{\"status\":0,\"message\":\"success\",\"data\":{\"ipaddr\":\"%s\",\"gateway\":\"%s\",\"subnetwork\":\"%s\",\"macaddr\":\"%s\"}}";//0 success, msg
@@ -10682,9 +10696,9 @@ int get_soc_status()
 					sprintf(response_header, json_header, strlen(json_response));
 				}
 
-				// printf("#### FAKE query network! #####\n");
+				// web_debug("#### FAKE query network! #####\n");
 
-                // printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
+                // web_debug("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
                 netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
                 netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
@@ -10692,11 +10706,11 @@ int get_soc_status()
                 // free(response_header);
                 // free(json_response);
             }else if(strcmp(path, "/fake_add_session")==0 ){
-                printf("GET location: fake_add_session \n");
+                web_debug("GET location: fake_add_session \n");
                 char* user_name=NULL;
                 kv_pair *current = params.head;
                 while (current) {
-                    // printf("%s = %s\n", current->key, current->value);
+                    // web_debug("%s = %s\n", current->key, current->value);
                     if(strcmp(current->key,"user_name")==0){
                         user_name= current->value;
                         break;
@@ -10754,13 +10768,13 @@ int get_soc_status()
 					sprintf(response_header, json_header, strlen(json_response));
 				}
 
-                // printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
+                // web_debug("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
                 netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
                 netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
 
             }else if(strcmp(path, "/board_info_cb")==0 ){
-                printf("get ,location: /board_info_cb \n");
+                web_debug("get ,location: /board_info_cb \n");
 				CBSimpleInfo simpleInfo=get_cb_info();
 
                	char json_response[BUF_SIZE_256]={0};
@@ -10775,13 +10789,13 @@ int get_soc_status()
 					sprintf(response_header, json_header, strlen(json_response));
 				}
 
-                // printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
+                // web_debug("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
                 netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
                 netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
 
             }else if(strcmp(path, "/rtc")==0 ){
-                printf("get ,location: /rtc \n");
+                web_debug("get ,location: /rtc \n");
 				RTCInfo rtcInfo = {0};
 				get_rtcinfo(&rtcInfo);
 
@@ -10799,14 +10813,14 @@ int get_soc_status()
 					sprintf(response_header, json_header, strlen(json_response));
 				}
 
-                // printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
+                // web_debug("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
                 netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
                 netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
 
             }else if(strcmp(path, "/soc-status")==0){
 
-				printf("get ,location: /soc-status \n");
+				web_debug("get ,location: /soc-status \n");
 				int ret=get_soc_status();
 
                	char json_response[BUF_SIZE_128]={0};
@@ -10822,14 +10836,14 @@ int get_soc_status()
 					sprintf(response_header, json_header, strlen(json_response));
 				}
 
-                // printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
+                // web_debug("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
                 netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
                 netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
 
 
 			}else{
-                printf("ERROR unsupport get path \n");
+                web_debug("ERROR unsupport get path \n");
                 send_response_200(conn);
             }
 
@@ -10839,8 +10853,8 @@ int get_soc_status()
             }
         }else if(method && url && version && strcmp(method, "POST") == 0)
         {
-            printf("func:httpserver_serve method:POST  enter \n");
-            // printf("buf length:%d \n",strlen(buf));
+            web_debug("func:httpserver_serve method:POST  enter \n");
+            // web_debug("buf length:%d \n",strlen(buf));
             if(strlen(buf)>TCP_MSS){
 
 				char response_413_body[BUF_SIZE_64] = {0};
@@ -10865,26 +10879,26 @@ int get_soc_status()
                         content_length = atoi(len_str);
                     }
                 }
-                // printf("content_length:%d \n",content_length);
+                // web_debug("content_length:%d \n",content_length);
 
-                // printf("########### buf hex##############\n");
+                // web_debug("########### buf hex##############\n");
                 // for (int i = 0; i < strlen(buf); i++) {
-                //     printf("%02X ", buf[i]);
+                //     web_debug("%02X ", buf[i]);
                 //     if(i%16==15){
-                //         printf("\n");
+                //         web_debug("\n");
                 //     }
                 // }
-                // printf("\n");
+                // web_debug("\n");
 
                 char *body_start = strstr(buf, "\r\n\r\n");
                 // const char *body_start = process_header(buf);
 
                 if (body_start) {
                     body_start += 4;
-                    // printf("find the body of the POST request. \n body_start posabs:%d strlen():%d \n",body_start-buf,strlen(body_start));
+                    // web_debug("find the body of the POST request. \n body_start posabs:%d strlen():%d \n",body_start-buf,strlen(body_start));
                 } else {
-                    // printf("Could not find the body of the POST request. \n");
-                    printf("Could not find the body of the POST request. \n body_start strlen() %d \n",strlen(body_start));
+                    // web_debug("Could not find the body of the POST request. \n");
+                    web_debug("Could not find the body of the POST request. \n body_start strlen() %d \n",strlen(body_start));
                 }
                 assert(content_length==0||(content_length>0)&&body_start);
 
@@ -10893,19 +10907,19 @@ int get_soc_status()
                 strncpy(query, body_start , content_length);
                 query[content_length] = '\0';
 
-                // printf("query %d %s.\n",strlen(query),query);
+                // web_debug("query %d %s.\n",strlen(query),query);
                 // ------- end query info ---------------
 
-            //    printf("########### query hex##############\n");
+            //    web_debug("########### query hex##############\n");
     		// 	for (int i = 0; i < strlen(query); i++) {
-    		// 		printf("%02X,%c ", query[i],query[i]);
+    		// 		web_debug("%02X,%c ", query[i],query[i]);
     		// 		if(i%16==15){
-    		// 			printf("\n");
+    		// 			web_debug("\n");
     		// 		}
     		// 	}
-    		// 	printf("\n");
-            //     printf("POST path:%s query:%s \n",path,query);
-            //     printf("start parse post query \n");
+    		// 	web_debug("\n");
+            //     web_debug("POST path:%s query:%s \n",path,query);
+            //     web_debug("start parse post query \n");
                 kv_map params={NULL,0};
                 kv_map* p_params=NULL;
                 if(strlen(query)>0){
@@ -10914,36 +10928,36 @@ int get_soc_status()
 
                     kv_pair *current = params.head;
                     while (current) {
-                        printf("%s = %s\n", current->key, current->value);
+                        web_debug("%s = %s\n", current->key, current->value);
                         current = current->next;
                     }
                 }
-                // printf("end parse post query \n");
+                // web_debug("end parse post query \n");
 				free(query);
 
                 if(strcmp(path, "/testpost")==0 ){		//testpost
-                    // printf("POST ,location: testpost \n");
+                    // web_debug("POST ,location: testpost \n");
 
                     char* a=NULL;
                     kv_pair *current = params.head;
                     while (current) {
-                        // printf("%s = %s\n", current->key, current->value);
+                        // web_debug("%s = %s\n", current->key, current->value);
                         if(strcmp(current->key,"a")==0){
                             a= current->value;
                             break;
                         }
                         current = current->next;
                     }
-                    // printf("param a: %s \n",a);
+                    // web_debug("param a: %s \n",a);
 
                 }else if(strcmp(path, "/login")==0 ){		//login
-                    printf("POST ,location: login \n");
+                    web_debug("POST ,location: login \n");
                     char* username=NULL;
                     char* password=NULL;
                     assert(p_params!=NULL);
                     kv_pair *current = params.head;
                     while (current) {
-                        // printf("%s = %s\n", current->key, current->value);
+                        // web_debug("%s = %s\n", current->key, current->value);
                         if(strcmp(current->key,"username")==0){
                             username= current->value;
                             if(password!=NULL){//two param is found
@@ -10959,18 +10973,18 @@ int get_soc_status()
                         current = current->next;
                     }
                     assert(username!=NULL && password!=NULL);
-                    // printf("param username: %s \n",username);
-                    // printf("param password: %s \n",password);
+                    // web_debug("param username: %s \n",username);
+                    // web_debug("param password: %s \n",password);
 
                     bool loginSuccess = validate_credentials(username,password)==0?TRUE:FALSE;
 
                     if(loginSuccess){
-                        printf("login success!\n");
+                        web_debug("login success!\n");
 
                         //add sessions
                         char session_id[SESSION_ID_LENGTH + 1];
                         generate_session_id(session_id, SESSION_ID_LENGTH);
-                        // printf("session add user,sessionId:%s \n",session_id);
+                        // web_debug("session add user,sessionId:%s \n",session_id);
 
                         Session *session1 = create_session(session_id, username);
                         add_session(session1);
@@ -10986,7 +11000,7 @@ int get_soc_status()
                     }
 
                 }else if(strcmp(path,"/modify_account")==0){
-					printf("POST ,location: modify_account \n");
+					web_debug("POST ,location: modify_account \n");
 
 
                     char* password=NULL;
@@ -11000,28 +11014,28 @@ int get_soc_status()
                         current = current->next;
                     }
                     assert( password!=NULL);
-                    // printf("param password: %s \n",password);
+                    // web_debug("param password: %s \n",password);
 
 					int ret =save_sys_username_password(found_session_user_name,password);//save new username ,password to eeprom
 					if(ret==0){
-						// printf("save_sys_username_password success,redirect to login.html \n");
+						// web_debug("save_sys_username_password success,redirect to login.html \n");
 						sprintf(resp_cookies, "Set-Cookie: sid=; Max-Age=0; Path=/\r\n");
                         send_redirect(conn,"/login.html",resp_cookies);
                         // send_redirect(conn,"/login.html",NULL);
 					}else{
-						// printf("save_sys_username_password fail,redirect to modify_account.html \n");
+						// web_debug("save_sys_username_password fail,redirect to modify_account.html \n");
 						send_redirect(conn,"/modify_account.html",NULL);
 					}
 
 				}else if(strcmp(path, "/logout")==0 ){		//login_out
-                    printf("POST ,location: logout \n");
+                    web_debug("POST ,location: logout \n");
                     //todo:verify current user is username
                     if(found_session_user_name!=NULL && strlen(found_session_user_name)>0){//todo verify user_name in txt config(valid)
                         // send_response_content(conn,NULL, login_html);
-                        // printf("redirect to login.html \n");
+                        // web_debug("redirect to login.html \n");
                         if(sidValue!=NULL){
                             int ret=delete_session(sidValue);
-                            // printf("delete sidValue:%s\n",sidValue);
+                            // web_debug("delete sidValue:%s\n",sidValue);
                             assert(ret>0);//make sure delete ok
                         }
                     }
@@ -11029,7 +11043,7 @@ int get_soc_status()
                     send_redirect(conn,"/login.html",resp_cookies);
 
                 }else if(strcmp(path, "/power_status")==0 ){
-					printf("POST ,location: power_status \n");
+					web_debug("POST ,location: power_status \n");
                     char* status=NULL;
                     assert(p_params!=NULL);
                     kv_pair *current = params.head;
@@ -11041,7 +11055,7 @@ int get_soc_status()
                         current = current->next;
                     }
                     assert( status!=NULL);
-                    // printf("param status: %s \n",status);
+                    // web_debug("param status: %s \n",status);
 
 					int change_status_ret=0;
 					if(strcmp(status,"0")==0){//power on -> power off
@@ -11070,13 +11084,13 @@ int get_soc_status()
 						sprintf(response_header, json_header, strlen(json_response));
 					}
 
-                    // printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
+                    // web_debug("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
                     netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
                     netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
 
 				}else if(strcmp(path, "/power_lostresume_status")==0 ){
-					printf("POST ,location: power_lostresume_status \n");
+					web_debug("POST ,location: power_lostresume_status \n");
                     char* status=NULL;
                     assert(p_params!=NULL);
                     kv_pair *current = params.head;
@@ -11088,7 +11102,7 @@ int get_soc_status()
                         current = current->next;
                     }
                     assert( status!=NULL);
-                    // printf("param power_lostresume_status: %s \n",status);
+                    // web_debug("param power_lostresume_status: %s \n",status);
 
 					int change_status_ret=0;
 					if(strcmp(status,"0")==0){//power on -> power off
@@ -11116,13 +11130,13 @@ int get_soc_status()
 						sprintf(response_header, json_header, strlen(json_response));
 					}
 
-                    // printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
+                    // web_debug("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
                     netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
                     netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
 
 				}else if(strcmp(path, "/reset")==0 ){
-					printf("POST ,location: reset \n");
+					web_debug("POST ,location: reset \n");
 					int reset_ret=reset();
                     char *json_response_patt =NULL;
 					char json_response[BUF_SIZE_64]={0};
@@ -11143,14 +11157,14 @@ int get_soc_status()
 						sprintf(response_header, json_header, strlen(json_response));
 					}
 
-                    // printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
+                    // web_debug("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
                     netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
                     netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
 
 
 				}else if(strcmp(path, "/dip_switch")==0 ){
-					printf("POST ,location: dip_switch \n");
+					web_debug("POST ,location: dip_switch \n");
 
 					DIPSwitchInfo dipSwitchInfo;
                     assert(p_params!=NULL);
@@ -11197,12 +11211,12 @@ int get_soc_status()
 						sprintf(response_header, json_header, strlen(json_response));
 					}
 
-                    // printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
+                    // web_debug("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
                     netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
                     netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
 				}else if(strcmp(path, "/network")==0 ){		//post network
-                    printf("POST ,location: network \n");
+                    web_debug("POST ,location: network \n");
 
                     char* ipaddr=NULL;
                     char* gateway=NULL;
@@ -11211,7 +11225,7 @@ int get_soc_status()
 
                     kv_pair *current = params.head;
                     while (current) {
-                        // printf("%s = %s\n", current->key, current->value);
+                        // web_debug("%s = %s\n", current->key, current->value);
                         if(strcmp(current->key,"ipaddr")==0){
                             ipaddr= current->value;
                         }else if(strcmp(current->key,"gateway")==0){
@@ -11225,14 +11239,14 @@ int get_soc_status()
                     }
                     assert(ipaddr!=NULL&&gateway!=NULL&&subnetwork!=NULL&&macaddr!=NULL);
 
-					// printf("###############  macaddr:%d %s \n",strlen(macaddr),macaddr);
+					// web_debug("###############  macaddr:%d %s \n",strlen(macaddr),macaddr);
 					unescape_colon(macaddr);
-					// printf("############### macaddr:%d %s \n",strlen(macaddr),macaddr);
+					// web_debug("############### macaddr:%d %s \n",strlen(macaddr),macaddr);
 
-                    // printf("param ipaddr: %s \n",ipaddr);
-                    // printf("param gateway: %s \n",gateway);
-                    // printf("param subnetwork: %s \n",subnetwork);
-					// printf("param macaddr: %s \n",macaddr);
+                    // web_debug("param ipaddr: %s \n",ipaddr);
+                    // web_debug("param gateway: %s \n",gateway);
+                    // web_debug("param subnetwork: %s \n",subnetwork);
+					// web_debug("param macaddr: %s \n",macaddr);
 
 
 					assert(strlen(ipaddr)<16 && strlen(macaddr)<18 &&strlen(subnetwork)<16 && strlen(gateway)<16 );
@@ -11260,7 +11274,7 @@ int get_soc_status()
 						sprintf(response_header, json_header, strlen(json_response));
 					}
 
-                    // printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
+                    // web_debug("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
                     netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
                     netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
@@ -11271,7 +11285,7 @@ int get_soc_status()
                     send_response_200(conn);
 
                 }else if(strcmp(path, "/rtc")==0 ){	//rtc
-                    printf("POST ,location: rtc \n");
+                    web_debug("POST ,location: rtc \n");
 
 					RTCInfo rtcInfo;
                     assert(p_params!=NULL);
@@ -11325,31 +11339,31 @@ int get_soc_status()
 						sprintf(response_header, json_header, strlen(json_response));
 					}
 
-                    // printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
+                    // web_debug("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
 
                     netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
                     netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
 
                 }else if(strcmp(path, "/off")==0 ){	//off
-                    printf("POST ,location: off \n");
+                    web_debug("POST ,location: off \n");
 
                     char* c=NULL;
                     kv_pair *current = params.head;
                     while (current) {
-                        // printf("%s = %s\n", current->key, current->value);
+                        // web_debug("%s = %s\n", current->key, current->value);
                         if(strcmp(current->key,"c")==0){
                             c= current->value;
                             break;
                         }
                         current = current->next;
                     }
-                    // printf("param c: %s \n",c);
+                    // web_debug("param c: %s \n",c);
 
 
                     send_response_200(conn);
 
                 }else{
-                    // printf("func:httpserver_serve else 111111111111111 \n");
+                    // web_debug("func:httpserver_serve else 111111111111111 \n");
                     send_response_200(conn);
                 }
 
@@ -11357,20 +11371,20 @@ int get_soc_status()
                     free_kv_map(&params);
                     p_params=NULL;
                 }
-                // printf("func:httpserver_serve method:POST  exit \n");
+                // web_debug("func:httpserver_serve method:POST  exit \n");
             }
         }else{
-            printf("ERROR unsupport methoc(only support GET,POST) %S \n",method);
+            web_debug("ERROR unsupport methoc(only support GET,POST) %S \n",method);
             send_response_200(conn);
         }
         free(buf_copy);
      }else{
-        printf("ERROR :444444444444444444444444444444 \n");
-        printf("http_server_netconn_serve after else 33333333333333\n");
+        web_debug("ERROR :444444444444444444444444444444 \n");
+        web_debug("http_server_netconn_serve after else 33333333333333\n");
      }
 
      netbuf_delete(inbuf);
-    //  printf("http_server_netconn_serve after:netbuf_delete \n");
+    //  web_debug("http_server_netconn_serve after:netbuf_delete \n");
  }
 
  /** The main function, never returns! */
@@ -11388,7 +11402,7 @@ int get_soc_status()
 	netconn_listen(conn);
 
 	led_on = TRUE;
-	printf("start http server! MEMP_NUM_TCP_PCB %d\n",MEMP_NUM_TCP_PCB );
+	web_debug("start http server! MEMP_NUM_TCP_PCB %d\n",MEMP_NUM_TCP_PCB );
 
 	do
 	{
@@ -11400,7 +11414,7 @@ int get_soc_status()
 			netconn_close(newconn);
 			netconn_delete(newconn);
 		}else{
-			printf("http_server_netconn_thread:err %d \n",err);
+			web_debug("http_server_netconn_thread:err %d \n",err);
 			netconn_close(newconn);
 			netconn_delete(newconn);
 		}
@@ -11408,9 +11422,9 @@ int get_soc_status()
 	while (1);
 	netconn_close(conn);
 	netconn_delete(conn);
-	printf("http_server_netconn_thread after netconn_delete \n");
+	web_debug("http_server_netconn_thread after netconn_delete \n");
 
-	// printf("http_server_netconn_thread exit \n");
+	// web_debug("http_server_netconn_thread exit \n");
  }
 
  /** Initialize the HTTP server (start its thread) */
@@ -11419,10 +11433,10 @@ int get_soc_status()
  {
  	int ret=sys_thread_new("http_server_netconn", http_server_netconn_thread, NULL, 1024*4, 4);
 	if (ret<=0){
-		printf("ERROR:create thread http_server_netconn_thread failed %d\n", ret);
+		web_debug("ERROR:create thread http_server_netconn_thread failed %d\n", ret);
 	}
 	else {
-		printf("create thread http_server_netconn_thread ok!\n");
+		web_debug("create thread http_server_netconn_thread ok!\n");
 	}
  }
 

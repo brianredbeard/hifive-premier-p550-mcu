@@ -22,6 +22,7 @@
 #include "hf_common.h"
 #include "web-server.h"
 #include "hf_power_process.h"
+#include "hf_spi_slv.h"
 
 #define CONSOLE_VERSION_MAJOR                   1
 #define CONSOLE_VERSION_MINOR                   0
@@ -89,6 +90,10 @@ static BaseType_t prvCommandReboot(char *pcWriteBuffer, size_t xWriteBufferLen, 
 // get the software version of the BMC(Baseboard Management Controller, aka mcu software verrsion)
 static BaseType_t prvCommandBMCVersion(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString);
 
+// read the memory/io address space of som, this is a backdoor for sniffering the som statuer
+static BaseType_t prvCommandDevmemRead(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString);
+// write the memory/io addrerss space of som
+static BaseType_t prvCommandDevmemWrite(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString);
 
 static BaseType_t prvCommandEcho( char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString);
 static BaseType_t prvCommandTaskStats( char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString);
@@ -239,6 +244,18 @@ static const CLI_Command_Definition_t xCommands[] =
         "\r\nreboot: Reboot the kernel on som board.\r\n",
         prvCommandReboot,
         0
+    },
+    {
+        "devmem-r",
+        "\r\ndevmem-r <address in hex>: Read the memory/io address of som board.\r\n",
+        prvCommandDevmemRead,
+        1
+    },
+    {
+        "devmem-w",
+        "\r\ndevmem-w <address in hex,like 0x180000000> <value in hex,like 0xabcd1234>: write the memory/io address of som board.\r\n",
+        prvCommandDevmemWrite,
+        2
     },
     {
        "echo",
@@ -1053,6 +1070,75 @@ static BaseType_t prvCommandReboot(char *pcWriteBuffer, size_t xWriteBufferLen, 
 static BaseType_t prvCommandBMCVersion(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString)
 {
     snprintf(pcWriteBuffer, xWriteBufferLen, "%d.%d\n", (uint8_t)(BMC_SOFTWARE_VERSION_MAJOR), (uint8_t)(BMC_SOFTWARE_VERSION_MINOR));
+    return pdFALSE;
+}
+
+/**
+* @brief Command that read 4 bytes of the memory/io on som
+* @param *pcWriteBuffer FreeRTOS CLI write buffer.
+* @param xWriteBufferLen Length of write buffer.
+* @param *pcCommandString pointer to the command name.
+* @retval FreeRTOS status
+*/
+static BaseType_t prvCommandDevmemRead(char *pcWriteBuffer, size_t xWriteBufferLen\
+                                     , const char *pcCommandString)
+{
+    const char *cAddr;
+    BaseType_t xParamLen;
+    uint64_t memAddr;
+    uint32_t value;
+    uint32_t memAddrLow, memAddrHigh;
+    // uint8_t outbuf[4];
+
+    /* get the memory/io address, in hex */
+    cAddr = FreeRTOS_CLIGetParameter(pcCommandString, 1, &xParamLen);
+    memAddr = atoh(cAddr, xParamLen);
+    memAddrHigh = 0xFFFFFFFF & (memAddr >> 32);
+    memAddrLow = 0xFFFFFFFF & memAddr;
+
+    /* Read memory/io and fill FreeRTOS write buffer */
+    if (HAL_OK != es_spi_read((uint8_t *)&value, memAddr, 4)) {
+        snprintf(pcWriteBuffer, xWriteBufferLen, "Failed to read mem/io at 0x%llx\n", memAddr);
+        goto out;
+    }
+    // value = ((uint32_t)outbuf[3] << 24) | ((uint32_t)outbuf[2] << 16) | ((uint32_t)outbuf[1] << 8) | (uint32_t)outbuf[0];
+    snprintf(pcWriteBuffer, xWriteBufferLen, "addr:0x%lX%lX  value:0x%08lX\n", memAddrHigh, memAddrLow, value);
+
+out:
+    return pdFALSE;
+}
+
+/**
+* @brief Command that write 4 bytes of the memory/io on som
+* @param *pcWriteBuffer FreeRTOS CLI write buffer.
+* @param xWriteBufferLen Length of write buffer.
+* @param *pcCommandString pointer to the command name.
+* @retval FreeRTOS status
+*/
+static BaseType_t prvCommandDevmemWrite(char *pcWriteBuffer, size_t xWriteBufferLen\
+                                     , const char *pcCommandString)
+{
+    const char *cAddr;
+    const char *cValue;
+    BaseType_t xParamLen;
+    uint64_t memAddr;
+    uint32_t value;
+    uint32_t memAddrLow, memAddrHigh;
+
+    /* get the memory/io address, in hex */
+    cAddr = FreeRTOS_CLIGetParameter(pcCommandString, 1, &xParamLen);
+    memAddr = atoh(cAddr, xParamLen);
+    memAddrHigh = 0xFFFFFFFF & (memAddr >> 32);
+    memAddrLow = 0xFFFFFFFF & memAddr;
+
+    cValue = FreeRTOS_CLIGetParameter(pcCommandString, 2, &xParamLen);
+    value = atoh(cValue, xParamLen);
+
+    /* Write memory/io and fill FreeRTOS write buffer */
+    if (HAL_OK != es_spi_write((uint8_t *)&value, memAddr, 4)) {
+        snprintf(pcWriteBuffer, xWriteBufferLen, "Failed to write mem/io at 0x%lx%lx\n", memAddrHigh, memAddrLow);
+    }
+
     return pdFALSE;
 }
 

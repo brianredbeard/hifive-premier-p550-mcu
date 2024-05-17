@@ -227,7 +227,7 @@ extern UART_HandleTypeDef huart3;
 
 /* functions prototypes ---------------------------------------------*/
 void hexstr2mac(uint8_t *mac, const char *hexstr);
-uint32_t atoh(const char *in, uint32_t len);
+uint64_t atoh(const char *in, uint32_t len);
 
 void hf_http_task(void *argument);
 void es_eeprom_wp(uint8_t flag);
