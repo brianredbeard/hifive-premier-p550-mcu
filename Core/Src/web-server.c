@@ -16,7 +16,7 @@
 #define BUF_SIZE_128 128
 #define BUF_SIZE_256 256
 #define BUF_SIZE_512 512
-#define MAX_AGE 60*3 //auto logout timeout
+#define MAX_AGE 60*5 //auto logout timeout
 
 #define EEPROM_USERNAME_PASSWORD_ADDR 0x0100
 #define EEPROM_USERNAME_PASSWORD_BUFFER_SIZE 64
@@ -9504,7 +9504,6 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
 													}, 30*1000); \n \
 													setInterval(function() {\n \
 														$('#pvt-info-refresh-hid').click(); \n \
-														$('#dip-switch-refresh-hid').click(); \n \
    														$('#net-work-refresh-hid').click(); \n \
 													}, 3*60*1000); \n \
 													setInterval(function() {\n \
@@ -11373,7 +11372,7 @@ int get_soc_status()
      }
 
      netbuf_delete(inbuf);
-     printf("http_server_netconn_serve after:netbuf_delete \n");
+    //  printf("http_server_netconn_serve after:netbuf_delete \n");
  }
 
  /** The main function, never returns! */
