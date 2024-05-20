@@ -9030,7 +9030,7 @@ const unsigned char login_html[] ="<html lang=\"zh\"> \
 															if(response.status===0){\n \
 																window.location.href = '/info.html';  \n \
 															}else{\n \
-																alert('username or password not right!') \n \
+																alert('username or password not right!'); \n \
 																window.location.href = '/login.html';  \n \
 															}\n \
 															console.log('Network settings updated successfully.');\n \
@@ -9539,6 +9539,25 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
 													$('input[name=\"swctrl\"]').change(function() {\n \
 														toggleDipRadios($(this).val() === '1');\n \
 													});\n \
+													$('#logoutForm').submit(function(event) { \n \
+														event.preventDefault();  \n \
+														$.ajax({ \n \
+															url: '/logout', \n \
+															method: 'POST', \n \
+															success: function(response) {\n \
+																if(response.status===0){\n \
+																	alert('logout success!'); \n \
+																	window.location.href = '/login.html';  \n \
+																}else{\n \
+																	alert('logout error!'); \n \
+																}\n \
+																console.log('logoutForm updated successfully.');\n \
+															},\n \
+															error: function() { \n \
+																alert('request failt,try again！'); \n \
+															} \n \
+														}); \n \
+													}); \n \
 													// --------------------after load page ------------- \n \
 													$('#power-on-refresh-hid').click(); \n \
 													$('#power-lostresume-refresh-hid').click(); \n \
@@ -9602,7 +9621,7 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
 											<button><a href=\"/modify_account.html\">ModifyAccont</a></button> \
                                         </div> \
                                         <div class=\"logout-form-wrapper\"> \
-											<form class=\"logout-form\" action=\"/logout\" method=\"post\"> \
+											<form class=\"logout-form\" action=\"/logout\" id=\"logoutForm\" method=\"post\"> \
 												<button type=\"submit\">Exit</button> \
 											</form> \
                                         </div> \
@@ -9782,6 +9801,56 @@ const unsigned char modify_account_html[] ="<html lang=\"zh\"> \
                                     <head> \
                                         <meta charset=\"UTF-8\"> \
                                         <title>Account modify</title> \
+										<script src=\"/jquery.min.js\"></script> \
+ 										<script> \n \
+											$(document).ready(function() { \n \
+												$('#modifyForm').submit(function(event) { \n \
+													event.preventDefault();  \n \
+													var username = $('#username').val(); \n \
+													var password = $('#password').val(); \n \
+													$.ajax({ \n \
+														url: '/modify_account', \n \
+														method: 'POST', \n \
+														contentType: 'application/x-www-form-urlencoded', \n \
+														data: { \n \
+															username: username, \n \
+															password: password \n \
+														}, \n \
+														success: function(response) {\n \
+															if(response.status===0){\n \
+																alert(' modify success! login in please!'); \n \
+																window.location.href = '/login.html';  \n \
+															}else{\n \
+																alert('username or password not right!retry'); \n \
+															}\n \
+															console.log('modifyForm updated successfully.');\n \
+														},\n \
+														error: function() { \n \
+															alert('request failt,try again！'); \n \
+														} \n \
+													}); \n \
+												}); \n \
+												$('#logoutForm').submit(function(event) { \n \
+													event.preventDefault();  \n \
+													$.ajax({ \n \
+														url: '/logout', \n \
+														method: 'POST', \n \
+														success: function(response) {\n \
+															if(response.status===0){\n \
+																alert('logout success!'); \n \
+																window.location.href = '/login.html';  \n \
+															}else{\n \
+																alert('logout error!') \n \
+															}\n \
+															console.log('logoutForm updated successfully.');\n \
+														},\n \
+														error: function() { \n \
+															alert('request failt,try again！'); \n \
+														} \n \
+													}); \n \
+												}); \n \
+											}); \n \
+										</script> \n \
 										 <style> \
                                             .logout-form-wrapper { \
                                                 position: absolute; \
@@ -9808,15 +9877,15 @@ const unsigned char modify_account_html[] ="<html lang=\"zh\"> \
 											<button><a href=\"/info.html\">Info</a></button> \
                                         </div> \
                                         <div class=\"logout-form-wrapper\"> \
-											<form class=\"logout-form\" action=\"/logout\" method=\"post\"> \
+											<form class=\"logout-form\" action=\"/logout\" id=\"logoutForm\" method=\"post\"> \
 												<button type=\"submit\">Exit</button> \
 											</form> \
                                         </div> \
 										<div style=\"display: flex; flex-direction: column; align-items: center;\"> \
                                         <h2>Account modify</h2> \
-                                        <form action=\"/modify_account\" method=\"POST\"  > \
+                                        <form action=\"/modify_account\" id=\"modifyForm\" method=\"POST\"  > \
 											<div class=\"network-row\"> \
-												<label for=\"username\">Username:</label> <input type=\"text\" id=\"username\" name=\"username\" value=\"%s\" required disabled> \
+												<label for=\"username\">Username:</label> <input type=\"text\" id=\"username\" name=\"username\"  required> \
 											</div> \
 											<div class=\"network-row\"> \
 												<label for=\"password\">Password:</label>  <input type=\"password\" id=\"password\" name=\"password\" required> \
@@ -10593,11 +10662,11 @@ int get_soc_status()
 				if(found_session_user_name!=NULL && strlen(found_session_user_name)>0){
 					// web_debug("response modify_account_html.html%s \n",found_session_user_name);
 					assert(strlen(found_session_user_name)<BUF_SIZE_64);
-					char modify_account_html_resp[strlen(modify_account_html)+BUF_SIZE_64];
-					sprintf(modify_account_html_resp, modify_account_html, found_session_user_name);
+					// char modify_account_html_resp[strlen(modify_account_html)+BUF_SIZE_64];
+					// sprintf(modify_account_html_resp, modify_account_html, found_session_user_name);
 					// web_debug("modify_account_html_resp sizeof: %d ,strlen:%d \n",sizeof(modify_account_html_resp),strlen(modify_account_html_resp));
 					sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",sidValue,MAX_AGE);
-               		send_response_content(conn,resp_cookies, modify_account_html_resp);
+               		send_response_content(conn,resp_cookies, modify_account_html);
 				}else{
 					// web_debug("redirect to login.html \n");
 					sprintf(resp_cookies, "Set-Cookie: sid=; Max-Age=0; Path=/\r\n");
@@ -11019,7 +11088,7 @@ int get_soc_status()
 						char *json_response=NULL;
 						char response_header[BUF_SIZE_256];
                     if(loginSuccess){
-							json_response="{\"status\":0,\"message\":\"success!\",\"data\":{}}";
+						json_response="{\"status\":0,\"message\":\"success!\",\"data\":{}}";
 
                         //add sessions
                         char session_id[SESSION_ID_LENGTH + 1];
@@ -11030,17 +11099,17 @@ int get_soc_status()
                         add_session(session1);
                         assert(find_session(session_id)!=NULL);
 
-							sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",session_id,MAX_AGE);
-							sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
+						sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",session_id,MAX_AGE);
+						sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
                     }else{
-							json_response="{\"status\":1,\"message\":\"failt\",\"data\":{}}";
+						json_response="{\"status\":1,\"message\":\"failt\",\"data\":{}}";
 
 						sprintf(resp_cookies, "Set-Cookie: sid=; Max-Age=0; Path=/\r\n");
-							sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
+						sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
                     }
 
-						netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
-						netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
+					netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
+					netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
 
 
 
@@ -11068,31 +11137,39 @@ int get_soc_status()
                 }else if(strcmp(path,"/modify_account")==0){
 					web_debug("POST location: modify_account \n");
 
-
+					char* username=NULL;
                     char* password=NULL;
                     assert(p_params!=NULL);
                     kv_pair *current = params.head;
                     while (current) {
                         if(strcmp(current->key,"password")==0){
                             password= current->value;
-                                break;
+                        }else if(strcmp(current->key,"username")==0){
+                            username= current->value;
                         }
                         current = current->next;
                     }
-                    assert( password!=NULL);
+                    assert(password!=NULL&&username!=NULL);
+					// assert(strcmp(username,found_session_user_name)==0);
                     // web_debug("param password: %s \n",password);
 
-					int ret =save_sys_username_password(found_session_user_name,password);//save new username ,password to eeprom
-					if(ret==0){
-						// web_debug("save_sys_username_password success,redirect to login.html \n");
-						sprintf(resp_cookies, "Set-Cookie: sid=; Max-Age=0; Path=/\r\n");
-                        send_redirect(conn,"/login.html",resp_cookies);
-                        // send_redirect(conn,"/login.html",NULL);
-					}else{
-						// web_debug("save_sys_username_password fail,redirect to modify_account.html \n");
-						send_redirect(conn,"/modify_account.html",NULL);
-					}
+					int ret =save_sys_username_password(username,password);//save new username ,password to eeprom
 
+
+					char *json_response=NULL;
+					char response_header[BUF_SIZE_256];
+					 if(ret==0){
+						json_response="{\"status\":0,\"message\":\"failt\",\"data\":{}}";
+
+						sprintf(resp_cookies, "Set-Cookie: sid=; Max-Age=0; Path=/\r\n");//clear cookie
+						sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
+                    }else{
+						json_response="{\"status\":1,\"message\":\"failt\",\"data\":{}}";
+						sprintf(response_header, json_header, strlen(json_response));
+
+					}
+					netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
+					netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
 				}else if(strcmp(path, "/logout")==0 ){		//login_out
                     web_debug("POST location: logout \n");
                     //todo:verify current user is username
@@ -11105,8 +11182,15 @@ int get_soc_status()
                             assert(ret>0);//make sure delete ok
                         }
                     }
-					sprintf(resp_cookies, "Set-Cookie: sid=; Max-Age=0; Path=/\r\n");
-                    send_redirect(conn,"/login.html",resp_cookies);
+					char response_header[BUF_SIZE_256];
+					char *json_response="{\"status\":0,\"message\":\"failt\",\"data\":{}}";
+					sprintf(resp_cookies, "Set-Cookie: sid=; Max-Age=0; Path=/\r\n");//clear cookie
+					sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
+
+					// sprintf(resp_cookies, "Set-Cookie: sid=; Max-Age=0; Path=/\r\n");
+                    // send_redirect(conn,"/login.html",resp_cookies);
+					netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
+					netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
 
                 }else if(strcmp(path, "/power_status")==0 ){
 					web_debug("POST location: power_status \n");
