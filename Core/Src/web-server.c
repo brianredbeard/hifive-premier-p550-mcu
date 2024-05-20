@@ -9287,6 +9287,7 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
 																	$('input[name=\"dip04\"][value=\"' + response.data.dip04 + '\"]').prop('checked', true);\n \
 																	$('input[name=\"swctrl\"][value=\"' + response.data.swctrl + '\"]').prop('checked', true);\n \
 																} \n \
+																toggleDipRadios($('input[name=\"swctrl\"]').val() === '1');\n \
                                                                 console.log('dip_switch refreshed successfully.');\n \
                                                             },\n \
                                                             error: function(xhr, status, error) {\n \
@@ -9641,7 +9642,7 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
 											<label>pcbRevision:</label> <input type=\"text\" id=\"som_pcbRevision\" value=\"0\" style=\"width: 100px;\" disabled>  <br> \
 											</div> \
 											<div class=\"network-row\"> \
-											<label>boardSerialNumber:</label> <input type=\"text\" id=\"som_boardSerialNumber\" value=\"0\" style=\"width: 100px;\" disabled>  <br> \
+											<label>boardSerialNumber:</label> <input type=\"text\" id=\"som_boardSerialNumber\" value=\"0\" style=\"width: 180px;\" disabled>  <br> \
 											</div> \
 											<button id=\"board-info-som-refresh\" >refresh</button> \
 											<h4>CarrierBoard Info</h4> \
@@ -9658,7 +9659,7 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
 											<label>pcbRevision:</label> <input type=\"text\" id=\"cb_pcbRevision\" value=\"0\" style=\"width: 100px;\" disabled>  <br> \
 											</div> \
 											<div class=\"network-row\"> \
-											<label>boardSerialNumber:</label> <input type=\"text\" id=\"cb_boardSerialNumber\" value=\"0\" style=\"width: 100px;\" disabled>  <br> \
+											<label>boardSerialNumber:</label> <input type=\"text\" id=\"cb_boardSerialNumber\" value=\"0\" style=\"width: 180px;\" disabled>  <br> \
 											</div> \
 											<button id=\"board-info-cb-refresh\" >refresh</button> \
 										</div> \
@@ -10587,6 +10588,7 @@ int get_soc_status()
                     found_session_user_name=strdup(found_session->session_data);
                 }
             }
+			free(cookies_copy);
         }
 
         char resp_cookies[BUF_SIZE_256] = {0};
@@ -10886,7 +10888,7 @@ int get_soc_status()
 				CBSimpleInfo simpleInfo=get_cb_info();
 
                	char json_response[BUF_SIZE_256]={0};
-                char *json_response_patt = "{\"status\":0,\"message\":\"success\",\"data\":{\"magicNumber\":\"%d\",\"formatVersionNumber\":\"%d\",\"productIdentifier\":\"%d\",\"pcbRevision\":\"%d\",\"boardSerialNumber\":\"%s\"}}";
+                char *json_response_patt = "{\"status\":0,\"message\":\"success\",\"data\":{\"magicNumber\":\"%d\",\"formatVersionNumber\":\"%d\",\"productIdentifier\":\"%d\",\"pcbRevision\":\"%d\",\"boardSerialNumber\":\"%.18s\"}}";
                 sprintf(json_response, json_response_patt,simpleInfo.magicNumber,simpleInfo.formatVersionNumber,simpleInfo.productIdentifier,simpleInfo.pcbRevision,simpleInfo.boardSerialNumber);
 
                 char response_header[BUF_SIZE_256];
@@ -11085,11 +11087,17 @@ int get_soc_status()
                     // web_debug("param password: %s \n",password);
 
                     bool loginSuccess = validate_credentials(username,password)==0?TRUE:FALSE;
-						char *json_response=NULL;
-						char response_header[BUF_SIZE_256];
+					char *json_response=NULL;
+					char response_header[BUF_SIZE_256];
                     if(loginSuccess){
 						json_response="{\"status\":0,\"message\":\"success!\",\"data\":{}}";
-
+						if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 ){
+							//clean exist login info
+							if(sidValue!=NULL){
+								delete_session(sidValue);
+//								assert(ret>0);//make sure delete ok
+							}
+						}
                         //add sessions
                         char session_id[SESSION_ID_LENGTH + 1];
                         generate_session_id(session_id, SESSION_ID_LENGTH);
@@ -11179,7 +11187,7 @@ int get_soc_status()
                         if(sidValue!=NULL){
                             int ret=delete_session(sidValue);
                             // web_debug("delete sidValue:%s\n",sidValue);
-                            assert(ret>0);//make sure delete ok
+                            // assert(ret>0);//make sure delete ok
                         }
                     }
 					char response_header[BUF_SIZE_256];
@@ -11528,6 +11536,7 @@ int get_soc_status()
             send_response_200(conn);
         }
         free(buf_copy);
+		free(found_session_user_name);
      }else{
         web_debug("ERROR :444444444444444444444444444444 \n");
         web_debug("http_server_netconn_serve after else 33333333333333\n");
