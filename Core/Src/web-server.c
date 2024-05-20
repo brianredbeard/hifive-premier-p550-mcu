@@ -9266,6 +9266,10 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
 														$('#pvt-info-refresh-hid').click(); \n \
 														$('#pvt-info-refresh-hid').val(\"0\"); \n \
                                                     }); \n \
+													var $dipRadios = $('.network-roww.option-row input[type=\"radio\"]');\n \
+													function toggleDipRadios(isEnabled) {\n \
+														$dipRadios.prop('disabled', !isEnabled);\n \
+													}\n \
 													$('#dip-switch-refresh-hid').click(function() {\n \
                                                         $.ajax({\n \
 															async: false,\n \
@@ -9532,6 +9536,9 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
 														$('#soc-refresh-hid').click(); \n \
 														$('#soc-refresh-hid').val(\"0\"); \n \
                                                     }); \n \
+													$('input[name=\"swctrl\"]').change(function() {\n \
+														toggleDipRadios($(this).val() === '1');\n \
+													});\n \
 													// --------------------after load page ------------- \n \
 													$('#power-on-refresh-hid').click(); \n \
 													$('#power-lostresume-refresh-hid').click(); \n \
@@ -9686,6 +9693,7 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
                                         </div> \
 										 <div class=\"dip-switch\" > \
                                             <h3>DIP Switch</h3> \
+											<label>Software config:</label> \
 											<div class=\"network-roww label-row\">\
 												<label>dip0</label>\
 												<label>dip1</label>\
