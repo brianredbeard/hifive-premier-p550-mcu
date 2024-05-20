@@ -53,6 +53,8 @@ static const char *prvpcPrompt = "#cmd: ";
 
 /* Command function prototypes */
 static BaseType_t prvCommandCarrierBoardInfoGet(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString);
+static BaseType_t prvCommandCarrierBoardInfoSet(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString);
+
 static BaseType_t prvCommandSomBoardInfoGet(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString);
 
 static BaseType_t prvCommandAccountGet(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString);
@@ -98,7 +100,6 @@ static BaseType_t prvCommandDevmemWrite(char *pcWriteBuffer, size_t xWriteBuffer
 static BaseType_t prvCommandEcho( char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString);
 static BaseType_t prvCommandTaskStats( char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString);
 static BaseType_t prvCommandHeap(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString);
-static BaseType_t prvCommandTicks(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString);
 
 /**
 *   @brief  This function is executed in case of error occurrence.
@@ -126,10 +127,16 @@ static const CLI_Command_Definition_t xCommands[] =
         0
     },
     {
-        "cbinfo",
-        "\r\ncbinfo: Display carrierboard information.\r\n",
+        "cbinfo-g",
+        "\r\ncbinfo-g: Display carrierboard information.\r\n",
         prvCommandCarrierBoardInfoGet,
         0
+    },
+    {
+        "cbinfo-s",
+        "\r\ncbinfo-s <magic/format/productid/pcbv/bomr/bomv/boardsn/manu> <value in hex>: Set magicNumber...\r\n",
+        prvCommandCarrierBoardInfoSet,
+        2
     },
     {
         "sominfo",
@@ -270,12 +277,6 @@ static const CLI_Command_Definition_t xCommands[] =
         0
     },
     {
-        "ticks",
-        "\r\nticks: Display OS tick count and run time in seconds.\r\n",
-        prvCommandTicks,
-        0
-    },
-    {
         "version",
         "\r\nversion: Get BMC version\r\n",
         prvCommandBMCVersion,
@@ -375,6 +376,7 @@ static BaseType_t prvCommandCarrierBoardInfoGet(char *pcWriteBuffer, size_t xWri
     CarrierBoardInfo carrierBoardInfo;
     char *pcWb = pcWriteBuffer;
     size_t len, size = xWriteBufferLen;
+    char boardSn[19] = {0};
 
     es_get_carrier_borad_info(&carrierBoardInfo);
     len = snprintf(pcWb, size, "[Carrierboard Information:]\r\n");
@@ -398,17 +400,91 @@ static BaseType_t prvCommandCarrierBoardInfoGet(char *pcWriteBuffer, size_t xWri
     len = snprintf(pcWb, size, "bomVariant:0x%x\r\n", carrierBoardInfo.bomVariant);
     pcWb += len;
     size -= len;
-    len = snprintf(pcWb, size, "SN(hex):");
+
+    memcpy(boardSn, carrierBoardInfo.boardSerialNumber, sizeof(carrierBoardInfo.boardSerialNumber));
+    len = snprintf(pcWb, size, "SN:%s\r\n", boardSn);
     pcWb += len;
     size -= len;
-    for (int i = 0; i < sizeof(carrierBoardInfo.boardSerialNumber); i++) {
-        pcWb += snprintf(pcWb, size, "%x", carrierBoardInfo.boardSerialNumber[i]);
-        size--;
+
+    snprintf(pcWb, size, "manufacturingTestStatus:0x%x\r\n", carrierBoardInfo.manufacturingTestStatus);
+
+    return pdFALSE;
+}
+
+
+/**
+* @brief Command that sets carrier board information.
+* @param *pcWriteBuffer FreeRTOS CLI write buffer.
+* @param xWriteBufferLen Length of write buffer.
+* @param *pcCommandString pointer to the command name.
+* @retval FreeRTOS status
+*/
+static BaseType_t prvCommandCarrierBoardInfoSet(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString)
+{
+    BaseType_t xParamLen;
+    const char * pcField;
+    const char * pcValue;
+    CarrierBoardInfo carrier_board_info;
+    int updateFlag = 0;
+
+    /* get the carrier board info first */
+    es_get_carrier_borad_info(&carrier_board_info);
+
+    pcField = FreeRTOS_CLIGetParameter(pcCommandString, 1, &xParamLen);
+    /* fill with new accout name */
+    if (!strncmp(pcField, "magic", sizeof("magic") - 1)) {
+        pcValue = FreeRTOS_CLIGetParameter(pcCommandString, 2, &xParamLen);
+        carrier_board_info.magicNumber = atoh(pcValue, xParamLen);
+        updateFlag++;
     }
-    len = snprintf(pcWb, size, "\r\n");
-    pcWb += len;
-    size -= len;
-    snprintf(pcWb, size, "manufacturingTestStatus:%d\r\n", carrierBoardInfo.manufacturingTestStatus);
+    else if (!strncmp(pcField, "format", sizeof("format") - 1)) {
+        pcValue = FreeRTOS_CLIGetParameter(pcCommandString, 2, &xParamLen);
+        carrier_board_info.formatVersionNumber = atoh(pcValue, xParamLen);
+        updateFlag++;
+    }
+    else if (!strncmp(pcField, "productid", sizeof("productid") - 1)) {
+        pcValue = FreeRTOS_CLIGetParameter(pcCommandString, 2, &xParamLen);
+        carrier_board_info.productIdentifier = atoh(pcValue, xParamLen);
+        updateFlag++;
+    }
+    else if (!strncmp(pcField, "pcbr", sizeof("pcbr") - 1)) {
+        pcValue = FreeRTOS_CLIGetParameter(pcCommandString, 2, &xParamLen);
+        carrier_board_info.pcbRevision = atoh(pcValue, xParamLen);
+        updateFlag++;
+    }
+    else if (!strncmp(pcField, "bomr", sizeof("bomr") - 1)) {
+        pcValue = FreeRTOS_CLIGetParameter(pcCommandString, 2, &xParamLen);
+        carrier_board_info.bomRevision = atoh(pcValue, xParamLen);
+        updateFlag++;
+    }
+    else if (!strncmp(pcField, "bomv", sizeof("bomv") - 1)) {
+        pcValue = FreeRTOS_CLIGetParameter(pcCommandString, 2, &xParamLen);
+        carrier_board_info.bomVariant = atoh(pcValue, xParamLen);
+        updateFlag++;
+    }
+    else if (!strncmp(pcField, "boardsn", sizeof("boardsn") - 1)) {
+        pcValue = FreeRTOS_CLIGetParameter(pcCommandString, 2, &xParamLen);
+        if (xParamLen != sizeof(carrier_board_info.boardSerialNumber)) {
+            snprintf(pcWriteBuffer, xWriteBufferLen, "Invalid boardsn parameter!!!\n");
+            goto out;
+        }
+        memcpy(carrier_board_info.boardSerialNumber, pcValue, xParamLen);
+        updateFlag++;
+    }
+    else if (!strncmp(pcField, "manu", sizeof("manu") - 1)) {
+        pcValue = FreeRTOS_CLIGetParameter(pcCommandString, 2, &xParamLen);
+        carrier_board_info.manufacturingTestStatus = atoh(pcValue, xParamLen);
+        updateFlag++;
+    }
+    else
+        snprintf(pcWriteBuffer, xWriteBufferLen, "Invalid field parameter!!!\n");
+
+
+    if (updateFlag) {
+        es_set_carrier_borad_info(&carrier_board_info);
+    }
+out:
+
 
     return pdFALSE;
 }
@@ -767,28 +843,6 @@ static BaseType_t prvCommandHeap(char *pcWriteBuffer, size_t xWriteBufferLen, co
     snprintf(pcWriteBuffer, xWriteBufferLen,
              "Heap size            : %3u bytes (%3d KiB)\r\nRemaining            : %3u bytes (%3d KiB)\r\nMinimum ever existed : %3u bytes (%3d KiB)\r\n",
              configTOTAL_HEAP_SIZE, configTOTAL_HEAP_SIZE / 1024, xHeapFree, xHeapFree / 1024, xHeapMinMemExisted, xHeapMinMemExisted / 1024);
-
-    return pdFALSE;
-}
-
-/**
-* @brief Command that calculate OS ticks information.
-* @param *pcWriteBuffer FreeRTOS CLI write buffer.
-* @param xWriteBufferLen Length of write buffer.
-* @param *pcCommandString pointer to the command name.
-* @retval FreeRTOS status
-*/
-static BaseType_t prvCommandTicks(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString)
-{
-    uint32_t uMs;
-    uint32_t uSec;
-    TickType_t xTickCount = xTaskGetTickCount();
-
-    uSec = xTickCount / configTICK_RATE_HZ;
-    uMs = xTickCount % configTICK_RATE_HZ;
-    snprintf(pcWriteBuffer, xWriteBufferLen,
-             "Tick rate: %u Hz\r\nTicks: %lu\r\nRun time: %lu.%.3lu seconds\r\n",
-              (unsigned)configTICK_RATE_HZ, xTickCount, uSec, uMs);
 
     return pdFALSE;
 }

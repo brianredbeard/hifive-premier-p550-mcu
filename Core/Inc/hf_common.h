@@ -92,7 +92,7 @@ typedef struct {
 	uint8_t pcbRevision;
 	uint8_t bomRevision;
 	uint8_t bomVariant;
-	uint8_t boardSerialNumber[18];
+	char boardSerialNumber[18];	// 18 bytes of serial number, excluding string terminator
 	uint8_t manufacturingTestStatus;
 	uint8_t ethernetMAC1[6];	// The MAC of the SOM
 	uint8_t ethernetMAC2[6];	// The MAC of the SOM
@@ -237,6 +237,7 @@ int web_cmd_handle(CommandType cmd, void *data, int data_len, uint32_t timeout);
 int es_init_info_in_eeprom(void);
 
 int es_get_carrier_borad_info(CarrierBoardInfo *pCarrier_board_info);
+int es_set_carrier_borad_info(CarrierBoardInfo *pCarrier_board_info);
 
 int es_get_mcu_mac(uint8_t *p_mac_address);
 int es_set_mcu_mac(uint8_t *p_mac_address);
