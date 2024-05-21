@@ -193,7 +193,7 @@ extern UART_HandleTypeDef huart3;
 #define BMC_SOFTWARE_VERSION_MAJOR                   1
 #define BMC_SOFTWARE_VERSION_MINOR                   0
 
-#define MAGIC_NUMBER	0xdeadbeaf
+#define MAGIC_NUMBER	0xF15E5045
 
 #define AT24C_ADDR (0x50<<1)
 

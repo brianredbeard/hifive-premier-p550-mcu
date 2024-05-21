@@ -15,7 +15,7 @@ typedef struct {
 	uint8_t pcb;
 	uint8_t bom_revision;
 	uint8_t bom_variant;
-	uint8_t sn[18];
+	uint8_t sn[18];		// 18 bytes of serial number, excluding string terminator
 	uint8_t status;
 	uint32_t crc;
 } __attribute__((packed)) som_info;

@@ -134,7 +134,7 @@ static const CLI_Command_Definition_t xCommands[] =
     },
     {
         "cbinfo-s",
-        "\r\ncbinfo-s <magic/format/productid/pcbv/bomr/bomv/boardsn/manu> <value in hex>: Set magicNumber...\r\n",
+        "\r\ncbinfo-s <magic/format/productid/pcbr/bomr/bomv/boardsn/manu> <value in hex>: Set magicNumber...\r\n",
         prvCommandCarrierBoardInfoSet,
         2
     },
