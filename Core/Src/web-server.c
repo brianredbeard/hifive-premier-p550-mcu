@@ -10888,8 +10888,8 @@ int get_soc_status()
 				CBSimpleInfo simpleInfo=get_cb_info();
 
                	char json_response[BUF_SIZE_256]={0};
-                char *json_response_patt = "{\"status\":0,\"message\":\"success\",\"data\":{\"magicNumber\":\"%d\",\"formatVersionNumber\":\"%d\",\"productIdentifier\":\"%d\",\"pcbRevision\":\"%d\",\"boardSerialNumber\":\"%.18s\"}}";
-                sprintf(json_response, json_response_patt,simpleInfo.magicNumber,simpleInfo.formatVersionNumber,simpleInfo.productIdentifier,simpleInfo.pcbRevision,simpleInfo.boardSerialNumber);
+                char *json_response_patt = "{\"status\":0,\"message\":\"success\",\"data\":{\"magicNumber\":\"0x%x\",\"formatVersionNumber\":\"%c\",\"productIdentifier\":\"%c%c\",\"pcbRevision\":\"%c\",\"boardSerialNumber\":\"%.18s\"}}";
+                sprintf(json_response, json_response_patt,simpleInfo.magicNumber,simpleInfo.formatVersionNumber, (char)(simpleInfo.productIdentifier >> 8), (char)(simpleInfo.productIdentifier & 0xFF),simpleInfo.pcbRevision,simpleInfo.boardSerialNumber);
 
                 char response_header[BUF_SIZE_256];
                 if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 && byhand ){
