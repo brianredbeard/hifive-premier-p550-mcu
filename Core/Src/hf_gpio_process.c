@@ -144,19 +144,9 @@ static void mcu_reset_som_process(void)
 static void som_rst_feedback_process(void)
 {
 	printf("%s %d som reset\n", __func__, __LINE__);
-	GPIO_InitTypeDef GPIO_InitStruct = {0};
-	GPIO_InitStruct.Pin = MCU_RESET_SOM_N_Pin;
-	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-	GPIO_InitStruct.Pull = GPIO_NOPULL;
-	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-	HAL_GPIO_Init(MCU_RESET_SOM_N_GPIO_Port, &GPIO_InitStruct);
-	HAL_GPIO_WritePin(MCU_RESET_SOM_N_GPIO_Port, MCU_RESET_SOM_N_Pin, GPIO_PIN_RESET);
+	som_reset_control(pdTRUE);
 	osDelay(2);
-	GPIO_InitStruct.Pin = MCU_RESET_SOM_N_Pin;
-	GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
-	GPIO_InitStruct.Pull = GPIO_NOPULL;
-	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-	HAL_GPIO_Init(MCU_RESET_SOM_N_GPIO_Port, &GPIO_InitStruct);
+	som_reset_control(pdFALSE);
 }
 
 void hf_gpio_task(void *parameter)
