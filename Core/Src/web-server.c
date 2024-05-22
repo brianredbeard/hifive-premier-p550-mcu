@@ -1,4 +1,5 @@
 
+#include <stdlib.h>
 #include "lwip/opt.h"
 #include "lwip/arch.h"
 #include "lwip/api.h"
@@ -32,12 +33,12 @@
 /* define ------------------------------------------------------------*/
 #define WEB_DEBUG_EN	0
 #define web_fmt(fmt)	"[%s-WEB]: " fmt
-#define dbg_web_fmt(fmt)	web_fmt("%s[%d]: " fmt), "DEBUG",	\
+#define web_dbg_fmt(fmt)	web_fmt("%s[%d]: " fmt), "DEBUG",	\
 		        __func__, __LINE__
 #if WEB_DEBUG_EN
 #define web_debug(fmt, args...) \
 	do {							\
-		printf(dbg_web_fmt(fmt), ##args);	\
+		printf(web_dbg_fmt(fmt), ##args);	\
 	} while (0)
 #else
 #define web_debug(fmt, args...)
@@ -9997,7 +9998,7 @@ char* concatenate_strings(const char* str1, const char* str2) {
     int length = strlen(str1) + strlen(str2) + 1; // +1 for the null terminator
     char* new_str = malloc(length);
     if (new_str == NULL) {
-        web_debug(stderr, "Memory allocation failed\n");
+        web_debug("Memory allocation failed\n");
         exit(1);
     }
 
@@ -10413,12 +10414,12 @@ typedef struct  {
 POWERInfo get_power_info(void){
 
 
-	POWERInfo example = {
-        60,5,12
-    };
-	get_board_power(&example.voltage,&example.current,&example.consumption);
-	//get_som_power(&example.voltage,&example.current,&example.consumption);
-    return example;
+	POWERInfo example = {0};
+
+	if (get_power_status())
+		get_board_power(&example.voltage,&example.current,&example.consumption);
+
+	return example;
 }
 
 
@@ -11661,6 +11662,7 @@ int get_soc_status()
 			netconn_close(newconn);
 			netconn_delete(newconn);
 		}
+		// osDelay(1000);
 	}
 	while (1);
 	netconn_close(conn);

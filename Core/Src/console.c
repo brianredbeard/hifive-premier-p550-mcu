@@ -1100,15 +1100,20 @@ static BaseType_t prvCommandReboot(char *pcWriteBuffer, size_t xWriteBufferLen, 
 {
     int ret = HAL_OK;
 
-    ret = web_cmd_handle(CMD_RESET, NULL, 0, 1000);
-    if (HAL_OK != ret) {
-        som_reset_control(pdTRUE);
-        osDelay(10);
-        som_reset_control(pdFALSE);
-        printf("Faild to reboot SOM(ret %d), force reset SOM!\n", ret);
+    if (SOM_POWER_ON == get_som_power_state()) {
+        ret = web_cmd_handle(CMD_RESET, NULL, 0, 1000);
+        if (HAL_OK != ret) {
+            som_reset_control(pdTRUE);
+            osDelay(10);
+            som_reset_control(pdFALSE);
+            printf("Faild to reboot SOM(ret %d), force reset SOM!\n", ret);
+        }
+        // Trigger the Som timer to enusre SOM could reboot in 5 senconds
+        TriggerSomRebootTimer();
     }
-    // Trigger the Som timer to enusre SOM could reboot in 5 senconds
-    TriggerSomRebootTimer();
+    else {
+         printf("Err, som board is in power off status, can NOT be reboot!!!\n");
+    }
 
     return pdFALSE;
 }
