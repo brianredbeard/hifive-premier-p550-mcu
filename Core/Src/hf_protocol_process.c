@@ -599,6 +599,8 @@ void deamon_keeplive_task(void *argument)
 	int ret = HAL_OK;
 	deamon_stats_t old_status;
 	static uint8_t count = 0;
+	struct rtc_date_t date = {0};
+	struct rtc_time_t time = {0};
 
 	for (;;) {
 		if (SOM_POWER_ON != get_som_power_state()) {
@@ -616,7 +618,7 @@ void deamon_keeplive_task(void *argument)
 					printf("SOM keeplive request send failed!\n");
 			}
 			count++;
-			if (5 >= count) {
+			if (count >= 5) {
 				change_som_daemon_state(SOM_DAEMON_OFF);
 			}
 		} else {
@@ -624,11 +626,14 @@ void deamon_keeplive_task(void *argument)
 			count = 0;
 		}
 		if (old_status != get_som_daemon_state()) {
-			printf("SOM Daemon status change to %s!\n",
-				get_som_daemon_state() == SOM_DAEMON_ON ? "on" : "off");
+			es_get_rtc_date(&date);
+			es_get_rtc_time(&time);
+			printf("SOM Daemon status change to %s at %d-%d-%d %02d:%02d:%02d!\n",
+				get_som_daemon_state() == SOM_DAEMON_ON ? "on" : "off",
+				date.Year, date.Month, date.Date, time.Hours, time.Minutes, time.Seconds);
 		}
-		/*check every 4 second*/
-		osDelay(pdMS_TO_TICKS(4000));
+		/*check every 1 second*/
+		osDelay(pdMS_TO_TICKS(1000));
 	}
 }
 

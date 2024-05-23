@@ -10204,7 +10204,7 @@ int delete_timeout_session() {//return del count;
 	uint32_t current_time_tick=HAL_GetTick();
 	int del_count=0;
     Session *current = &head_session;
-    while (current->next != NULL) {//handle node:current->next 
+    while (current->next != NULL) {//handle node:current->next
         if (current_time_tick - current->next->tick_value > MAX_AGE*1000) {
             Session *to_delete = current->next;
             current->next = current->next->next;//delete current->next from node list
@@ -10269,7 +10269,7 @@ int update_session(const char *id, const char *data) {
 int delete_session(const char *id) {
 	int del_count=0;
     Session *current = &head_session;
-    while (current->next != NULL) {//handle node:current->next 
+    while (current->next != NULL) {//handle node:current->next
         if (strcmp(current->next->session_id, id) == 0) {
             Session *to_delete = current->next;
             current->next = current->next->next;//delete current->next from node list
@@ -10387,7 +10387,7 @@ static int change_power_status(int status)
 
 	if (0 == status) {
 		if (SOM_POWER_ON == get_som_power_state()) {
-			ret = web_cmd_handle(CMD_POWER_OFF, NULL, 0, 1000);
+			ret = web_cmd_handle(CMD_POWER_OFF, NULL, 0, 2000);
 			if (HAL_OK != ret) {
 				change_som_power_state(SOM_POWER_OFF);
 				web_debug("Poweroff SOM error(ret %d), force shutdown it!\n", ret);
@@ -10421,7 +10421,7 @@ int reset()
 {
 	int ret = HAL_OK;
 
-	ret = web_cmd_handle(CMD_RESET, NULL, 0, 1000);
+	ret = web_cmd_handle(CMD_RESET, NULL, 0, 2000);
 	if (HAL_OK != ret) {
 		som_reset_control(pdTRUE);
 		osDelay(10);
@@ -11214,9 +11214,9 @@ int get_soc_status()
                     bool loginSuccess = validate_credentials(username,password)==0?TRUE:FALSE;
 					char *json_response=NULL;
 					char response_header[BUF_SIZE_256];
-				
+
                     if(loginSuccess){
-						
+
 // 						if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 ){
 // 							//clean exist login info
 // 							if(sidValue!=NULL){
@@ -11246,13 +11246,13 @@ int get_soc_status()
 							sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",session_id,MAX_AGE);
 							sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
 
-							
+
 						}else{
 							json_response="{\"status\":1,\"message\":\"User login exceeds limit!\",\"data\":{}}";
 							sprintf(response_header, json_header, strlen(json_response));
 
 						}
-						
+
                     }else{
 						json_response="{\"status\":1,\"message\":\"username or password not right!\",\"data\":{}}";
 

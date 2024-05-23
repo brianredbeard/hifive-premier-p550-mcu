@@ -60,6 +60,7 @@ static void key_process(void)
 	TickType_t pressStartTime = 0;
 	TickType_t ReleaseTime = 0;
 	TickType_t currentTime = 0;
+	int ret = 0;
 
 	while (key_status == KEY_PUSHDOWN) {
 		currentTime = xTaskGetTickCount();
@@ -114,7 +115,12 @@ static void key_process(void)
 			printf("KEY_LONG_PRESS_STATE time %ld\n", currentTime - pressStartTime);
 			button_state = KEY_PRESS_STATE_END;
 			if (get_som_power_state() == SOM_POWER_ON) {
-				change_som_power_state(SOM_POWER_OFF);
+				ret = web_cmd_handle(CMD_POWER_OFF, NULL, 0, 2000);
+				if (HAL_OK != ret) {
+					change_som_power_state(SOM_POWER_OFF);
+				}
+				// Trigger the Som timer to enusre SOM could poweroff in 5 senconds
+				TriggerSomPowerOffTimer();
 			}
 			break;
 		case KEY_DOUBLE_PRESS_STATE:

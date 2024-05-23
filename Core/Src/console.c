@@ -1047,7 +1047,7 @@ static BaseType_t prvCommandSomPwrStatusSet(char *pcWriteBuffer, size_t xWriteBu
     /* change som power */
     if (0 == powerOnOff) {
         if (SOM_POWER_ON == get_som_power_state()) {
-            ret = web_cmd_handle(CMD_POWER_OFF, NULL, 0, 1000);
+            ret = web_cmd_handle(CMD_POWER_OFF, NULL, 0, 2000);
             if (HAL_OK != ret) {
                 change_som_power_state(SOM_POWER_OFF);
                 printf("Poweroff SOM error(ret %d), force shutdown it!\n", ret);
@@ -1098,7 +1098,7 @@ static BaseType_t prvCommandReboot(char *pcWriteBuffer, size_t xWriteBufferLen, 
     int ret = HAL_OK;
 
     if (SOM_POWER_ON == get_som_power_state()) {
-        ret = web_cmd_handle(CMD_RESET, NULL, 0, 1000);
+        ret = web_cmd_handle(CMD_RESET, NULL, 0, 2000);
         if (HAL_OK != ret) {
             som_reset_control(pdTRUE);
             osDelay(10);
