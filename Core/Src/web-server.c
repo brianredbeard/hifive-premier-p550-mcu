@@ -12,6 +12,7 @@
 #include "hf_power_process.h"
 
 #define SESSION_ID_LENGTH 32
+#define SESSION_DATA_LENGTH 20
 #define BUF_SIZE 1024
 #define BUF_SIZE_64 64
 #define BUF_SIZE_128 128
@@ -10189,11 +10190,10 @@ void generate_session_id(char *session_id, int length) {
 
 
 typedef struct Session {
-    char session_id[256];
-    char session_data[256];
+    char session_id[SESSION_ID_LENGTH+1];// +1 for \0
+    char session_data[SESSION_DATA_LENGTH+1];
     struct Session *next;
 } Session;
-
 
 
 Session *session_list = NULL;
