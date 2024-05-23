@@ -19,6 +19,7 @@
 #define BUF_SIZE_256 256
 #define BUF_SIZE_512 512
 #define MAX_AGE 60*5 //auto logout timeout
+#define MAX_SESSION 3
 
 #define EEPROM_USERNAME_PASSWORD_ADDR 0x0100
 #define EEPROM_USERNAME_PASSWORD_BUFFER_SIZE 64
@@ -9042,7 +9043,7 @@ const unsigned char login_html[] ="<html lang=\"zh\"> \
 															if(response.status===0){\n \
 																window.location.href = '/info.html';  \n \
 															}else{\n \
-																alert('username or password not right!'); \n \
+																alert(response.message); \n \
 																window.location.href = '/login.html';  \n \
 															}\n \
 															console.log('Network settings updated successfully.');\n \
@@ -10179,7 +10180,7 @@ void parse_cookies(const char* request, char* cookies) {
 void generate_session_id(char *session_id, int length) {
     const char charset[] = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
     if (length > 0) {
-        srand((unsigned int)time(NULL));
+        srand(HAL_GetTick());
         for (int i = 0; i < length - 1; ++i) {
             int key = rand() % (int)(sizeof(charset) - 1);
             session_id[i] = charset[key];
@@ -10192,36 +10193,64 @@ void generate_session_id(char *session_id, int length) {
 typedef struct Session {
     char session_id[SESSION_ID_LENGTH+1];// +1 for \0
     char session_data[SESSION_DATA_LENGTH+1];
+	uint32_t tick_value;//HAL_GetTick(),ms
     struct Session *next;
 } Session;
 
 
-Session *session_list = NULL;
+Session head_session = {"head_session","head_session",0,NULL};
 
+int delete_timeout_session() {//return del count;
+	uint32_t current_time_tick=HAL_GetTick();
+	int del_count=0;
+    Session *current = &head_session;
+    while (current->next != NULL) {//handle node:current->next 
+        if (current_time_tick - current->next->tick_value > MAX_AGE*1000) {
+            Session *to_delete = current->next;
+            current->next = current->next->next;//delete current->next from node list
+            vPortFree(to_delete);//free mem
+			del_count++;
+        }else{
+			current = current->next;
+		}
+    }
+    return del_count;
+}
 
 Session* create_session(const char *id, const char *data) {
+
     Session *new_session = (Session *)pvPortMalloc(sizeof(Session));
     if (new_session) {
         strncpy(new_session->session_id, id, sizeof(new_session->session_id) - 1);
         new_session->session_id[sizeof(new_session->session_id) - 1] = '\0';
         strncpy(new_session->session_data, data, sizeof(new_session->session_data) - 1);
         new_session->session_data[sizeof(new_session->session_data) - 1] = '\0';
+		new_session->tick_value=HAL_GetTick();
         new_session->next = NULL;
     }
     return new_session;
 }
 
 void add_session(Session *session) {
-    session->next = session_list;
-    session_list = session;
+    session->next = head_session.next;
+	head_session.next=session;
 }
 
 Session* find_session(const char *id) {
-    Session *current = session_list;
+    Session *current = head_session.next;
     while (current != NULL) {
         if (strcmp(current->session_id, id) == 0) {
             return current;
         }
+        current = current->next;
+    }
+    return NULL;
+}
+void print_session() {
+	web_debug("sessons: \n");
+    Session *current = head_session.next;
+    while (current != NULL) {
+		web_debug("current->session_id:%s current->data:%s tick_value:%d\n",current->session_id,current->session_data,current->tick_value);
         current = current->next;
     }
     return NULL;
@@ -10238,27 +10267,29 @@ int update_session(const char *id, const char *data) {
 }
 
 int delete_session(const char *id) {
-    Session **current = &session_list;
-    while (*current != NULL) {
-        if (strcmp((*current)->session_id, id) == 0) {
-            Session *to_delete = *current;
-            *current = (*current)->next;
-            vPortFree(to_delete);
-            return 1;
-        }
-        current = &(*current)->next;
+	int del_count=0;
+    Session *current = &head_session;
+    while (current->next != NULL) {//handle node:current->next 
+        if (strcmp(current->next->session_id, id) == 0) {
+            Session *to_delete = current->next;
+            current->next = current->next->next;//delete current->next from node list
+            vPortFree(to_delete);//free mem
+			del_count++;
+        }else{
+			current = current->next;
+		}
     }
-    return 0;
+    return del_count;
 }
 
 void clear_sessions() {
-    Session *current = session_list;
-    while (current != NULL) {
-        Session *to_delete = current;
-        current = current->next;
+    Session *current = &head_session;
+    while (current->next != NULL) {
+        Session *to_delete = current->next;
+        current->next = current->next->next;
         vPortFree(to_delete);
     }
-    session_list = NULL;
+    head_session.next = NULL;
 }
 
 // ------------------------ session end ---------------------
@@ -10645,15 +10676,15 @@ int get_soc_status()
         // parse cookie ,session sid
         char *found_session_user_name=NULL;
         char *sidValue = NULL;
+		Session *found_session=NULL;
         if (cookies != NULL) {
-
             // web_debug("\t session \n");
-            Session *current = session_list;
-            while (current != NULL) {
-                web_debug("%s %s\n",current->session_id,current->session_data);
-                current = current->next;
-            }
-
+            // Session *current = session_list;
+            // while (current != NULL) {
+            //     web_debug("%s %s\n",current->session_id,current->session_data);
+            //     current = current->next;
+            // }
+			// print_session();
 
             char *cookies_copy=strdup(cookies);
             char *token = strtok(cookies_copy, "; ");
@@ -10667,7 +10698,7 @@ int get_soc_status()
 
             if (sidValue != NULL) {
                 // web_debug("sidValue : %s\n", sidValue);
-                Session *found_session = find_session(sidValue);
+                found_session = find_session(sidValue);
                 if (found_session) {
                     // web_debug("\t Found session: ID=%s, Data=%s\n", found_session->session_id, found_session->session_data);
                     found_session_user_name=strdup(found_session->session_data);
@@ -10685,9 +10716,6 @@ int get_soc_status()
 
             // web_debug("GET path:%s \n",path);
 			int byhand=0;
-
-
-
 
             kv_map params={NULL,0};
             kv_map* p_params=NULL;
@@ -10736,6 +10764,7 @@ int get_soc_status()
 
 				if(found_session_user_name!=NULL && strlen(found_session_user_name)>0){
 					// web_debug("response info.html%s \n",found_session_user_name);
+					found_session->tick_value=HAL_GetTick();
 					sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",sidValue,MAX_AGE);
                		send_response_content(conn,resp_cookies, info_html);
 				}else{
@@ -10752,6 +10781,7 @@ int get_soc_status()
 					// char modify_account_html_resp[strlen(modify_account_html)+BUF_SIZE_64];
 					// sprintf(modify_account_html_resp, modify_account_html, found_session_user_name);
 					// web_debug("modify_account_html_resp sizeof: %d ,strlen:%d \n",sizeof(modify_account_html_resp),strlen(modify_account_html_resp));
+					found_session->tick_value=HAL_GetTick();
 					sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",sidValue,MAX_AGE);
                		send_response_content(conn,resp_cookies, modify_account_html);
 				}else{
@@ -10771,6 +10801,7 @@ int get_soc_status()
 
 				char response_header[BUF_SIZE_256];
 				if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 && byhand ){
+					found_session->tick_value=HAL_GetTick();
 					sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",sidValue,MAX_AGE);
 					sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
 				}else{
@@ -10790,6 +10821,7 @@ int get_soc_status()
 
                 char response_header[BUF_SIZE_256];
                 if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 && byhand ){
+					found_session->tick_value=HAL_GetTick();
 					sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",sidValue,MAX_AGE);
 					sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
 				}else{
@@ -10810,6 +10842,7 @@ int get_soc_status()
 
                 char response_header[BUF_SIZE_256];
                 if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 && byhand ){
+					found_session->tick_value=HAL_GetTick();
 					sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",sidValue,MAX_AGE);
 					sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
 				}else{
@@ -10840,6 +10873,7 @@ int get_soc_status()
 
                 char response_header[BUF_SIZE_256];
                 if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 && byhand ){
+					found_session->tick_value=HAL_GetTick();
 					sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",sidValue,MAX_AGE);
 					sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
 				}else{
@@ -10863,6 +10897,7 @@ int get_soc_status()
 
                 char response_header[BUF_SIZE_256];
                 if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 && byhand ){
+					found_session->tick_value=HAL_GetTick();
 					sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",sidValue,MAX_AGE);
 					sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
 				}else{
@@ -10885,6 +10920,7 @@ int get_soc_status()
 
                 char response_header[BUF_SIZE_256];
                 if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 && byhand ){
+					found_session->tick_value=HAL_GetTick();
 					sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",sidValue,MAX_AGE);
 					sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
 				}else{
@@ -10957,6 +10993,7 @@ int get_soc_status()
 
                 char response_header[BUF_SIZE_256];
                 if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 && byhand ){
+					found_session->tick_value=HAL_GetTick();
 					sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",sidValue,MAX_AGE);
 					sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
 				}else{
@@ -10978,6 +11015,7 @@ int get_soc_status()
 
                 char response_header[BUF_SIZE_256];
                 if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 && byhand ){
+					found_session->tick_value=HAL_GetTick();
 					sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",sidValue,MAX_AGE);
 					sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
 				}else{
@@ -11002,6 +11040,7 @@ int get_soc_status()
 
                 char response_header[BUF_SIZE_256];
                 if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 && byhand ){
+					found_session->tick_value=HAL_GetTick();
 					sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",sidValue,MAX_AGE);
 					sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
 				}else{
@@ -11025,6 +11064,7 @@ int get_soc_status()
 
                 char response_header[BUF_SIZE_256];
                 if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 && byhand ){
+					found_session->tick_value=HAL_GetTick();
 					sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",sidValue,MAX_AGE);
 					sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
 				}else{
@@ -11153,7 +11193,7 @@ int get_soc_status()
                     kv_pair *current = params.head;
                     while (current) {
                         // web_debug("%s = %s\n", current->key, current->value);
-                        if(strcmp(current->key,"username")==0){
+                        if(strcmp(current->key,"username")==0){ //login
                             username= current->value;
                             if(password!=NULL){//two param is found
                                 break;
@@ -11174,28 +11214,47 @@ int get_soc_status()
                     bool loginSuccess = validate_credentials(username,password)==0?TRUE:FALSE;
 					char *json_response=NULL;
 					char response_header[BUF_SIZE_256];
+				
                     if(loginSuccess){
-						json_response="{\"status\":0,\"message\":\"success!\",\"data\":{}}";
-						if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 ){
-							//clean exist login info
-							if(sidValue!=NULL){
-								delete_session(sidValue);
-//								assert(ret>0);//make sure delete ok
-							}
+						
+// 						if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 ){
+// 							//clean exist login info
+// 							if(sidValue!=NULL){
+// 								int ret = delete_session(sidValue);
+// 								printf("delete_session:%d \n",ret);
+// //								assert(ret>0);//make sure delete ok
+// 							}
+// 						}
+						int del_count = delete_timeout_session();
+						web_debug("delete_timeout_session ret:%d \n",del_count);
+						int aval_session_count=0;
+						Session *pSession=head_session.next;
+						while(pSession!=NULL){
+							aval_session_count++;
+							pSession=pSession->next;
 						}
-                        //add sessions
-                        char session_id[SESSION_ID_LENGTH + 1];
-                        generate_session_id(session_id, SESSION_ID_LENGTH);
-                        // web_debug("session add user,sessionId:%s \n",session_id);
+						web_debug("aval_session_count ret:%d \n",aval_session_count);
+						if(aval_session_count<MAX_SESSION){
+							json_response="{\"status\":0,\"message\":\"success!\",\"data\":{}}";
+							//add sessions
+							char session_id[SESSION_ID_LENGTH + 1];
+							generate_session_id(session_id, SESSION_ID_LENGTH);
+							Session *session1 = create_session(session_id, username);
+							assert(session1!=NULL);
+							add_session(session1);
+							// assert(find_session(session_id)!=NULL);
+							sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",session_id,MAX_AGE);
+							sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
 
-                        Session *session1 = create_session(session_id, username);
-                        add_session(session1);
-                        assert(find_session(session_id)!=NULL);
+							
+						}else{
+							json_response="{\"status\":1,\"message\":\"User login exceeds limit!\",\"data\":{}}";
+							sprintf(response_header, json_header, strlen(json_response));
 
-						sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",session_id,MAX_AGE);
-						sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
+						}
+						
                     }else{
-						json_response="{\"status\":1,\"message\":\"failt\",\"data\":{}}";
+						json_response="{\"status\":1,\"message\":\"username or password not right!\",\"data\":{}}";
 
 						sprintf(resp_cookies, "Set-Cookie: sid=; Max-Age=0; Path=/\r\n");
 						sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
@@ -11271,7 +11330,7 @@ int get_soc_status()
                         // web_debug("redirect to login.html \n");
                         if(sidValue!=NULL){
                             int ret=delete_session(sidValue);
-                            // web_debug("delete sidValue:%s\n",sidValue);
+                            web_debug("delete sidValue:%s ret:%d \n",sidValue,ret);
                             // assert(ret>0);//make sure delete ok
                         }
                     }
@@ -11321,6 +11380,7 @@ int get_soc_status()
 
                     char response_header[BUF_SIZE_256];
 					if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 ){
+						found_session->tick_value=HAL_GetTick();
 						sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",sidValue,MAX_AGE);
 						sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
 					}else{
@@ -11367,6 +11427,7 @@ int get_soc_status()
 
                     char response_header[BUF_SIZE_256];
 					if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 ){
+						found_session->tick_value=HAL_GetTick();
 						sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",sidValue,MAX_AGE);
 						sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
 					}else{
@@ -11394,6 +11455,7 @@ int get_soc_status()
 
                     char response_header[BUF_SIZE_256];
 					if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 ){
+						found_session->tick_value=HAL_GetTick();
 						sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",sidValue,MAX_AGE);
 						sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
 					}else{
@@ -11448,6 +11510,7 @@ int get_soc_status()
 
                     char response_header[BUF_SIZE_256];
                     if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 ){
+						found_session->tick_value=HAL_GetTick();
 						sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",sidValue,MAX_AGE);
 						sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
 					}else{
@@ -11511,6 +11574,7 @@ int get_soc_status()
 
                     char response_header[BUF_SIZE_256];
 					if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 ){
+						found_session->tick_value=HAL_GetTick();
 						sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",sidValue,MAX_AGE);
 						sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
 					}else{
@@ -11576,6 +11640,7 @@ int get_soc_status()
 
                     char response_header[BUF_SIZE_256];
 					if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 ){
+						found_session->tick_value=HAL_GetTick();
 						sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",sidValue,MAX_AGE);
 						sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
 					}else{
