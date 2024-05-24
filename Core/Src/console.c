@@ -504,6 +504,7 @@ static BaseType_t prvCommandSomBoardInfoGet(char *pcWriteBuffer, size_t xWriteBu
     som_info *psomInfo = &somInfo;
     char *pcWb = pcWriteBuffer;
     size_t len, size = xWriteBufferLen;
+    char boardSn[19] = {0};
 
     ret = web_cmd_handle(CMD_READ_BOARD_INFO, psomInfo, sizeof(som_info), 1000);
     if (HAL_OK != ret) {
@@ -531,17 +532,13 @@ static BaseType_t prvCommandSomBoardInfoGet(char *pcWriteBuffer, size_t xWriteBu
         len = snprintf(pcWb, size, "bom_variant:0x%x\r\n", psomInfo->bom_variant);
         pcWb += len;
         size -= len;
-        len = snprintf(pcWb, size, "SN(hex):");
+
+        memcpy(boardSn, psomInfo->sn, sizeof(psomInfo->sn));
+        len = snprintf(pcWb, size, "SN:%s\r\n", boardSn);
         pcWb += len;
         size -= len;
-        for (int i = 0; i < sizeof(psomInfo->sn); i++) {
-            pcWb += snprintf(pcWb, size, "%x", psomInfo->sn[i]);
-            size--;
-        }
-        len = snprintf(pcWb, size, "\r\n");
-        pcWb += len;
-        size -= len;
-        len = snprintf(pcWb, size, "status:%d\n", psomInfo->status);
+
+        len = snprintf(pcWb, size, "status:0x%x\r\n", psomInfo->status);
     }
 
     return pdFALSE;
@@ -1281,6 +1278,10 @@ void vTaskConsole(void *pvParams)
     {
         goto out_task_console;
     }
+
+    /* print RTC time */
+    prvCommandRtcGet(pcOutputString, MAX_OUT_STR_LEN, NULL);
+    vConsoleWrite(pcOutputString);
 
     vConsoleWrite(pcWelcomeMsg);
     vConsoleEnableRxInterrupt();
