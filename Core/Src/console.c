@@ -887,7 +887,7 @@ static BaseType_t prvCommandRtcGet(char *pcWriteBuffer, size_t xWriteBufferLen, 
         default:
             break;
     }
-    snprintf(pcWriteBuffer, xWriteBufferLen, "%u-%u-%u %s %u:%u:%u CST\r\n",
+    snprintf(pcWriteBuffer, xWriteBufferLen, "%u-%02u-%2u %s %02u:%02u:%02u CST\r\n",
                 date.Year, date.Month, date.Date, cWeekDay,
                 time.Hours, time.Minutes, time.Seconds);
 
@@ -978,8 +978,10 @@ static BaseType_t prvCommandTempGet(char *pcWriteBuffer, size_t xWriteBufferLen,
          snprintf(pcWriteBuffer, xWriteBufferLen, "Faild to get PVT info(errcode:%d)\n", ret);
     }
     else {
-        snprintf(pcWriteBuffer, xWriteBufferLen,"cpu_temp:%d  npu_temp:%d  fan_speed:%d\n",
-            pvtInfo.cpu_temp, pvtInfo.npu_temp, pvtInfo.fan_speed);
+        snprintf(pcWriteBuffer, xWriteBufferLen,"cpu_temp(Celsius):%d.%d  npu_temp(Celsius):%d.%d  fan_speed(rpm):%d\n",
+            pvtInfo.cpu_temp/1000, pvtInfo.cpu_temp%1000,
+            pvtInfo.npu_temp/1000, pvtInfo.npu_temp%1000,
+            pvtInfo.fan_speed);
     }
 
     return pdFALSE;
@@ -1002,7 +1004,7 @@ static BaseType_t prvCommandPwrDissipationGet(char *pcWriteBuffer, size_t xWrite
     if (pwrStaus == SOM_POWER_ON) {
         get_board_power(&millivolt, &milliCur, &microWatt);
     }
-    snprintf(pcWriteBuffer, xWriteBufferLen,"consumption:%ld.%3ld(W)  voltage:%ld.%3ld(V)  current:%ld.%3ld(A)\n",
+    snprintf(pcWriteBuffer, xWriteBufferLen,"consumption:%ld.%3.3ld(W)  voltage:%ld.%03ld(V)  current:%ld.%03ld(A)\n",
         microWatt / 1000000, microWatt % 1000000, millivolt / 1000, millivolt % 1000, milliCur / 1000, milliCur % 1000);
 
     return pdFALSE;

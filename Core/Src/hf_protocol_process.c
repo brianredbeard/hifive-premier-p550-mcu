@@ -628,7 +628,7 @@ void deamon_keeplive_task(void *argument)
 		if (old_status != get_som_daemon_state()) {
 			es_get_rtc_date(&date);
 			es_get_rtc_time(&time);
-			printf("SOM Daemon status change to %s at %d-%d-%d %02d:%02d:%02d!\n",
+			printf("SOM Daemon status change to %s at %d-%02d-%02d %02d:%02d:%02d!\n",
 				get_som_daemon_state() == SOM_DAEMON_ON ? "on" : "off",
 				date.Year, date.Month, date.Date, time.Hours, time.Minutes, time.Seconds);
 		}
