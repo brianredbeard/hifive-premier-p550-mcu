@@ -25,6 +25,14 @@
 /* macro -------------------------------------------------------------*/
 #define EEPROM_TEST_DEBUG 0
 #define SET_MAGIC_NUM_DEBUG 0
+
+#if 0
+#define esENTER_CRITICAL(MUTEX, DELAY)	xSemaphoreTake(MUTEX, DELAY)
+#define esEXIT_CRITICAL(MUTEX)		xSemaphoreGive(MUTEX)
+#else
+#define esENTER_CRITICAL(MUTEX, DELAY)	taskENTER_CRITICAL()
+#define esEXIT_CRITICAL(MUTEX)		taskEXIT_CRITICAL()
+#endif
 /* variables ---------------------------------------------------------*/
 static CarrierBoardInfo gCarrier_Board_Info;
 static MCUServerInfo gMCU_Server_Info;
@@ -409,9 +417,9 @@ int es_get_carrier_borad_info(CarrierBoardInfo *pCarrier_board_info)
 	if (NULL == pCarrier_board_info)
 		return -1;
 
-	xSemaphoreTake(gEEPROM_Mutex, portMAX_DELAY);
+	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
 	memcpy(pCarrier_board_info, &gCarrier_Board_Info, sizeof(CarrierBoardInfo));
-	xSemaphoreGive(gEEPROM_Mutex);
+	esEXIT_CRITICAL(gEEPROM_Mutex);
 	return 0;
 }
 
@@ -420,14 +428,14 @@ int es_set_carrier_borad_info(CarrierBoardInfo *pCarrier_board_info)
 	if (NULL == pCarrier_board_info)
 		return -1;
 
-	xSemaphoreTake(gEEPROM_Mutex, portMAX_DELAY);
+	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
 	if (0 != memcmp(pCarrier_board_info, &gCarrier_Board_Info, sizeof(CarrierBoardInfo))) {
 		memcpy(&gCarrier_Board_Info, pCarrier_board_info, sizeof(CarrierBoardInfo));
 		hf_i2c_mem_write(&hi2c1, AT24C_ADDR, CARRIER_BOARD_INFO_EEPROM_OFFSET,
 				  (uint8_t *)&gCarrier_Board_Info, sizeof(CarrierBoardInfo));
 		eeprom_debug("Updated CarrierBoardInfo in EEPROM!\n");
 	}
-	xSemaphoreGive(gEEPROM_Mutex);
+	esEXIT_CRITICAL(gEEPROM_Mutex);
 
 	return 0;
 }
@@ -437,9 +445,9 @@ int es_get_mcu_mac(uint8_t *p_mac_address)
 	if (NULL == p_mac_address)
 		return -1;
 
-	xSemaphoreTake(gEEPROM_Mutex, portMAX_DELAY);
+	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
 	memcpy(p_mac_address, gCarrier_Board_Info.ethernetMAC3, sizeof(gCarrier_Board_Info.ethernetMAC3));
-	xSemaphoreGive(gEEPROM_Mutex);
+	esEXIT_CRITICAL(gEEPROM_Mutex);
 
 	return 0;
 }
@@ -453,13 +461,13 @@ int es_set_mcu_mac(uint8_t *p_mac_address)
 		return -1;
 	}
 
-	xSemaphoreTake(gEEPROM_Mutex, portMAX_DELAY);
+	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
 	if (0 != memcmp(gCarrier_Board_Info.ethernetMAC3, p_mac_address, sizeof(gCarrier_Board_Info.ethernetMAC3))) {
 		memcpy(gCarrier_Board_Info.ethernetMAC3, p_mac_address, sizeof(gCarrier_Board_Info.ethernetMAC3));
 		hf_i2c_mem_write(&hi2c1, AT24C_ADDR, CARRIER_BOARD_INFO_EEPROM_OFFSET,
 					(uint8_t *)&gCarrier_Board_Info, sizeof(CarrierBoardInfo));
 	}
-	xSemaphoreGive(gEEPROM_Mutex);
+	esEXIT_CRITICAL(gEEPROM_Mutex);
 
 	return 0;
 }
@@ -470,9 +478,9 @@ int es_get_mcu_ipaddr(uint8_t *p_ip_address)
 	if (NULL == p_ip_address)
 		return -1;
 
-	xSemaphoreTake(gEEPROM_Mutex, portMAX_DELAY);
+	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
 	memcpy(p_ip_address, gMCU_Server_Info.ip_address, sizeof(gMCU_Server_Info.ip_address));
-	xSemaphoreGive(gEEPROM_Mutex);
+	esEXIT_CRITICAL(gEEPROM_Mutex);
 
 	return 0;
 }
@@ -486,13 +494,13 @@ int es_set_mcu_ipaddr(uint8_t *p_ip_address)
 		return -1;
 	}
 
-	xSemaphoreTake(gEEPROM_Mutex, portMAX_DELAY);
+	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
 	if (0 != memcmp(gMCU_Server_Info.ip_address, p_ip_address, sizeof(gMCU_Server_Info.ip_address))) {
 		memcpy(gMCU_Server_Info.ip_address, p_ip_address, sizeof(gMCU_Server_Info.ip_address));
 		hf_i2c_mem_write(&hi2c1, AT24C_ADDR, MCU_SERVER_INFO_EEPROM_OFFSET,
 			(uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo));
 	}
-	xSemaphoreGive(gEEPROM_Mutex);
+	esEXIT_CRITICAL(gEEPROM_Mutex);
 
 	return 0;
 }
@@ -503,9 +511,9 @@ int es_get_mcu_netmask(uint8_t *p_netmask_address)
 	if (NULL == p_netmask_address)
 		return -1;
 
-	xSemaphoreTake(gEEPROM_Mutex, portMAX_DELAY);
+	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
 	memcpy(p_netmask_address, gMCU_Server_Info.netmask_address, sizeof(gMCU_Server_Info.netmask_address));
-	xSemaphoreGive(gEEPROM_Mutex);
+	esEXIT_CRITICAL(gEEPROM_Mutex);
 
 	return 0;
 }
@@ -522,13 +530,13 @@ int es_set_mcu_netmask(uint8_t *p_netmask_address)
 		return -1;
 	}
 
-	xSemaphoreTake(gEEPROM_Mutex, portMAX_DELAY);
+	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
 	if (0 != memcmp(gMCU_Server_Info.netmask_address, p_netmask_address, sizeof(gMCU_Server_Info.netmask_address))) {
 		memcpy(gMCU_Server_Info.netmask_address, p_netmask_address, sizeof(gMCU_Server_Info.netmask_address));
 		hf_i2c_mem_write(&hi2c1, AT24C_ADDR, MCU_SERVER_INFO_EEPROM_OFFSET,
 			(uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo));
 	}
-	xSemaphoreGive(gEEPROM_Mutex);
+	esEXIT_CRITICAL(gEEPROM_Mutex);
 
 	return 0;
 }
@@ -539,9 +547,9 @@ int es_get_mcu_gateway(uint8_t *p_gateway_address)
 	if (NULL == p_gateway_address)
 		return -1;
 
-	xSemaphoreTake(gEEPROM_Mutex, portMAX_DELAY);
+	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
 	memcpy(p_gateway_address, gMCU_Server_Info.gateway_address, sizeof(gMCU_Server_Info.gateway_address));
-	xSemaphoreGive(gEEPROM_Mutex);
+	esEXIT_CRITICAL(gEEPROM_Mutex);
 
 	return 0;
 }
@@ -554,13 +562,13 @@ int es_set_mcu_gateway(uint8_t *p_gateway_address)
 	if (0 == p_gateway_address[0])
 		return -1;
 
-	xSemaphoreTake(gEEPROM_Mutex, portMAX_DELAY);
+	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
 	if (0 != memcmp(gMCU_Server_Info.gateway_address, p_gateway_address, sizeof(gMCU_Server_Info.gateway_address))) {
 		memcpy(gMCU_Server_Info.gateway_address, p_gateway_address, sizeof(gMCU_Server_Info.gateway_address));
 		hf_i2c_mem_write(&hi2c1, AT24C_ADDR, MCU_SERVER_INFO_EEPROM_OFFSET,
 			(uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo));
 	}
-	xSemaphoreGive(gEEPROM_Mutex);
+	esEXIT_CRITICAL(gEEPROM_Mutex);
 
 	return 0;
 }
@@ -574,10 +582,10 @@ int es_get_username_password(char *p_admin_name, char *p_admin_password)
 	if (NULL == p_admin_password)
 		return -1;
 
-	xSemaphoreTake(gEEPROM_Mutex, portMAX_DELAY);
+	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
 	strcpy(p_admin_name, gMCU_Server_Info.AdminName);
 	strcpy(p_admin_password, gMCU_Server_Info.AdminPassword);
-	xSemaphoreGive(gEEPROM_Mutex);
+	esEXIT_CRITICAL(gEEPROM_Mutex);
 
 	return 0;
 }
@@ -598,14 +606,14 @@ int es_set_username_password(const char *p_admin_name, const char *p_admin_passw
 		return -1;
 	}
 
-	xSemaphoreTake(gEEPROM_Mutex, portMAX_DELAY);
+	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
 	if ((0 != strcmp(gMCU_Server_Info.AdminName, p_admin_name)) || (0 != strcmp(gMCU_Server_Info.AdminPassword, p_admin_password))) {
 		strcpy(gMCU_Server_Info.AdminName, p_admin_name);
 		strcpy(gMCU_Server_Info.AdminPassword, p_admin_password);
 		hf_i2c_mem_write(&hi2c1, AT24C_ADDR, MCU_SERVER_INFO_EEPROM_OFFSET,
 			(uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo));
 	}
-	xSemaphoreGive(gEEPROM_Mutex);
+	esEXIT_CRITICAL(gEEPROM_Mutex);
 
 	return 0;
 }
@@ -616,12 +624,12 @@ int is_som_pwr_lost_resume(void)
 {
 	int isResumePwrLost = 0;
 
-	xSemaphoreTake(gEEPROM_Mutex, portMAX_DELAY);
+	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
 	if (gSOM_PwgMgtDIP_Info.som_pwr_lost_resume_attr == SOM_PWR_LOST_RESUME_ENABLE)
 		isResumePwrLost = 1;
 	else
 		isResumePwrLost = 0;
-	xSemaphoreGive(gEEPROM_Mutex);
+	esEXIT_CRITICAL(gEEPROM_Mutex);
 
 	return isResumePwrLost;
 }
@@ -646,14 +654,14 @@ int es_set_som_pwr_lost_resume_attr(int isResumePwrLost)
 	eeprom_debug("old_resume_attr=0x%x, new_resume_attr=0x%x\n",
 			gSOM_PwgMgtDIP_Info.som_pwr_lost_resume_attr, som_pwr_lost_resume_attr);
 
-	xSemaphoreTake(gEEPROM_Mutex, portMAX_DELAY);
+	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
 	if (som_pwr_lost_resume_attr != gSOM_PwgMgtDIP_Info.som_pwr_lost_resume_attr) {
 		gSOM_PwgMgtDIP_Info.som_pwr_lost_resume_attr = som_pwr_lost_resume_attr;
 		hf_i2c_mem_write(&hi2c1, AT24C_ADDR, SOM_PWRMGT_DIP_INFO_EEPROM_OFFSET,
 			(uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(SomPwrMgtDIPInfo));
 		eeprom_debug("Update SomPwrMgtDIPInfo in EEPROM for lost_resume_attr\n");
 	}
-	xSemaphoreGive(gEEPROM_Mutex);
+	esEXIT_CRITICAL(gEEPROM_Mutex);
 
 	return 0;
 }
@@ -666,9 +674,9 @@ int es_get_som_pwr_last_state(int *p_som_pwr_last_state)
 	if (NULL == p_som_pwr_last_state)
 		return -1;
 
-	xSemaphoreTake(gEEPROM_Mutex, portMAX_DELAY);
+	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
 	*p_som_pwr_last_state = (gSOM_PwgMgtDIP_Info.som_pwr_last_state == SOM_PWR_LAST_STATE_ON) ? 1 : 0;
-	xSemaphoreGive(gEEPROM_Mutex);
+	esEXIT_CRITICAL(gEEPROM_Mutex);
 
 	return 0;
 }
@@ -687,13 +695,13 @@ int es_set_som_pwr_last_state(int som_pwr_last_state)
 		som_pwr_last_state_internal_fmt = SOM_PWR_LAST_STATE_OFF;
 	}
 
-	xSemaphoreTake(gEEPROM_Mutex, portMAX_DELAY);
+	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
 	if (som_pwr_last_state_internal_fmt != gSOM_PwgMgtDIP_Info.som_pwr_last_state) {
 		gSOM_PwgMgtDIP_Info.som_pwr_last_state = som_pwr_last_state_internal_fmt;
 		hf_i2c_mem_write(&hi2c1, AT24C_ADDR, SOM_PWRMGT_DIP_INFO_EEPROM_OFFSET,
 			(uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(SomPwrMgtDIPInfo));
 	}
-	xSemaphoreGive(gEEPROM_Mutex);
+	esEXIT_CRITICAL(gEEPROM_Mutex);
 
 	return 0;
 }
@@ -706,9 +714,9 @@ int es_get_som_dip_switch_soft_ctl_attr(int *p_som_dip_switch_soft_ctl_attr)
 	if (NULL == p_som_dip_switch_soft_ctl_attr)
 		return -1;
 
-	xSemaphoreTake(gEEPROM_Mutex, portMAX_DELAY);
+	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
 	*p_som_dip_switch_soft_ctl_attr = (gSOM_PwgMgtDIP_Info.som_dip_switch_soft_ctl_attr == SOM_DIP_SWITCH_SOFT_CTL_ENABLE) ? 1 : 0;
-	xSemaphoreGive(gEEPROM_Mutex);
+	esEXIT_CRITICAL(gEEPROM_Mutex);
 
 	return 0;
 }
@@ -727,13 +735,13 @@ int es_set_som_dip_switch_soft_ctl_attr(int som_dip_switch_soft_ctl_attr)
 		som_dip_swtich_soft_ctl_attr_internal_fmt = SOM_DIP_SWITCH_SOFT_CTL_DISABLE;
 	}
 
-	xSemaphoreTake(gEEPROM_Mutex, portMAX_DELAY);
+	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
 	if (som_dip_swtich_soft_ctl_attr_internal_fmt != gSOM_PwgMgtDIP_Info.som_dip_switch_soft_ctl_attr) {
 		gSOM_PwgMgtDIP_Info.som_dip_switch_soft_ctl_attr = som_dip_swtich_soft_ctl_attr_internal_fmt;
 		hf_i2c_mem_write(&hi2c1, AT24C_ADDR, SOM_PWRMGT_DIP_INFO_EEPROM_OFFSET,
 			(uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(SomPwrMgtDIPInfo));
 	}
-	xSemaphoreGive(gEEPROM_Mutex);
+	esEXIT_CRITICAL(gEEPROM_Mutex);
 
 	return 0;
 }
@@ -746,9 +754,9 @@ int es_get_som_dip_switch_soft_state(uint8_t *p_som_dip_switch_soft_state)
 	if (NULL == p_som_dip_switch_soft_state)
 		return -1;
 
-	xSemaphoreTake(gEEPROM_Mutex, portMAX_DELAY);
+	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
 	*p_som_dip_switch_soft_state = 0xF & gSOM_PwgMgtDIP_Info.som_dip_switch_soft_state;
-	xSemaphoreGive(gEEPROM_Mutex);
+	esEXIT_CRITICAL(gEEPROM_Mutex);
 
 	return 0;
 }
@@ -759,13 +767,13 @@ int es_set_som_dip_switch_soft_state(uint8_t som_dip_switch_soft_state)
 
 	som_dip_switch_soft_state_internal_fmt = 0xE0 | (0xF & som_dip_switch_soft_state);
 
-	xSemaphoreTake(gEEPROM_Mutex, portMAX_DELAY);
+	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
 	if (som_dip_switch_soft_state_internal_fmt != gSOM_PwgMgtDIP_Info.som_dip_switch_soft_state) {
 		gSOM_PwgMgtDIP_Info.som_dip_switch_soft_state = som_dip_switch_soft_state_internal_fmt;
 		hf_i2c_mem_write(&hi2c1, AT24C_ADDR, SOM_PWRMGT_DIP_INFO_EEPROM_OFFSET,
 			(uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(SomPwrMgtDIPInfo));
 	}
-	xSemaphoreGive(gEEPROM_Mutex);
+	esEXIT_CRITICAL(gEEPROM_Mutex);
 
 	return 0;
 }
