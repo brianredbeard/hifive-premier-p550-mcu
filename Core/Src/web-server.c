@@ -9081,6 +9081,7 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
                                          <script src=\"/jquery.min.js\"></script> \
 										 <script> \n \
                                                 $(document).ready(function() { \n \
+													var power_on_change_countdown=5;//click button timeout count \n \
 													function isValidMacAddress(mac) {\n \
 														const macAddressRegex = /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/;\n \
 														return macAddressRegex.test(mac);\n \
@@ -9168,6 +9169,7 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
 														$('#power-consum-refresh').prop(\"disabled\", true); \n \
 														$('#reset').prop(\"disabled\", true); \n \
 														$('#soc-refresh').prop(\"disabled\", true); \n \
+														power_on_change_countdown=5;//5*1000ms \n \
                                                         $.ajax({\n \
                                                             url: '/power_status',\n \
                                                             type: 'POST',\n \
@@ -9176,7 +9178,6 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
                                                                 power_status: power_status,\n \
                                                             },\
                                                             success: function(response) {\n \
-																$('#power-on-refresh-hid').click(); \n \
                                                                 if(response.status===0){\n \
                                                                     alert(\"update success!\");\n \
                                                                 }else{\n \
@@ -9215,7 +9216,7 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
                                                         });\n \
                                                     });\n\
 													$('#reset').click(function() { \n \
-														if($('#power-on-change').val()==='1'){ //off status \n \
+														if($('#power-on-change').val()==='1' || power_on_change_countdown > 0 ){ //off status \n \
 															return; \n \
 														}\n \
                                                         $.ajax({ \n\
@@ -9237,7 +9238,7 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
                                                         });\n \
                                                     });\n \
 													$('#power-consum-refresh-hid').click(function() {\n \
-														if($('#power-on-change').val()===1){ //off status \n \
+														if($('#power-on-change').val()===1 || power_on_change_countdown>0){ //off status \n \
 															return; \n \
 														}\n \
                                                         $.ajax({\n \
@@ -9582,6 +9583,9 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
 															$('#soc-status').val(\"stopped\");\n \
 															return; \n \
 														}\n \
+														if( power_on_change_countdown > 0 ){ \n \
+															return; \n \
+														} \n \
                                                         $.ajax({\n \
 															async: false,\n \
                                                             url: '/soc-status',\n \
@@ -9642,6 +9646,9 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
 													$('#board-info-cb-refresh').click(); \n \
 													$('#rtc-refresh-hid').click(); \n \
 													$('#soc-refresh-hid').click(); \n \
+													setInterval(function() { \n \
+														power_on_change_countdown--; \n \
+													}, 1000);  \n \
 													setInterval(function() {\n \
 														$('#power-consum-refresh-hid').click(); \n \
 														$('#rtc-refresh-hid').click(); \n \
@@ -9785,7 +9792,7 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
                                         </div> \
 										 <div class=\"dip-switch\" > \
                                             <h3>DIP Switch</h3> \
-											<label>Software config:</label> \
+											<label>Config:</label> \
 											<div class=\"network-roww label-row\">\
 												<label>dip0</label>\
 												<label>dip1</label>\
@@ -10041,7 +10048,7 @@ err_t send_large_data(struct netconn *conn, const char *data, unsigned int lengt
 
 
         result = netconn_write(conn, data + offset, chunk_size, NETCONN_COPY);
-		web_debug("offset:%d chunk_size:%d \n" ,offset,chunk_size);
+		// web_debug("offset:%d chunk_size:%d \n" ,offset,chunk_size);
 
         if (result != ERR_OK) {
             break;
@@ -10516,7 +10523,7 @@ int get_pvt_info(PVTInfo *ppvtInfo)
 }
 
 typedef struct {
-    int dip01;
+    int dip01;//0 on,1 off
     int dip02;
     int dip03;
 	int dip04;
@@ -10644,11 +10651,15 @@ int get_soc_status()
     {
         netbuf_data(inbuf, (void**)&buf, &buflen);
 
-        // web_debug(" ############### buf: ############## %d %d \n",sizeof(buf),strlen(buf));
-        // for (int i = 0; i < sizeof(buf)>10?10:sizeof(buf); i++) {
-        //     web_debug("%c", buf[i]);
+        // printf(" ############### buf: ##############\n");
+		// printf("sizeof(buf):%d strlen(buf):%d \n",sizeof(buf),strlen(buf));
+        // for (int i = 0; i < strlen(buf); i++) {
+        //     printf("%x(%c) ", buf[i],buf[i]);
+		// 	if(i%16==0){
+		// 		printf("\n");
+		// 	}
         // }
-        // web_debug("\n");
+        // printf("\n");
 
         char *buf_copy;
         buf_copy = strdup(buf);
@@ -10665,6 +10676,7 @@ int get_soc_status()
         char *found_session_user_name=NULL;
         char *sidValue = NULL;
 		Session *found_session=NULL;
+		char *cookies_copy=NULL;
         if (cookies != NULL) {
             // web_debug("\t session \n");
             // Session *current = session_list;
@@ -10674,11 +10686,13 @@ int get_soc_status()
             // }
 			// print_session();
 
-            char *cookies_copy=strdup(cookies);
+            cookies_copy=strdup(cookies);
             char *token = strtok(cookies_copy, "; ");
+//			printf("cookies_copy:%s\n",cookies_copy);
             while (token != NULL) {
                 if (strncmp(token, "sid=",4) == 0) {
                     sidValue = token + 4;
+//					printf("## sidValue:%s\n",sidValue);
                     break;
                 }
                 token = strtok(NULL, "; ");
@@ -10690,7 +10704,7 @@ int get_soc_status()
                     found_session_user_name=strdup(found_session->session_data);
                 }
             }
-			free(cookies_copy);
+			
         }
 
         char resp_cookies[BUF_SIZE_256] = {0};
@@ -11509,6 +11523,10 @@ int get_soc_status()
             web_debug("ERROR unsupport methoc(only support GET,POST) %s \n",method);
             send_response_200(conn);
         }
+		if(cookies_copy!=NULL){
+			free(cookies_copy);
+			cookies_copy=NULL;
+		}
         free(buf_copy);
 		free(found_session_user_name);
     }else{
