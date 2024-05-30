@@ -148,19 +148,6 @@ extern void get_rtc_info(void);
 extern void hf_power_task (void* parameter);
 extern void hf_gpio_task (void* parameter);
 
-
-typedef struct {
-  int dip01;
-  int dip02;
-  int dip03;
-	int dip04;
-	int swctrl;//0 hw,1,sw
-} DIPSwitchInfo;
-
-extern int get_dip_switch(DIPSwitchInfo *dipSwitchInfo);
-extern int set_dip_switch(DIPSwitchInfo dipSwitchInfo);
-
-
 void hf_main_task(void *argument)
 {
   printf("HiFive 106SC!\n");

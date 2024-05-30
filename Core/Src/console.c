@@ -743,11 +743,7 @@ static BaseType_t prvCommandDipSwitchSoftGet(char *pcWriteBuffer, size_t xWriteB
     uint8_t state;
     int ctl_attr;
 
-    /* Read dip switch ctl attribute */
-    es_get_som_dip_switch_soft_ctl_attr(&ctl_attr);
-
-    /* Read dip switch state and fill FreeRTOS write buffer */
-    es_get_som_dip_switch_soft_state(&state);
+    get_bootsel(&ctl_attr, &state);
 
     snprintf(pcWriteBuffer, xWriteBufferLen, "Get: Bootsel Controlled by: %s, bootsel[3 2 1 0]:%d %d %d %d\r\n",
             ctl_attr == 1?"SW":"HW", (0x8&state)>>3, (0x4&state)>>2, (0x2&state)>>1, (0x1&state));
@@ -772,6 +768,7 @@ static BaseType_t prvCommandDipSwitchSoftSet(char *pcWriteBuffer, size_t xWriteB
     const char * pcCtlAttr;
     const char * pcState;
     int setAttrFlag = 0;
+    DIPSwitchInfo dipSwitchInfo;
 
     pcCtlAttr = FreeRTOS_CLIGetParameter(pcCommandString, 1, &xParamLen);
     if ((0 == strncmp("sw", pcCtlAttr, xParamLen)) || (0 == strncmp("SW", pcCtlAttr, xParamLen))) {
@@ -787,17 +784,21 @@ static BaseType_t prvCommandDipSwitchSoftSet(char *pcWriteBuffer, size_t xWriteB
     }
 
     if (setAttrFlag) {
-        /* set new dip switch ctl attr */
-        es_set_som_dip_switch_soft_ctl_attr(ctl_attr);
-
         /* get dip switch state parameter */
         pcState = FreeRTOS_CLIGetParameter(pcCommandString, 2, &xParamLen);
         state = atoh(pcState, xParamLen) & 0xF;
-        /* set new dip switch state */
-        es_set_som_dip_switch_soft_state(state);
+
+        dipSwitchInfo.swctrl = ctl_attr;
+        dipSwitchInfo.dip01 = 0x1 & state;
+        dipSwitchInfo.dip02 = (0x2 & state) >> 1;
+        dipSwitchInfo.dip03 = (0x4 & state) >> 2;
+        dipSwitchInfo.dip04 = (0x8 & state) >> 3;
+
+        set_dip_switch(dipSwitchInfo);
+        get_dip_switch(&dipSwitchInfo);
 
         snprintf(pcWriteBuffer, xWriteBufferLen, "Set: Bootsel Controlled by: %s, bootsel[3 2 1 0]:%d %d %d %d\r\n",
-                ctl_attr == 1?"SW":"HW", (0x8&state)>>3, (0x4&state)>>2, (0x2&state)>>1, (0x1&state));
+                dipSwitchInfo.swctrl == 1?"SW":"HW", dipSwitchInfo.dip04, dipSwitchInfo.dip03, dipSwitchInfo.dip02, dipSwitchInfo.dip01);
     }
 
     return pdFALSE;

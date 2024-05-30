@@ -179,6 +179,13 @@ struct rtc_time_t {
 	uint8_t Seconds;
 };
 
+typedef struct {
+    int dip01;//0 on,1 off
+    int dip02;
+    int dip03;
+	int dip04;
+	int swctrl;//0 hw,1,sw
+} DIPSwitchInfo;
 /* constants --------------------------------------------------------*/
 extern UART_HandleTypeDef huart3;
 
@@ -266,6 +273,9 @@ int es_set_som_dip_switch_soft_ctl_attr(int som_dip_switch_soft_ctl_attr);
 int es_get_som_dip_switch_soft_state(uint8_t *p_som_dip_switch_soft_state);
 int es_set_som_dip_switch_soft_state(uint8_t som_dip_switch_soft_state);
 
+int es_get_som_dip_switch_soft_state_all(int *p_som_dip_switch_soft_ctl_attr, uint8_t *p_som_dip_switch_soft_state);
+int es_set_som_dip_switch_soft_state_all(int som_dip_switch_soft_ctl_attr, uint8_t som_dip_switch_soft_state);
+
 int es_eeprom_info_test(void);
 power_switch_t get_som_power_state(void);
 void change_som_power_state(power_switch_t newState);
@@ -277,6 +287,11 @@ void TriggerSomRebootTimer(void);
 void StopSomRebootTimer(void);
 
 void set_bootsel(uint8_t is_soft_crtl, uint8_t sel);
+int get_bootsel(int *pCtl_attr, uint8_t *pSel);
+int init_bootsel(void);
+
+int get_dip_switch(DIPSwitchInfo *dipSwitchInfo);
+int set_dip_switch(DIPSwitchInfo dipSwitchInfo);
 
 uint32_t es_autoboot(void);
 

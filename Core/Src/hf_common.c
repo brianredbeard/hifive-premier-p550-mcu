@@ -778,6 +778,50 @@ int es_set_som_dip_switch_soft_state(uint8_t som_dip_switch_soft_state)
 	return 0;
 }
 
+
+int es_get_som_dip_switch_soft_state_all(int *p_som_dip_switch_soft_ctl_attr, uint8_t *p_som_dip_switch_soft_state)
+{
+	if (NULL == p_som_dip_switch_soft_state)
+		return -1;
+
+	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
+	*p_som_dip_switch_soft_ctl_attr = (gSOM_PwgMgtDIP_Info.som_dip_switch_soft_ctl_attr == SOM_DIP_SWITCH_SOFT_CTL_ENABLE) ? 1 : 0;
+	*p_som_dip_switch_soft_state = 0xF & gSOM_PwgMgtDIP_Info.som_dip_switch_soft_state;
+	esEXIT_CRITICAL(gEEPROM_Mutex);
+
+	return 0;
+}
+
+int es_set_som_dip_switch_soft_state_all(int som_dip_switch_soft_ctl_attr, uint8_t som_dip_switch_soft_state)
+{
+	int som_dip_swtich_soft_ctl_attr_internal_fmt;
+	uint8_t som_dip_switch_soft_state_internal_fmt;
+
+	/* convert to internal ctl attr */
+	if (som_dip_switch_soft_ctl_attr) {
+		som_dip_swtich_soft_ctl_attr_internal_fmt = SOM_DIP_SWITCH_SOFT_CTL_ENABLE;
+	}
+	else {
+		som_dip_swtich_soft_ctl_attr_internal_fmt = SOM_DIP_SWITCH_SOFT_CTL_DISABLE;
+	}
+
+	/* convert to internal soft sate */
+
+	som_dip_switch_soft_state_internal_fmt = 0xE0 | (0xF & som_dip_switch_soft_state);
+
+	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
+	if ((som_dip_swtich_soft_ctl_attr_internal_fmt != gSOM_PwgMgtDIP_Info.som_dip_switch_soft_ctl_attr) ||
+	    (som_dip_switch_soft_state_internal_fmt != gSOM_PwgMgtDIP_Info.som_dip_switch_soft_state)) {
+		gSOM_PwgMgtDIP_Info.som_dip_switch_soft_ctl_attr = som_dip_swtich_soft_ctl_attr_internal_fmt;
+		gSOM_PwgMgtDIP_Info.som_dip_switch_soft_state = som_dip_switch_soft_state_internal_fmt;
+		hf_i2c_mem_write(&hi2c1, AT24C_ADDR, SOM_PWRMGT_DIP_INFO_EEPROM_OFFSET,
+			(uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(SomPwrMgtDIPInfo));
+	}
+	esEXIT_CRITICAL(gEEPROM_Mutex);
+
+	return 0;
+}
+
 #if EEPROM_TEST_DEBUG
 static int es_eeprom_test(void)
 {
@@ -965,6 +1009,7 @@ int es_eeprom_info_test(void)
 	return 0;
 }
 
+
 /**
  * @brief  eic7700 boot sel.
  * @param  sel 4'b, bit3:bootsel3 ,bit2:bootsel2; bit1:bootsel2; bit0:bootsel0
@@ -998,7 +1043,86 @@ void set_bootsel(uint8_t is_soft_crtl, uint8_t sel)
 		GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
 		HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 	}
+}
 
+int get_bootsel(int *pCtl_attr, uint8_t *pSel)
+{
+	uint8_t bootsel = 0;
+
+	es_get_som_dip_switch_soft_state_all(pCtl_attr, pSel);
+
+	/* if it's controlled by hardware, then read the gpio pin */
+	if (*pCtl_attr == 0) {
+		*pSel = 0;
+		uint16_t pin_n = BOOT_SEL0_Pin;
+		for (int i = 0; i < 4; i++) {
+			bootsel = HAL_GPIO_ReadPin(BOOT_SEL0_GPIO_Port, pin_n);
+			*pSel |= (bootsel << i);
+			pin_n = pin_n << 1;
+		}
+	}
+
+	return 0;
+}
+
+/* This API must be called after es_init_info_in_eeprom() */
+int init_bootsel(void)
+{
+	int dip_switch_soft_ctl_attr;
+	uint8_t dip_switch_soft_state;
+
+	es_get_som_dip_switch_soft_state_all(&dip_switch_soft_ctl_attr, &dip_switch_soft_state);
+
+	set_bootsel(dip_switch_soft_ctl_attr, dip_switch_soft_state);
+
+	return 0;
+}
+
+int get_dip_switch(DIPSwitchInfo *dipSwitchInfo)
+{
+	uint8_t som_dip_switch_state;
+
+	get_bootsel(&dipSwitchInfo->swctrl, &som_dip_switch_state);
+
+	dipSwitchInfo->dip01 = 0x1 & som_dip_switch_state;
+	dipSwitchInfo->dip02 = (0x2 & som_dip_switch_state) >> 1;
+	dipSwitchInfo->dip03 = (0x4 & som_dip_switch_state) >> 2;
+	dipSwitchInfo->dip04 = (0x8 & som_dip_switch_state) >> 3;
+
+	return 0;
+}
+
+int set_dip_switch(DIPSwitchInfo dipSwitchInfo)
+{
+	uint8_t som_dip_switch_state;
+	int dip_switch_soft_ctl_attr = 0;
+
+	som_dip_switch_state =  ((0x1 & dipSwitchInfo.dip04) << 3) | ((0x1 & dipSwitchInfo.dip03) << 2)
+				| ((0x1 & dipSwitchInfo.dip02) << 1)| (0x1 & dipSwitchInfo.dip01);
+
+	es_get_som_dip_switch_soft_ctl_attr(&dip_switch_soft_ctl_attr);
+
+	if (dipSwitchInfo.swctrl != dip_switch_soft_ctl_attr) {
+		/* if it's controlled by hardware */
+		if (dipSwitchInfo.swctrl == 0) {
+			set_bootsel(0, 0);
+			es_set_som_dip_switch_soft_ctl_attr(0);
+		}
+		else {
+			set_bootsel(1, som_dip_switch_state);
+			es_set_som_dip_switch_soft_state_all(dipSwitchInfo.swctrl, som_dip_switch_state);
+		}
+	}
+	else {
+		/* if it's controlled by software */
+		if (dipSwitchInfo.swctrl == 1) {
+			set_bootsel(1, som_dip_switch_state);
+			/* since ctl attr is not changed, only needs to update software state */
+			es_set_som_dip_switch_soft_state(som_dip_switch_state);
+		}
+	}
+
+	return 0;
 }
 
 int32_t es_set_rtc_date(struct rtc_date_t *sdate)

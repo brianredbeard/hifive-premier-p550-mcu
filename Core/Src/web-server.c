@@ -10522,35 +10522,6 @@ int get_pvt_info(PVTInfo *ppvtInfo)
 	return ret;
 }
 
-typedef struct {
-    int dip01;//0 on,1 off
-    int dip02;
-    int dip03;
-	int dip04;
-	int swctrl;//0 hw,1,sw
-} DIPSwitchInfo;
-
-int get_dip_switch(DIPSwitchInfo *dipSwitchInfo)
-{
-	uint8_t som_dip_switch_state;
-	es_get_som_dip_switch_soft_state(&som_dip_switch_state);
-	dipSwitchInfo->dip01 = 0x1 & som_dip_switch_state;
-	dipSwitchInfo->dip02 = (0x2 & som_dip_switch_state) >> 1;
-	dipSwitchInfo->dip03 = (0x4 & som_dip_switch_state) >> 2;
-	dipSwitchInfo->dip04 = (0x8 & som_dip_switch_state) >> 3;
-	return 0;
-}
-
-int set_dip_switch(DIPSwitchInfo dipSwitchInfo)
-{
-	uint8_t som_dip_switch_state;
-
-	som_dip_switch_state =  ((0x1 & dipSwitchInfo.dip04) << 3) | ((0x1 & dipSwitchInfo.dip03) << 2)
-				| ((0x1 & dipSwitchInfo.dip02) << 1)| (0x1 & dipSwitchInfo.dip01);
-	es_set_som_dip_switch_soft_ctl_attr(dipSwitchInfo.swctrl);
-	return es_set_som_dip_switch_soft_state(som_dip_switch_state);
-}
-
 int get_som_info(som_info *psomInfo)
 {
 	int ret = HAL_OK;
