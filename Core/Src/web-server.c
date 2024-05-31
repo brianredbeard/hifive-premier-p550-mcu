@@ -9284,7 +9284,7 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
 																	$('#cpu_temp').val(cpu_temp.toFixed(2));\n \
 																	var npu_temp = parseFloat(response.data.npu_temp)/ 1000; \n \
 																	$('#npu_temp').val(npu_temp.toFixed(2));\n \
-																	var fan_speed = parseFloat(response.data.fan_speed) \n \
+																	var fan_speed = parseFloat(response.data.fan_speed); \n \
 																	$('#fan_speed').val(fan_speed);\n \
 																}\n \
                                                                 console.log('pvt info refreshed successfully.');\n \
@@ -9303,24 +9303,23 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
 													function toggleDipRadios(isEnabled) {\n \
 														$dipRadios.prop('disabled', !isEnabled);\n \
 													}\n \
-													$('#dip-switch-refresh-hid').click(function() {\n \
+													$('#dip-switch-show-refresh-hid').click(function() {\n \
                                                         $.ajax({\n \
 															async: false,\n \
                                                             url: '/dip_switch',\n \
                                                             type: 'GET',\n \
 															data: {\n \
-                                                                byhand: $('#dip-switch-refresh-hid').val(),\n \
+                                                                byhand: $('#dip-switch-show-refresh-hid').val(),\n \
                                                             },\
 															contentType: 'application/x-www-form-urlencoded', \n \
                                                             success: function(response) {\n \
 																if(response.status===0){\n \
-																	$('input[name=\"dip01\"][value=\"' + response.data.dip01 + '\"]').prop('checked', true);\n \
-																	$('input[name=\"dip02\"][value=\"' + response.data.dip02 + '\"]').prop('checked', true);\n \
-																	$('input[name=\"dip03\"][value=\"' + response.data.dip03 + '\"]').prop('checked', true);\n \
-																	$('input[name=\"dip04\"][value=\"' + response.data.dip04 + '\"]').prop('checked', true);\n \
-																	$('input[name=\"swctrl\"][value=\"' + response.data.swctrl + '\"]').prop('checked', true);\n \
+																	$('input[name=\"dip01-show\"][value=\"' + response.data.dip01 + '\"]').prop('checked', true);\n \
+																	$('input[name=\"dip02-show\"][value=\"' + response.data.dip02 + '\"]').prop('checked', true);\n \
+																	$('input[name=\"dip03-show\"][value=\"' + response.data.dip03 + '\"]').prop('checked', true);\n \
+																	$('input[name=\"dip04-show\"][value=\"' + response.data.dip04 + '\"]').prop('checked', true);\n \
+																	$('input[name=\"swctrl-show\"][value=\"' + response.data.swctrl + '\"]').prop('checked', true);\n \
 																} \n \
-																toggleDipRadios($('input[name=\"swctrl\"]').val() === '1');\n \
                                                                 console.log('dip_switch refreshed successfully.');\n \
                                                             },\n \
                                                             error: function(xhr, status, error) {\n \
@@ -9328,10 +9327,18 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
                                                             }\n \
                                                         });\n\
                                                     });\n\
-													$('#dip-switch-refresh').click(function() { \n \
-                                                        $('#dip-switch-refresh-hid').val(\"1\"); \n \
-														$('#dip-switch-refresh-hid').click(); \n \
-														$('#dip-switch-refresh-hid').val(\"0\"); \n \
+													$('#dip-switch-refresh-hid').click(function() {//refresh value from server \n \
+														$('input[name=\"swctrl\"][value=\"' + $('input[name=\"swctrl-show\"]:checked').val() + '\"]').prop('checked', true);\n \
+														$('input[name=\"dip01\"][value=\"' + $('input[name=\"dip01-show\"]:checked').val() + '\"]').prop('checked', true);\n \
+                                                        $('input[name=\"dip02\"][value=\"' + $('input[name=\"dip02-show\"]:checked').val() + '\"]').prop('checked', true);\n \
+														$('input[name=\"dip03\"][value=\"' + $('input[name=\"dip03-show\"]:checked').val() + '\"]').prop('checked', true);\n \
+														$('input[name=\"dip04\"][value=\"' + $('input[name=\"dip04-show\"]:checked').val() + '\"]').prop('checked', true);\n \
+														toggleDipRadios($('input[name=\"swctrl\"]:checked').val() === '1');\n \
+                                                    });\n\
+													$('#dip-switch-show-refresh').click(function() { \n \
+                                                        $('#dip-switch-show-refresh-hid').val(\"1\"); \n \
+														$('#dip-switch-show-refresh-hid').click(); \n \
+														$('#dip-switch-show-refresh-hid').val(\"0\"); \n \
                                                     }); \n \
 													$('#dip-switch-update').click(function() { \n \
                                                         var dip01 = $('input[name=\"dip01\"]:checked').val(); \n \
@@ -9356,11 +9363,12 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
                                                                 }else{\n \
                                                                     alert(response.message);\n \
                                                                 }\n \
-                                                                console.log('Network settings updated successfully.');\n \
+                                                                console.log('dip-switch settings updated successfully.');\n \
+																$('#dip-switch-show-refresh-hid').click(); \n \
                                                             },\n \
                                                             error: function(xhr, status, error) {\n \
                                                                 alert(\"udpate failed!\");\n \
-                                                                console.error('Error updating network settings:', error);\n \
+                                                                console.error('Error updating dip-switch settings:', error);\n \
                                                             }\n \
                                                         });\n \
                                                     });\n \
@@ -9614,7 +9622,7 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
 														$('#soc-refresh-hid').val(\"0\"); \n \
                                                     }); \n \
 													$('input[name=\"swctrl\"]').change(function() {\n \
-														toggleDipRadios($(this).val() === '1');\n \
+														toggleDipRadios($(this).val() === '1');//select button is sw and last dip-switch data is sw data \n \
 													});\n \
 													$('#logoutForm').submit(function(event) { \n \
 														event.preventDefault();  \n \
@@ -9640,6 +9648,7 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
 													$('#power-lostresume-refresh-hid').click(); \n \
 													$('#power-consum-refresh-hid').click(); \n \
 													$('#pvt-info-refresh-hid').click(); \n \
+													$('#dip-switch-show-refresh-hid').click(); \n \
 													$('#dip-switch-refresh-hid').click(); \n \
    													$('#net-work-refresh-hid').click(); \n \
 													$('#board-info-som-refresh').click(); \n \
@@ -9652,11 +9661,11 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
 													setInterval(function() {\n \
 														$('#power-consum-refresh-hid').click(); \n \
 														$('#rtc-refresh-hid').click(); \n \
-													}, 1*60*1000); \n \
+													}, 1*60*1000+400); \n \
 													setInterval(function() {\n \
 														$('#pvt-info-refresh-hid').click(); \n \
    														$('#net-work-refresh-hid').click(); \n \
-													}, 3*60*1000); \n \
+													}, 3*60*1000+700); \n \
 													setInterval(function() {\n \
 														$('#power-on-refresh-hid').click(); \n \
 														$('#soc-refresh-hid').click(); \n \
@@ -9683,6 +9692,12 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
 												width: 220px; \
 											} \
 											.network-roww {\
+												display: flex;\
+												justify-content: space-between;\
+												width: 400px;\
+												margin-bottom: 10px;\
+											}\
+											.network-roww-show {\
 												display: flex;\
 												justify-content: space-between;\
 												width: 400px;\
@@ -9792,39 +9807,76 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
                                         </div> \
 										 <div class=\"dip-switch\" > \
                                             <h3>DIP Switch</h3> \
-											<label>Config:</label> \
-											<div class=\"network-roww label-row\">\
-												<label>dip0</label>\
-												<label>dip1</label>\
-												<label>dip2</label>\
+											<label  style=\"font-family: 'Arial Black', sans-serif; font-weight: bold;\">&nbsp;&nbsp;Current Status:</label> \
+											<div  class=\"network-row\"> \
+												<label>Software/Hardware Ctrl:</label> \
+												<input type=\"radio\" name=\"swctrl-show\" value=\"0\" id=\"swctrl-show-false\" disabled><label for=\"swctrl-show-false\">HardWare</label> \
+												<input type=\"radio\" name=\"swctrl-show\" value=\"1\" id=\"swctrl-show-true\" disabled><label for=\"swctrl-show-true\">SoftWare</label> \
+											</div> \
+											<div class=\"network-roww-show label-row\">\
 												<label>dip3</label>\
+												<label>dip2</label>\
+												<label>dip1</label>\
+												<label>dip0</label>\
 											</div>\
-											<div class=\"network-roww option-row on-row\">\
-												<input type=\"radio\" name=\"dip01\" value=\"0\" id=\"dip01-true\">\
-												<label for=\"dip01-true\">ON</label>\
-												<input type=\"radio\" name=\"dip02\" value=\"0\" id=\"dip02-true\">\
-												<label for=\"dip02-true\">ON</label>\
-												<input type=\"radio\" name=\"dip03\" value=\"0\" id=\"dip03-true\">\
-												<label for=\"dip03-true\">ON</label>\
-												<input type=\"radio\" name=\"dip04\" value=\"0\" id=\"dip04-true\">\
-												<label for=\"dip04-true\">ON</label>\
+											<div class=\"network-roww-show option-row on-row\">\
+												<input type=\"radio\" name=\"dip04-show\" value=\"0\" id=\"dip04-show-true\"  disabled>\
+												<label for=\"dip04-show-true\">ON</label>\
+												<input type=\"radio\" name=\"dip03-show\" value=\"0\" id=\"dip03-show-true\" disabled>\
+												<label for=\"dip03-show-true\">ON</label>\
+												<input type=\"radio\" name=\"dip02-show\" value=\"0\" id=\"dip02-show-true\" disabled>\
+												<label for=\"dip02-show-true\">ON</label>\
+												<input type=\"radio\" name=\"dip01-show\" value=\"0\" id=\"dip01-show-true\" disabled>\
+												<label for=\"dip01-show-true\">ON</label>\
 											</div>\
-											<div class=\"network-roww option-row off-row\">\
-												<input type=\"radio\" name=\"dip01\" value=\"1\" id=\"dip01-false\">\
-												<label for=\"dip01-false\">OFF</label>\
-												<input type=\"radio\" name=\"dip02\" value=\"1\" id=\"dip02-false\">\
-												<label for=\"dip02-false\">OFF</label>\
-												<input type=\"radio\" name=\"dip03\" value=\"1\" id=\"dip03-false\">\
-												<label for=\"dip03-false\">OFF</label>\
-												<input type=\"radio\" name=\"dip04\" value=\"1\" id=\"dip04-false\">\
-												<label for=\"dip04-false\">OFF</label>\
+											<div class=\"network-roww-show option-row off-row\">\
+												<input type=\"radio\" name=\"dip04-show\" value=\"1\" id=\"dip04-show-false\" disabled>\
+												<label for=\"dip04-show-false\">OFF</label>\
+												<input type=\"radio\" name=\"dip03-show\" value=\"1\" id=\"dip03-show-false\" disabled>\
+												<label for=\"dip03-show-false\">OFF</label>\
+												<input type=\"radio\" name=\"dip02-show\" value=\"1\" id=\"dip02-show-false\" disabled>\
+												<label for=\"dip02-show-false\">OFF</label>\
+												<input type=\"radio\" name=\"dip01-show\" value=\"1\" id=\"dip01-show-false\" disabled>\
+												<label for=\"dip01-show-false\">OFF</label>\
 											</div>\
+                                            <button id=\"dip-switch-show-refresh\">refresh</button> \
+											<button id=\"dip-switch-show-refresh-hid\" value=\"0\" style=\"display:none;\">refresh</button> \
+											<br> \
+											<label>====================================</label> \
+											<br> \
+											<label  style=\"font-family: 'Arial Black', sans-serif; font-weight: bold;\">&nbsp;&nbsp;Update Config:</label> \
 											<div  class=\"network-row\"> \
 												<label>Software/Hardware Ctrl:</label> \
 												<input type=\"radio\" name=\"swctrl\" value=\"0\" id=\"swctrl-false\"><label for=\"swctrl-false\">HardWare</label> \
 												<input type=\"radio\" name=\"swctrl\" value=\"1\" id=\"swctrl-true\"><label for=\"swctrl-true\">SoftWare</label> \
 											</div> \
-                                            <button id=\"dip-switch-refresh\">refresh</button> <button id=\"dip-switch-update\">update</button> \
+											<div class=\"network-roww label-row\">\
+												<label>dip3</label>\
+												<label>dip2</label>\
+												<label>dip1</label>\
+												<label>dip0</label>\
+											</div>\
+											<div class=\"network-roww option-row on-row\">\
+												<input type=\"radio\" name=\"dip04\" value=\"0\" id=\"dip04-true\">\
+												<label for=\"dip04-true\">ON</label>\
+												<input type=\"radio\" name=\"dip03\" value=\"0\" id=\"dip03-true\">\
+												<label for=\"dip03-true\">ON</label>\
+												<input type=\"radio\" name=\"dip02\" value=\"0\" id=\"dip02-true\">\
+												<label for=\"dip02-true\">ON</label>\
+												<input type=\"radio\" name=\"dip01\" value=\"0\" id=\"dip01-true\">\
+												<label for=\"dip01-true\">ON</label>\
+											</div>\
+											<div class=\"network-roww option-row off-row\">\
+												<input type=\"radio\" name=\"dip04\" value=\"1\" id=\"dip04-false\">\
+												<label for=\"dip04-false\">OFF</label>\
+												<input type=\"radio\" name=\"dip03\" value=\"1\" id=\"dip03-false\">\
+												<label for=\"dip03-false\">OFF</label>\
+												<input type=\"radio\" name=\"dip02\" value=\"1\" id=\"dip02-false\">\
+												<label for=\"dip02-false\">OFF</label>\
+												<input type=\"radio\" name=\"dip01\" value=\"1\" id=\"dip01-false\">\
+												<label for=\"dip01-false\">OFF</label>\
+											</div>\
+											<button id=\"dip-switch-update\">update</button> \
 											<button id=\"dip-switch-refresh-hid\" value=\"0\" style=\"display:none;\">refresh</button> \
                                         </div> \
                                         <div class=\"net-work\" > \
