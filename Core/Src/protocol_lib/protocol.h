@@ -12,7 +12,7 @@
 #define MAX_FRAME_LEN 32
 
 typedef struct {
-	const uint8_t *pname;
+	const char *pname;
 	uint16_t head_len;
 	uint16_t end_len;
 	const char *head;

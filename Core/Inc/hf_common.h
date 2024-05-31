@@ -198,7 +198,7 @@ extern UART_HandleTypeDef huart3;
 #define MIN(x , y)  (((x) < (y)) ? (x) : (y))
 /* define ------------------------------------------------------------*/
 #define BMC_SOFTWARE_VERSION_MAJOR                   1
-#define BMC_SOFTWARE_VERSION_MINOR                   0
+#define BMC_SOFTWARE_VERSION_MINOR                   1
 
 #define MAGIC_NUMBER	0xF15E5045
 

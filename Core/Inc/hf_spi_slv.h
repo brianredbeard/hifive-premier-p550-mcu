@@ -17,6 +17,7 @@
 
 int es_spi_write(uint8_t *buf, uint64_t addr, int len);
 int es_spi_read(uint8_t *dst, uint64_t src, int len);
+int eswin_rx(uint8_t *rcvBuf, uint64_t addr, int len);
 
 #ifdef __cplusplus
 }

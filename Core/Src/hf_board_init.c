@@ -105,7 +105,7 @@ void uart_init(USART_TypeDef *Instance)
 	if (Instance == UART4) {
 		MX_UART4_Init();
 		//trigger uart rx
-		HAL_UARTEx_ReceiveToIdle_DMA(&huart4, (int8_t *)&UART4_RxMsg,
+		HAL_UARTEx_ReceiveToIdle_DMA(&huart4, (uint8_t *)&UART4_RxMsg,
 			sizeof(UART4_RxMsg));
 	}
 	else if (Instance == USART6)

@@ -101,7 +101,7 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 				printf("[%s %d]: xUart4MsgQueue is full, drop the msg!\n", __func__, __LINE__);
 			}
 			memset(&UART4_RxMsg, 0, sizeof(UART4_RxMsg) / sizeof(uint8_t));
-			HAL_UARTEx_ReceiveToIdle_DMA(&huart4, (int8_t *)&UART4_RxMsg, sizeof(UART4_RxMsg));
+			HAL_UARTEx_ReceiveToIdle_DMA(&huart4, (uint8_t *)&UART4_RxMsg, sizeof(UART4_RxMsg));
 			// If xHigherPriorityTaskWoken was set to true, there may be a higher priority task that can run now.
 			if (xHigherPriorityTaskWoken) {
 				// Force a context switch if xHigherPriorityTaskWoken is now set to pdTRUE.

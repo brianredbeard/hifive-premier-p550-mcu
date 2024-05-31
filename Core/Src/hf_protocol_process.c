@@ -10,6 +10,7 @@
 #include "queue.h"
 #include "semphr.h"
 #include "timers.h"
+#include "hf_spi_slv.h"
 
 #define head_meg "\xA5\x5A\xAA\x55"
 #define end_msg "\x0D\x0A\x0D\x0A"
@@ -21,7 +22,7 @@ extern uint8_t netmask_address[4];
 extern uint8_t getway_address[4];
 extern uint8_t mac_address[6];
 
-void es_send_req(b_frame_class_t *pframe,uint8_t req_cmd, int8_t *frame_data,uint8_t len)
+void es_send_req(b_frame_class_t *pframe,uint8_t req_cmd, char *frame_data,uint8_t len)
 {
 	uint8_t buf[MAX_FRAME_LEN] = {0};
 	uint8_t b_len, xor = 0;
@@ -91,7 +92,7 @@ int32_t es_set_eth(struct ip_t *ip, struct netmask_t *netmask, struct getway_t *
 		ip_address[1] = ip->ip_addr1;
 		ip_address[2] = ip->ip_addr2;
 		ip_address[3] = ip->ip_addr3;
-		// printf("IP_ADDR0:%d IP_ADDR1: %d IP_ADDR2: %d IP_ADDR3 %d\n", \
+		// printf("IP_ADDR0:%d IP_ADDR1: %d IP_ADDR2: %d IP_ADDR3 %d\n",
 		// 	ip_address[0], ip_address[1], ip_address[2], ip_address[3]);
 	}
 	if (netmask != NULL) {
@@ -217,19 +218,19 @@ int32_t es_spi_wl(struct spi_slv_w32_t *spi)
 {
 	uint32_t addr = 0;
 	uint32_t value = 0;
-	big2little(&addr, spi->addr, 4);
-	big2little(&value, spi->value, 4);
+	big2little((uint8_t *)&addr, spi->addr, 4);
+	big2little((uint8_t *)&value, spi->value, 4);
 	// printf("%s %d addr %lx val %lx\n",__func__,__LINE__, addr, value);
-	return es_spi_write(&value, addr, 4);
+	return es_spi_write((uint8_t *)&value, addr, 4);
 }
 
 int32_t es_spi_rl32(struct spi_slv_w32_t *spi)
 {
 	uint32_t addr=0, value=0;
 	int32_t ret = 0;
-	big2little(&addr, spi->addr, 4);
-	ret = eswin_rx(&value, addr, 4);
-	little2big(&spi->value, value,4);
+	big2little((uint8_t *)&addr, spi->addr, 4);
+	ret = eswin_rx((uint8_t *)&value, addr, 4);
+	little2big((uint8_t *)&spi->value, value,4);
 	return ret;
 }
 
@@ -280,7 +281,7 @@ void es_process_cmd(b_frame_class_t *pframe)
 		break;
 	case CMD_SET_TIME:
 		if (pframe->frame.len == sizeof(struct rtc_time_t)) {
-			if (es_set_rtc_time(&pframe->frame.data.rtc_date) == HAL_OK)
+			if (es_set_rtc_time(&pframe->frame.data.rtc_time) == HAL_OK)
 				req_type = REQ_OK;
 		}
 		break;
@@ -300,28 +301,28 @@ void es_process_cmd(b_frame_class_t *pframe)
 		if (pframe->frame.len == 0) {
 			if (es_get_rtc_date(&pframe->frame.data.rtc_date) == HAL_OK)
 			{
-				es_send_req(pframe, CMD_GET_DATE, &pframe->frame.data.rtc_date, sizeof(struct rtc_date_t));
+				es_send_req(pframe, CMD_GET_DATE, (char *)&pframe->frame.data.rtc_date, sizeof(struct rtc_date_t));
 				req_type = REQ_OTHER;
 			}
 		}
-		// printf("yy/mm/dd  %02d/%02d/%02d %02d\r\n", 2000 + pframe->frame.data.rtc_date.Year, pframe->frame.data.rtc_date.Month, \
-				pframe->frame.data.rtc_date.Date, pframe->frame.data.rtc_date.WeekDay);
+		// printf("yy/mm/dd  %02d/%02d/%02d %02d\r\n", 2000 + pframe->frame.data.rtc_date.Year, pframe->frame.data.rtc_date.Month,
+				// pframe->frame.data.rtc_date.Date, pframe->frame.data.rtc_date.WeekDay);
 		break;
 	case CMD_GET_TIME:
 		if (pframe->frame.len == 0) {
 			if (es_get_rtc_time(&pframe->frame.data.rtc_time) == HAL_OK) {
-				es_send_req(pframe, CMD_GET_TIME, &pframe->frame.data.rtc_time, sizeof(struct rtc_time_t));
+				es_send_req(pframe, CMD_GET_TIME, (char *)&pframe->frame.data.rtc_time, sizeof(struct rtc_time_t));
 				req_type = REQ_OTHER;
 			}
 		}
-		// printf(" hh:mm:ss %02d:%02d:%02d\r\n", pframe->frame.data.rtc_time.Hours,\
-						pframe->frame.data.rtc_time.Minutes, pframe->frame.data.rtc_time.Seconds);
+		// printf(" hh:mm:ss %02d:%02d:%02d\r\n", pframe->frame.data.rtc_time.Hours,
+						// pframe->frame.data.rtc_time.Minutes, pframe->frame.data.rtc_time.Seconds);
 		break;
 	case CMD_GET_FAN_DUTY:
 		printf("len %xuint8_t\n",pframe->frame.len);
 		if (pframe->frame.len == sizeof(uint8_t)) {
 			if (es_get_fan_duty(&pframe->frame.data.fan) == HAL_OK){
-				es_send_req(pframe, CMD_GET_FAN_DUTY, &pframe->frame.data.fan, sizeof(struct fan_control_t));
+				es_send_req(pframe, CMD_GET_FAN_DUTY, (char *)&pframe->frame.data.fan, sizeof(struct fan_control_t));
 				req_type = REQ_OTHER;
 			}
 		}
@@ -329,7 +330,7 @@ void es_process_cmd(b_frame_class_t *pframe)
 	case CMD_SPI_SLV_RL:
 		if (pframe->frame.len == sizeof(uint32_t)) {
 			if (es_spi_rl32(&pframe->frame.data.spislv32) == HAL_OK) {
-				es_send_req(pframe, CMD_SPI_SLV_RL, &pframe->frame.data.spislv32.value, sizeof(uint32_t));
+				es_send_req(pframe, CMD_SPI_SLV_RL, (char *)&pframe->frame.data.spislv32.value, sizeof(uint32_t));
 				req_type = REQ_OTHER;
 			}
 		}

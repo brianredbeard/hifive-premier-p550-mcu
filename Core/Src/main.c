@@ -74,16 +74,8 @@ const osThreadAttr_t http_task_attributes = {
   .priority = (osPriority_t) osPriorityNormal,
 };
 
-osThreadId_t moniter_task_handle;
-const osThreadAttr_t MoniterTask_attributes = {
-  .name = "MoniterTask",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityNormal,
-};
-
 /* Private function prototypes -----------------------------------------------*/
 void hf_main_task(void *argument);
-void MoniterTask(void *argument);
 void protocol_task(void *argument);
 void uart4_protocol_task(void *argument);
 void deamon_keeplive_task(void *argument);
@@ -167,7 +159,6 @@ void hf_main_task(void *argument)
   power_task_handle = osThreadNew(hf_power_task, NULL, &power_task_attributes);
   http_task_handle = osThreadNew(hf_http_task, NULL, &http_task_attributes);
   key_task_handle = osThreadNew(hf_gpio_task, NULL, &gpio_task_attributes);
-  // moniter_task_handle = osThreadNew(MoniterTask, NULL, &MoniterTask_attributes);
   uart4_protocol_task_handle = osThreadNew(uart4_protocol_task, NULL, &protocol_task_attributes);
   daemon_keelive_task_handle = osThreadNew(deamon_keeplive_task, NULL, &daemon_keeplive_task_attributes);
   #if ES_PRODUCTION_LINE_TEST
@@ -239,46 +230,3 @@ void get_rtc_info(void)
 
 }
 
-void MoniterTask(void *argument)
-{
-  TaskStatus_t *StatusArray;
-  UBaseType_t task_num;
-  uint32_t TotalRunTime;
-  TaskHandle_t TaskHandle;
-  TaskStatus_t TaskStatus;
-
-  osDelay(9000);
-  for(;;)
-  {
-    task_num = uxTaskGetNumberOfTasks();
-    printf("\nuxTaskGetNumberOfTasks %ld\r\n", task_num);
-
-    StatusArray = pvPortMalloc(task_num*sizeof(TaskStatus_t));
-    if(StatusArray!=NULL)
-    {
-        uxTaskGetSystemState((TaskStatus_t*   )StatusArray,
-                                      (UBaseType_t     )task_num,
-                                      (uint32_t*       )&TotalRunTime);
-        printf("\nTaskName\t\tPriority\t\tTaskNumber\t\t\r\n");
-        for(uint32_t x=0;x < task_num;x++)
-        {
-              TaskHandle = xTaskGetHandle(StatusArray[x].pcTaskName);
-
-              vTaskGetInfo((TaskHandle_t  )TaskHandle,
-                          (TaskStatus_t* )&TaskStatus,
-                          (BaseType_t    )pdTRUE,
-                          (eTaskState    )eInvalid);
-
-              printf("task name:                %s\r\n",TaskStatus.pcTaskName);
-              printf("task number:              %d\r\n",(int)TaskStatus.xTaskNumber);
-              printf("task state:              %d\r\n",TaskStatus.eCurrentState);
-              printf("task run time:             %d\r\n",(int)TaskStatus.ulRunTimeCounter);
-              printf("task stack base:        %#x\r\n",(int)TaskStatus.pxStackBase);
-              printf("stack high water mark: %d\r\n",TaskStatus.usStackHighWaterMark);
-        }
-    }
-    vPortFree(StatusArray);
-    osDelay(5000);
-
-  }
-}

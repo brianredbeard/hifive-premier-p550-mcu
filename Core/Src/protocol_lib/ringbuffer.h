@@ -26,7 +26,7 @@ int32_t get_ring_buf_free_space(ring_buf_t *r);
 int32_t write_ring_buf(ring_buf_t *r, uint8_t *pBuff, uint32_t len);
 int32_t read_ring_buf(ring_buf_t *r, uint8_t *pBuff, uint32_t len);
 uint32_t ring_buf_check_get(ring_buf_t *r, uint8_t *buf, uint32_t len);
-uint32_t ring_buf_clr_len(ring_buf_t *r, uint32_t len);
+int ring_buf_clr_len(ring_buf_t *r, uint32_t len);
 
 #ifdef __cplusplus
 }
