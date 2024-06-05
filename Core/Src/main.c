@@ -126,17 +126,16 @@ int main(void)
 }
 static void mcu_status_led_on(uint8_t turnon)
 {
-	if (HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_4) != HAL_OK) {
-		printf("HAL_TIM_PWM_Start(&htim4,TIM_CHANNEL_4) err\n");
-		Error_Handler();
-	}
+  if (HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_4) != HAL_OK) {
+    printf("HAL_TIM_PWM_Start(&htim4,TIM_CHANNEL_4) err\n");
+    Error_Handler();
+  }
 }
 /**
   * @brief  Function implementing the defaultTask thread.
   * @param  argument: Not used
   * @retval None
   */
-extern void get_rtc_info(void);
 extern void hf_power_task (void* parameter);
 extern void hf_gpio_task (void* parameter);
 
@@ -169,64 +168,12 @@ void hf_main_task(void *argument)
   }
   #endif
   // extern void MX_IWDG_Init(void);
-	// MX_IWDG_Init();
+  // MX_IWDG_Init();
 
-  // mcu_status_led_on(pdTRUE);
-  // extern uint32_t PWM2_T_Count;
-  // extern uint32_t PWM2_D_Count;
-  // uint32_t uiFrequency;
 
   for(;;)
   {
-		// uiFrequency = 1000000 / PWM2_D_Count;
-		// printf("占空:%dus    周期:%dus    频率:%dHz    \r\n", PWM2_T_Count, PWM2_D_Count, uiFrequency);
-    // PWM2_T_Count = 0;
-    // PWM2_D_Count = 0;
-    // uiFrequency = 0;
     // HAL_IWDG_Refresh(&hiwdg);
-    // get_rtc_info();
     osDelay(800);
   }
 }
-
-void fan_info(void)
-{
-  if (HAL_TIM_PWM_Start(&htim4,TIM_CHANNEL_1) != HAL_OK)
-	{
-	  printf("HAL_TIM_PWM_Start(&htim4,TIM_CHANNEL_1) err\n");
-	  Error_Handler();
-	}
-	if (HAL_TIM_PWM_Start(&htim4,TIM_CHANNEL_2) != HAL_OK)
-	{
-	  printf("HAL_TIM_PWM_Start(&htim4,TIM_CHANNEL_2) err\n");
-	  Error_Handler();
-	}
-
-  if (HAL_TIM_IC_Start_IT(&htim5,TIM_CHANNEL_1) != HAL_OK)
-	{
-	  printf("HAL_TIM_IC_Start(&htim5,TIM_CHANNEL_1) err\n");
-	  Error_Handler();
-	}
-	if (HAL_TIM_IC_Start_IT(&htim5,TIM_CHANNEL_2) != HAL_OK)
-	{
-		printf("HAL_TIM_IC_Start(&htim5,TIM_CHANNEL_2) err\n");
-		Error_Handler();
-	}
-}
-
-void get_rtc_info(void)
-{
-  RTC_DateTypeDef GetData;
-  RTC_TimeTypeDef GetTime;
-  HAL_RTC_GetTime(&hrtc, &GetTime, RTC_FORMAT_BIN);
-  /* Get the RTC current Date */
-  HAL_RTC_GetDate(&hrtc, &GetData, RTC_FORMAT_BIN);
-
-  /* Display date Format : yy/mm/dd */
-  printf("%s yy/mm/dd  %02d/%02d/%02d\r\n", __func__, 2000 + GetData.Year, GetData.Month, GetData.Date);
-  /* Display time Format : hh:mm:ss */
-  printf("%s hh:mm:ss %02d:%02d:%02d\r\n", __func__, GetTime.Hours, GetTime.Minutes, GetTime.Seconds);
-
-
-}
-

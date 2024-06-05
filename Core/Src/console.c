@@ -638,15 +638,15 @@ static BaseType_t prvCommandNetInfoGet(char *pcWriteBuffer, size_t xWriteBufferL
 */
 static BaseType_t prvCommandIPSet(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString)
 {
-	uint32_t naddr;
+    uint32_t naddr;
     const char * pcIPaddr;
     BaseType_t xParamLen;
 
     pcIPaddr = FreeRTOS_CLIGetParameter(pcCommandString, 1, &xParamLen);
 
-	/* set ipaddr */
-	naddr = ipaddr_addr(pcIPaddr);
-	es_set_mcu_ipaddr((uint8_t *)&naddr);
+    /* set ipaddr */
+    naddr = ipaddr_addr(pcIPaddr);
+    es_set_mcu_ipaddr((uint8_t *)&naddr);
 
     snprintf(pcWriteBuffer, xWriteBufferLen, "ip addr set to %s(0x%lx)\r\n", pcIPaddr, naddr);
 
@@ -663,15 +663,15 @@ static BaseType_t prvCommandIPSet(char *pcWriteBuffer, size_t xWriteBufferLen, c
 */
 static BaseType_t prvCommandNetMaskSet(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString)
 {
-	uint32_t naddr;
+    uint32_t naddr;
     const char * pcIPaddr;
     BaseType_t xParamLen;
 
     pcIPaddr = FreeRTOS_CLIGetParameter(pcCommandString, 1, &xParamLen);
 
-	/* set ipaddr */
-	naddr = ipaddr_addr(pcIPaddr);
-	es_set_mcu_netmask((uint8_t *)&naddr);
+    /* set ipaddr */
+    naddr = ipaddr_addr(pcIPaddr);
+    es_set_mcu_netmask((uint8_t *)&naddr);
 
     snprintf(pcWriteBuffer, xWriteBufferLen, "netmask addr set to %s(0x%lx)\r\n", pcIPaddr, naddr);
 
@@ -688,15 +688,15 @@ static BaseType_t prvCommandNetMaskSet(char *pcWriteBuffer, size_t xWriteBufferL
 */
 static BaseType_t prvCommandGateWaySet(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString)
 {
-	uint32_t naddr;
+    uint32_t naddr;
     const char * pcIPaddr;
     BaseType_t xParamLen;
 
     pcIPaddr = FreeRTOS_CLIGetParameter(pcCommandString, 1, &xParamLen);
 
-	/* set ipaddr */
-	naddr = ipaddr_addr(pcIPaddr);
-	es_set_mcu_gateway((uint8_t *)&naddr);
+    /* set ipaddr */
+    naddr = ipaddr_addr(pcIPaddr);
+    es_set_mcu_gateway((uint8_t *)&naddr);
 
     snprintf(pcWriteBuffer, xWriteBufferLen, "gateway addr set to %s(0x%lx)\r\n", pcIPaddr, naddr);
 
@@ -715,7 +715,7 @@ static BaseType_t prvCommandMacSet(char *pcWriteBuffer, size_t xWriteBufferLen, 
 {
     const char * pcMACaddr;
     BaseType_t xParamLen;
-	uint8_t mac[6];
+    uint8_t mac[6];
 
     pcMACaddr = FreeRTOS_CLIGetParameter(pcCommandString, 1, &xParamLen);
 
@@ -855,12 +855,12 @@ static BaseType_t prvCommandHeap(char *pcWriteBuffer, size_t xWriteBufferLen, co
 */
 static BaseType_t prvCommandRtcGet(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString)
 {
-	struct rtc_date_t date = {0};
-	struct rtc_time_t time = {0};
+    struct rtc_date_t date = {0};
+    struct rtc_time_t time = {0};
     char cWeekDay[4] = {0};
 
-	es_get_rtc_date(&date);
-	es_get_rtc_time(&time);
+    es_get_rtc_date(&date);
+    es_get_rtc_time(&time);
 
     switch (date.WeekDay)
     {
@@ -998,16 +998,16 @@ static BaseType_t prvCommandTempGet(char *pcWriteBuffer, size_t xWriteBufferLen,
 */
 static BaseType_t prvCommandPwrDissipationGet(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString)
 {
-	uint32_t millivolt = 0, milliCur = 0, microWatt = 0; //millivolt, milliCurrent, milliwatt
-	power_info power_info = {0};
+    uint32_t millivolt = 0, milliCur = 0, microWatt = 0; //millivolt, milliCurrent, milliwatt
+    power_info power_info = {0};
 
-	power_info = get_power_info();
-	millivolt = power_info.voltage;
-	milliCur = power_info.current;
-	microWatt = power_info.consumption;
-	snprintf(pcWriteBuffer, xWriteBufferLen,"consumption:%ld.%3.3ld(W)  voltage:%ld.%03ld(V)  current:%ld.%03ld(A)\n",
-		microWatt / 1000000, microWatt % 1000000, millivolt / 1000, millivolt % 1000, milliCur / 1000, milliCur % 1000);
-	return pdFALSE;
+    power_info = get_power_info();
+    millivolt = power_info.voltage;
+    milliCur = power_info.current;
+    microWatt = power_info.consumption;
+    snprintf(pcWriteBuffer, xWriteBufferLen,"consumption:%ld.%3.3ld(W)  voltage:%ld.%03ld(V)  current:%ld.%03ld(A)\n",
+        microWatt / 1000000, microWatt % 1000000, millivolt / 1000, millivolt % 1000, milliCur / 1000, milliCur % 1000);
+    return pdFALSE;
 }
 
 
@@ -1236,7 +1236,7 @@ static HAL_StatusTypeDef vConsoleWrite(const char *buff)
     status = HAL_UART_Transmit(pxUartDevHandle, (uint8_t *)buff, strlen(buff), portMAX_DELAY);
     if (status != HAL_OK)
     {
-    	return HAL_ERROR;
+        return HAL_ERROR;
     }
     return status;
 }

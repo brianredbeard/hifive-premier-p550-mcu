@@ -99,94 +99,94 @@ void NMI_Handler(void)
 void HardFault_Handler(void) __attribute__((naked));
 void HardFault_Handler(void)
 {
-	__asm volatile (
-		"TST lr, #4 \n" // Test EXC_RETURN bit 2
-		"ITE EQ \n"     // If-Then-Else (EQ)
-		"MRSEQ r0, MSP \n" // Main Stack Pointer to r0 if EQ
-		"MRSNE r0, PSP \n" // Process Stack Pointer to r0 if NE
-		"B HardFault_Handler_C \n" // Branch to C handler
-	);
+  __asm volatile (
+    "TST lr, #4 \n" // Test EXC_RETURN bit 2
+    "ITE EQ \n"     // If-Then-Else (EQ)
+    "MRSEQ r0, MSP \n" // Main Stack Pointer to r0 if EQ
+    "MRSNE r0, PSP \n" // Process Stack Pointer to r0 if NE
+    "B HardFault_Handler_C \n" // Branch to C handler
+  );
 }
 
 void HardFault_Handler_C(uint32_t *pulFaultStackAddress)
 {
-	// Extract values from the stack
-	uint32_t r0  = pulFaultStackAddress[0];
-	uint32_t r1  = pulFaultStackAddress[1];
-	uint32_t r2  = pulFaultStackAddress[2];
-	uint32_t r3  = pulFaultStackAddress[3];
-	uint32_t r12 = pulFaultStackAddress[4];
-	uint32_t lr  = pulFaultStackAddress[5];
-	uint32_t pc  = pulFaultStackAddress[6];
-	uint32_t psr = pulFaultStackAddress[7];
+  // Extract values from the stack
+  uint32_t r0  = pulFaultStackAddress[0];
+  uint32_t r1  = pulFaultStackAddress[1];
+  uint32_t r2  = pulFaultStackAddress[2];
+  uint32_t r3  = pulFaultStackAddress[3];
+  uint32_t r12 = pulFaultStackAddress[4];
+  uint32_t lr  = pulFaultStackAddress[5];
+  uint32_t pc  = pulFaultStackAddress[6];
+  uint32_t psr = pulFaultStackAddress[7];
 
-	// Read fault status registers
-	uint32_t CFSR = SCB->CFSR;    // Configurable Fault Status Register
-	uint32_t HFSR = SCB->HFSR;    // Hard Fault Status Register
-	uint32_t DFSR = SCB->DFSR;    // Debug Fault Status Register
-	uint32_t AFSR = SCB->AFSR;    // Auxiliary Fault Status Register
-	uint32_t MMAR = SCB->MMFAR;   // MemManage Fault Address Register
-	uint32_t BFAR = SCB->BFAR;    // Bus Fault Address Register
+  // Read fault status registers
+  uint32_t CFSR = SCB->CFSR;    // Configurable Fault Status Register
+  uint32_t HFSR = SCB->HFSR;    // Hard Fault Status Register
+  uint32_t DFSR = SCB->DFSR;    // Debug Fault Status Register
+  uint32_t AFSR = SCB->AFSR;    // Auxiliary Fault Status Register
+  uint32_t MMAR = SCB->MMFAR;   // MemManage Fault Address Register
+  uint32_t BFAR = SCB->BFAR;    // Bus Fault Address Register
 
-	// Print the fault information
-	printf("HardFault detected!\n");
-	printf("R0  = 0x%08lX\n", r0);
-	printf("R1  = 0x%08lX\n", r1);
-	printf("R2  = 0x%08lX\n", r2);
-	printf("R3  = 0x%08lX\n", r3);
-	printf("R12 = 0x%08lX\n", r12);
-	printf("LR  = 0x%08lX\n", lr);
-	printf("PC  = 0x%08lX\n", pc);
-	printf("PSR = 0x%08lX\n", psr);
+  // Print the fault information
+  printf("HardFault detected!\n");
+  printf("R0  = 0x%08lX\n", r0);
+  printf("R1  = 0x%08lX\n", r1);
+  printf("R2  = 0x%08lX\n", r2);
+  printf("R3  = 0x%08lX\n", r3);
+  printf("R12 = 0x%08lX\n", r12);
+  printf("LR  = 0x%08lX\n", lr);
+  printf("PC  = 0x%08lX\n", pc);
+  printf("PSR = 0x%08lX\n", psr);
 
-	printf("CFSR = 0x%08lX\n", CFSR);
-	printf("HFSR = 0x%08lX\n", HFSR);
-	printf("DFSR = 0x%08lX\n", DFSR);
-	printf("AFSR = 0x%08lX\n", AFSR);
-	printf("MMAR = 0x%08lX\n", MMAR);
-	printf("BFAR = 0x%08lX\n", BFAR);
+  printf("CFSR = 0x%08lX\n", CFSR);
+  printf("HFSR = 0x%08lX\n", HFSR);
+  printf("DFSR = 0x%08lX\n", DFSR);
+  printf("AFSR = 0x%08lX\n", AFSR);
+  printf("MMAR = 0x%08lX\n", MMAR);
+  printf("BFAR = 0x%08lX\n", BFAR);
 
-	// Decode CFSR to get specific fault details
-	if (CFSR & 0x00000001) printf("MemManage Fault: Instruction Access Violation\n");
-	if (CFSR & 0x00000002) printf("MemManage Fault: Data Access Violation\n");
-	if (CFSR & 0x00000008) printf("MemManage Fault: Unstacking Error\n");
-	if (CFSR & 0x00000010) printf("MemManage Fault: Stacking Error\n");
-	if (CFSR & 0x00000080) printf("MemManage Fault: MemManage Address Register Valid\n");
-	if (CFSR & 0x00000100) printf("Bus Fault: Instruction Access Violation\n");
-	if (CFSR & 0x00000200) printf("Bus Fault: Precise Data Access Violation\n");
-	if (CFSR & 0x00000400) printf("Bus Fault: Imprecise Data Access Violation\n");
-	if (CFSR & 0x00000800) printf("Bus Fault: Unstacking Error\n");
-	if (CFSR & 0x00001000) printf("Bus Fault: Stacking Error\n");
-	if (CFSR & 0x00008000) printf("Bus Fault: Bus Fault Address Register Valid\n");
-	if (CFSR & 0x01000000) printf("Usage Fault: Undefined Instruction\n");
-	if (CFSR & 0x02000000) printf("Usage Fault: Invalid State\n");
-	if (CFSR & 0x04000000) printf("Usage Fault: Invalid PC Load Usage Fault\n");
-	if (CFSR & 0x08000000) printf("Usage Fault: No Coprocessor\n");
-	if (CFSR & 0x10000000) printf("Usage Fault: Unaligned Access\n");
-	if (CFSR & 0x20000000) printf("Usage Fault: Divide By Zero\n");
+  // Decode CFSR to get specific fault details
+  if (CFSR & 0x00000001) printf("MemManage Fault: Instruction Access Violation\n");
+  if (CFSR & 0x00000002) printf("MemManage Fault: Data Access Violation\n");
+  if (CFSR & 0x00000008) printf("MemManage Fault: Unstacking Error\n");
+  if (CFSR & 0x00000010) printf("MemManage Fault: Stacking Error\n");
+  if (CFSR & 0x00000080) printf("MemManage Fault: MemManage Address Register Valid\n");
+  if (CFSR & 0x00000100) printf("Bus Fault: Instruction Access Violation\n");
+  if (CFSR & 0x00000200) printf("Bus Fault: Precise Data Access Violation\n");
+  if (CFSR & 0x00000400) printf("Bus Fault: Imprecise Data Access Violation\n");
+  if (CFSR & 0x00000800) printf("Bus Fault: Unstacking Error\n");
+  if (CFSR & 0x00001000) printf("Bus Fault: Stacking Error\n");
+  if (CFSR & 0x00008000) printf("Bus Fault: Bus Fault Address Register Valid\n");
+  if (CFSR & 0x01000000) printf("Usage Fault: Undefined Instruction\n");
+  if (CFSR & 0x02000000) printf("Usage Fault: Invalid State\n");
+  if (CFSR & 0x04000000) printf("Usage Fault: Invalid PC Load Usage Fault\n");
+  if (CFSR & 0x08000000) printf("Usage Fault: No Coprocessor\n");
+  if (CFSR & 0x10000000) printf("Usage Fault: Unaligned Access\n");
+  if (CFSR & 0x20000000) printf("Usage Fault: Divide By Zero\n");
 
-	// Decode HFSR to get specific fault details
-	if (HFSR & (1 << 0)) printf("Hard Fault: Reserved\n");
-	if (HFSR & (1 << 1)) printf("Hard Fault: Vector Table Read Fault\n");
-	if (HFSR & (1 << 30)) printf("Hard Fault: Forced Hard Fault\n");
-	if (HFSR & (1 << 31)) printf("Hard Fault: Debug Event\n");
+  // Decode HFSR to get specific fault details
+  if (HFSR & (1 << 0)) printf("Hard Fault: Reserved\n");
+  if (HFSR & (1 << 1)) printf("Hard Fault: Vector Table Read Fault\n");
+  if (HFSR & (1 << 30)) printf("Hard Fault: Forced Hard Fault\n");
+  if (HFSR & (1 << 31)) printf("Hard Fault: Debug Event\n");
 
-	// Decode DFSR to get specific fault details
-	if (DFSR & (1 << 0)) printf("Debug Fault: Halt requested by debugger\n");
-	if (DFSR & (1 << 1)) printf("Debug Fault: Breakpoint occurred\n");
-	if (DFSR & (1 << 2)) printf("Debug Fault: Data Watchpoint occurred\n");
-	if (DFSR & (1 << 3)) printf("Debug Fault: Vector catch occurred\n");
-	if (DFSR & (1 << 4)) printf("Debug Fault: External debug request\n");
+  // Decode DFSR to get specific fault details
+  if (DFSR & (1 << 0)) printf("Debug Fault: Halt requested by debugger\n");
+  if (DFSR & (1 << 1)) printf("Debug Fault: Breakpoint occurred\n");
+  if (DFSR & (1 << 2)) printf("Debug Fault: Data Watchpoint occurred\n");
+  if (DFSR & (1 << 3)) printf("Debug Fault: Vector catch occurred\n");
+  if (DFSR & (1 << 4)) printf("Debug Fault: External debug request\n");
 
-	// Decode AFSR to get specific fault details
-	if (AFSR != 0) printf("Auxiliary Fault Status: 0x%08lX\n", AFSR);
+  // Decode AFSR to get specific fault details
+  if (AFSR != 0) printf("Auxiliary Fault Status: 0x%08lX\n", AFSR);
 
-	// Decode MMAR and BFAR to get specific fault details
-	if (CFSR & 0x00000080) printf("MemManage Fault Address: 0x%08lX\n", MMAR);
-	if (CFSR & 0x00008000) printf("Bus Fault Address: 0x%08lX\n", BFAR);
+  // Decode MMAR and BFAR to get specific fault details
+  if (CFSR & 0x00000080) printf("MemManage Fault Address: 0x%08lX\n", MMAR);
+  if (CFSR & 0x00008000) printf("Bus Fault Address: 0x%08lX\n", BFAR);
 
-	// Infinite loop to halt the system for debugging
-	while (1);
+  // Infinite loop to halt the system for debugging
+  while (1);
 }
 
 /**

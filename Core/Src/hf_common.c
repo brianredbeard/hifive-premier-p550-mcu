@@ -1009,7 +1009,6 @@ int es_eeprom_info_test(void)
 	return 0;
 }
 
-
 /**
  * @brief  eic7700 boot sel.
  * @param  sel 4'b, bit3:bootsel3 ,bit2:bootsel2; bit1:bootsel2; bit0:bootsel0

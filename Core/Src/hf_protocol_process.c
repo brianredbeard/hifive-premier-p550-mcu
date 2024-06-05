@@ -426,28 +426,28 @@ TimerHandle_t xSomRestartTimer;
 
 // Function to initialize the mutex
 void init_transmit_mutex(void) {
-    // Create the mutex
-    xMutex = xSemaphoreCreateMutex();
-    // Check if the mutex was created successfully
-    if (xMutex == NULL) {
-        // Mutex creation failed
-        // Handle the error here
-    }
+	// Create the mutex
+	xMutex = xSemaphoreCreateMutex();
+	// Check if the mutex was created successfully
+	if (xMutex == NULL) {
+		// Mutex creation failed
+		// Handle the error here
+	}
 }
 
 // Function to acquire the mutex
 void acquire_transmit_mutex(void) {
-    // Attempt to take the mutex
-    if (xSemaphoreTake(xMutex, portMAX_DELAY) != pdPASS) {
-        // Failed to acquire the mutex
-        // Handle the error here
-    }
+	// Attempt to take the mutex
+	if (xSemaphoreTake(xMutex, portMAX_DELAY) != pdPASS) {
+		// Failed to acquire the mutex
+		// Handle the error here
+	}
 }
 
 // Function to release the mutex
 void release_transmit_mutex(void) {
-    // Release the mutex
-    xSemaphoreGive(xMutex);
+	// Release the mutex
+	xSemaphoreGive(xMutex);
 }
 
 // Function to check message checksum

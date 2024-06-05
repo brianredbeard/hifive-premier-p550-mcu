@@ -19,10 +19,10 @@ uint8_t ring_buf_init(ring_buf_t *r, uint32_t size)
 	}
 	memset(r->pHead, 0, sizeof(size));
 
-    r->pWrite = r->pHead;
-    r->pRead = r->pHead;
-    r->pTail = r->pHead + size;
-    r->is_full = 0; // Initialize is_full to false
+	r->pWrite = r->pHead;
+	r->pRead = r->pHead;
+	r->pTail = r->pHead + size;
+	r->is_full = 0; // Initialize is_full to false
 
 	return B_SUCCESS;
 }
@@ -40,7 +40,7 @@ void ring_buf_clr(ring_buf_t *r)
 	}
 	r->pWrite = r->pHead;
 	r->pRead = r->pHead;
-    r->is_full = 0; // Clear the is_full flag
+	r->is_full = 0; // Clear the is_full flag
 }
 
 int32_t get_ring_buf_len(ring_buf_t *r)
@@ -51,9 +51,9 @@ int32_t get_ring_buf_len(ring_buf_t *r)
 		printf("%s : RingBuff is not Init!\n", __func__);
 		return -1;
 	}
-    if (r->is_full) {
-        return r->pTail - r->pHead; // If buffer is full, length is equal to size
-    }
+	if (r->is_full) {
+		return r->pTail - r->pHead; // If buffer is full, length is equal to size
+	}
 	if (r->pRead > r->pWrite) {
 		len = r->pTail - r->pRead;
 		len += r->pWrite - r->pHead;
@@ -70,9 +70,9 @@ int32_t get_ring_buf_free_space(ring_buf_t *r)
 		printf("%s : RingBuff is not Init!\n", __func__);
 		return -1;
 	}
-    if (r->is_full) {
-        return 0; // If buffer is full, free space is 0
-    }
+	if (r->is_full) {
+		return 0; // If buffer is full, free space is 0
+	}
 	if (r->pRead > r->pWrite) {
 		len = r->pRead - r->pWrite;
 	} else {
@@ -193,7 +193,7 @@ int ring_buf_clr_len(ring_buf_t *r, uint32_t len)
 	if (len > get_ring_buf_len(r)) {
 		printf("%s : len is larger than the valid area and clean the buf!\n", __func__);
 		r->pRead = r->pWrite = r->pHead;
-	} else  if (r->pRead + len > r->pTail) {
+	} else if (r->pRead + len > r->pTail) {
 		uint32_t last_len = len - (r->pTail - r->pRead);
 		r->pRead = r->pHead + last_len;
 	} else {
