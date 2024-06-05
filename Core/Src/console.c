@@ -101,6 +101,11 @@ static BaseType_t prvCommandEcho( char *pcWriteBuffer, size_t xWriteBufferLen, c
 static BaseType_t prvCommandTaskStats( char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString);
 static BaseType_t prvCommandHeap(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString);
 
+// get the power lost resume attribute: enable or disable
+static BaseType_t prvCommandSomPwrLostResumeGet(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString);
+// set the power lost resume attribute: enable or disable
+static BaseType_t prvCommandSomPwrLostResumeSet(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString);
+
 /**
 *   @brief  This function is executed in case of error occurrence.
 *   @retval None
@@ -248,9 +253,9 @@ static const CLI_Command_Definition_t xCommands[] =
     },
     {
         "reboot",
-        "\r\nreboot: Reboot the kernel on som board.\r\n",
+        "\r\nreboot <cold/warm>: cold or warm reboot the kernel on som board.\r\n",
         prvCommandReboot,
-        0
+        1
     },
     {
         "devmem-r",
@@ -263,6 +268,18 @@ static const CLI_Command_Definition_t xCommands[] =
         "\r\ndevmem-w <address in hex,like 0x180000000> <value in hex,like 0xabcd1234>: write the memory/io address of som board.\r\n",
         prvCommandDevmemWrite,
         2
+    },
+    {
+        "powerlost-g",
+        "\r\npowerlost-g: Get the som power lost attr. Enable or Disable.\r\n",
+        prvCommandSomPwrLostResumeGet,
+        0
+    },
+    {
+        "powerlost-s",
+        "\r\npowerlost-s <1/0>: (1)Enable or (0)Disable.\r\n",
+        prvCommandSomPwrLostResumeSet,
+        1
     },
     {
        "echo",
@@ -1098,22 +1115,44 @@ static BaseType_t prvCommandSomSwWorkStatusGet(char *pcWriteBuffer, size_t xWrit
 static BaseType_t prvCommandReboot(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString)
 {
     int ret = HAL_OK;
+    const char * pcCtlAttr;
+    BaseType_t xParamLen;
+    int ctl_attr;
 
-    if (SOM_POWER_ON == get_som_power_state()) {
-        ret = web_cmd_handle(CMD_REBOOT, NULL, 0, 2000);
-        if (HAL_OK != ret) {
-            som_reset_control(pdTRUE);
-            osDelay(10);
-            som_reset_control(pdFALSE);
-            printf("Faild to reboot SOM(ret %d), force reset SOM!\n", ret);
-        }
-        // Trigger the Som timer to enusre SOM could reboot in 5 senconds
-        TriggerSomRebootTimer();
+    pcCtlAttr = FreeRTOS_CLIGetParameter(pcCommandString, 1, &xParamLen);
+    if ((0 == strncmp("cold", pcCtlAttr, xParamLen)) || (0 == strncmp("COLD", pcCtlAttr, xParamLen))) {
+        ctl_attr = 1;
+    }
+    else if ((0 == strncmp("warm", pcCtlAttr, xParamLen)) || (0 == strncmp("WRAM", pcCtlAttr, xParamLen))){
+        ctl_attr = 0;
     }
     else {
-         printf("Err, som board is in power off status, can NOT be reboot!!!\n");
+        snprintf(pcWriteBuffer, xWriteBufferLen, "Invalid parameter!\r\n");
+        goto out;
     }
 
+
+    if (SOM_POWER_ON == get_som_power_state()) {
+        if (0 == ctl_attr) { // warm reboot
+        ret = web_cmd_handle(CMD_REBOOT, NULL, 0, 2000);
+            if (HAL_OK != ret) {
+                som_reset_control(pdTRUE);
+                osDelay(10);
+                som_reset_control(pdFALSE);
+                printf("Faild to reboot SOM(ret %d), force reset SOM!\n", ret);
+            }
+            // Trigger the Som timer to enusre SOM could reboot in 5 senconds
+            TriggerSomRebootTimer();
+        }
+        else { // cold reboot
+            xSOMRestartHandle();
+        }
+    }
+    else {
+         printf("Err, som board is in power off status, can NOT be rebootted!!!\n");
+    }
+
+out:
     return pdFALSE;
 }
 
@@ -1196,6 +1235,43 @@ static BaseType_t prvCommandDevmemWrite(char *pcWriteBuffer, size_t xWriteBuffer
     if (HAL_OK != es_spi_write((uint8_t *)&value, memAddr, 4)) {
         snprintf(pcWriteBuffer, xWriteBufferLen, "Failed to write mem/io at 0x%lx%lx\n", memAddrHigh, memAddrLow);
     }
+
+    return pdFALSE;
+}
+
+
+/**
+* @brief Get the som power lost attribute: enable or disable
+* @param *pcWriteBuffer FreeRTOS CLI write buffer.
+* @param xWriteBufferLen Length of write buffer.
+* @param *pcCommandString pointer to the command name.
+* @retval FreeRTOS status
+*/
+static BaseType_t prvCommandSomPwrLostResumeGet(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString)
+{
+    snprintf(pcWriteBuffer, xWriteBufferLen, "Som Power Lost Attr: %s\n", (is_som_pwr_lost_resume())?"Enable":"Disable");
+
+    return pdFALSE;
+}
+
+/**
+* @brief Set the som power lost attribute: enable or disable
+* @param *pcWriteBuffer FreeRTOS CLI write buffer.
+* @param xWriteBufferLen Length of write buffer.
+* @param *pcCommandString pointer to the command name.
+* @retval FreeRTOS status
+*/
+static BaseType_t prvCommandSomPwrLostResumeSet(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString)
+{
+    const char *cPwrLostEn;
+    BaseType_t xParamLen;
+    int isResumePwrLost;
+
+    cPwrLostEn = FreeRTOS_CLIGetParameter(pcCommandString, 1, &xParamLen);
+    isResumePwrLost = atoi(cPwrLostEn);
+
+    /* set som power lost attr*/
+    es_set_som_pwr_lost_resume_attr(isResumePwrLost);
 
     return pdFALSE;
 }

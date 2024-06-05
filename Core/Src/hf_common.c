@@ -34,7 +34,9 @@
 #define esEXIT_CRITICAL(MUTEX)		taskEXIT_CRITICAL()
 #endif
 /* variables ---------------------------------------------------------*/
-static CarrierBoardInfo gCarrier_Board_Info;
+static uint32_t gCbinfoArray[CBINFO_MAX_SIZE]; // Store cbinfo to eliminate HAL_CRC_Calculate warning
+static CarrierBoardInfo *pgCarrier_Board_Info = (CarrierBoardInfo *)gCbinfoArray;
+
 static MCUServerInfo gMCU_Server_Info;
 static SomPwrMgtDIPInfo gSOM_PwgMgtDIP_Info;
 static SemaphoreHandle_t gEEPROM_Mutex;
@@ -189,44 +191,165 @@ void es_eeprom_wp(uint8_t flag)
 	}
 }
 
-static int get_carrier_board_info(void)
+typedef enum {
+	cbinfo_main = 0,
+	cbinfo_backup
+}CbinfoPart;
+
+static int read_cbinfo(CarrierBoardInfo *pCarrier_Board_Info, CbinfoPart cbinfo_part)
 {
 	int ret = 0;
-	int skip_update_eeprom = 1;
+	uint8_t reg_addr = 0;
 
-	memset((uint8_t *)&gCarrier_Board_Info, 0, sizeof(CarrierBoardInfo));
-	ret = hf_i2c_mem_read(&hi2c1, AT24C_ADDR, CARRIER_BOARD_INFO_EEPROM_OFFSET,
-				(uint8_t *)&gCarrier_Board_Info, sizeof(CarrierBoardInfo));
+	reg_addr = (cbinfo_part == cbinfo_main)?CARRIER_BOARD_INFO_EEPROM_MAIN_OFFSET:
+			CARRIER_BOARD_INFO_EEPROM_BACKUP_OFFSET;
+
+	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
+	ret = hf_i2c_mem_read(&hi2c1, AT24C_ADDR, reg_addr,
+				(uint8_t *)pCarrier_Board_Info, sizeof(CarrierBoardInfo));
+	esEXIT_CRITICAL(gEEPROM_Mutex);
 	if(ret) {
 		return -1;
 	}
 
-	if ((1 != is_valid_ethaddr(gCarrier_Board_Info.ethernetMAC3)) | (gCarrier_Board_Info.magicNumber != MAGIC_NUMBER)) {
-		eeprom_debug("No valid MCU MAC in eeprom, set to default!\n");
-		skip_update_eeprom = 0;
-		gCarrier_Board_Info.ethernetMAC3[0] = MAC_ADDR0;
-		gCarrier_Board_Info.ethernetMAC3[1] = MAC_ADDR1;
-		gCarrier_Board_Info.ethernetMAC3[2] = MAC_ADDR2;
-		gCarrier_Board_Info.ethernetMAC3[3] = MAC_ADDR3;
-		gCarrier_Board_Info.ethernetMAC3[4] = MAC_ADDR4;
-		gCarrier_Board_Info.ethernetMAC3[5] = MAC_ADDR5;
-	}
+	return 0;
+}
+static int write_cbinfo(CarrierBoardInfo *pCarrier_Board_Info, CbinfoPart cbinfo_part)
+{
+	uint8_t reg_addr = 0;
 
-	if (gCarrier_Board_Info.magicNumber != MAGIC_NUMBER) {
-		eeprom_debug("Invalid Magic Number, set it!\n");
-		skip_update_eeprom = 0;
-		gMagicNumber = 0; // gMagicNumber is used to determine if the eeprom is never initialized.
-		gCarrier_Board_Info.magicNumber = MAGIC_NUMBER;
-	}
-	else
-	{
-		gMagicNumber = MAGIC_NUMBER;
-	}
+	reg_addr = (cbinfo_part == cbinfo_main)?CARRIER_BOARD_INFO_EEPROM_MAIN_OFFSET:
+			CARRIER_BOARD_INFO_EEPROM_BACKUP_OFFSET;
 
-	if (0 == skip_update_eeprom) {
-		hf_i2c_mem_write(&hi2c1, AT24C_ADDR, CARRIER_BOARD_INFO_EEPROM_OFFSET,
-				  (uint8_t *)&gCarrier_Board_Info, sizeof(CarrierBoardInfo));
-		eeprom_debug("Updated CarrierBoardInfo in EEPROM!\n");
+	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
+	hf_i2c_mem_write(&hi2c1, AT24C_ADDR, reg_addr,
+				(uint8_t *)pCarrier_Board_Info, sizeof(CarrierBoardInfo));
+	esEXIT_CRITICAL(gEEPROM_Mutex);
+	eeprom_debug("Updated CarrierBoardInfo in EEPROM!\n");
+
+	return 0;
+}
+
+static int restore_cbinfo_to_factory(uint32_t *pCbinfoArray)
+{
+	char sn[] = "sn1234567890abcdef";
+	CarrierBoardInfo *pCarrier_Board_Info = (CarrierBoardInfo *)pCbinfoArray;
+
+	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
+
+	memset(pCarrier_Board_Info, 0, sizeof(CarrierBoardInfo));
+	pCarrier_Board_Info->magicNumber = MAGIC_NUMBER;
+
+	pCarrier_Board_Info->formatVersionNumber = 0x3;
+	pCarrier_Board_Info->productIdentifier = 0x4;
+	pCarrier_Board_Info->pcbRevision = 0x10;
+	pCarrier_Board_Info->bomRevision = 0x10;
+	pCarrier_Board_Info->bomVariant = 0x10;
+
+	memcpy(pCarrier_Board_Info->boardSerialNumber, sn, sizeof(pCarrier_Board_Info->boardSerialNumber));
+
+	pCarrier_Board_Info->manufacturingTestStatus = 0x10;
+
+	pCarrier_Board_Info->ethernetMAC3[0] = MAC_ADDR0;
+	pCarrier_Board_Info->ethernetMAC3[1] = MAC_ADDR1;
+	pCarrier_Board_Info->ethernetMAC3[2] = MAC_ADDR2;
+	pCarrier_Board_Info->ethernetMAC3[3] = MAC_ADDR3;
+	pCarrier_Board_Info->ethernetMAC3[4] = MAC_ADDR4;
+	pCarrier_Board_Info->ethernetMAC3[5] = MAC_ADDR5;
+
+	pCarrier_Board_Info->crc32Checksum = HAL_CRC_Calculate(&hcrc, (uint32_t *)pCbinfoArray, sizeof(CarrierBoardInfo)/4 - 1);
+
+	/* write to main partition */
+	write_cbinfo(pCarrier_Board_Info, cbinfo_main);
+
+	/* write to backup partition */
+	write_cbinfo(pCarrier_Board_Info, cbinfo_backup);
+
+	esEXIT_CRITICAL(gEEPROM_Mutex);
+
+	return 0;
+}
+
+static int print_cbinfo(CarrierBoardInfo *pCarrierBoardInfo)
+{
+	char boardSn[19] = {0};
+
+	eeprom_debug("[Carrierboard Information:]\n");
+
+	eeprom_debug("magicNumber:0x%lx\n", pCarrierBoardInfo->magicNumber);
+
+	eeprom_debug("formatVersionNumber:0x%x\n", pCarrierBoardInfo->formatVersionNumber);
+
+	eeprom_debug("productIdentifier:0x%x\r\n", pCarrierBoardInfo->productIdentifier);
+
+	eeprom_debug("pcbRevision:0x%x\r\n", pCarrierBoardInfo->pcbRevision);
+
+	eeprom_debug("bomRevision:0x%x\r\n", pCarrierBoardInfo->bomRevision);
+
+	eeprom_debug("bomVariant:0x%x\r\n", pCarrierBoardInfo->bomVariant);
+
+
+	memcpy(boardSn, pCarrierBoardInfo->boardSerialNumber, sizeof(pCarrierBoardInfo->boardSerialNumber));
+	eeprom_debug("SN:%s\n", boardSn);
+
+
+	eeprom_debug("manufacturingTestStatus:0x%x\n", pCarrierBoardInfo->manufacturingTestStatus);
+
+	return 0;
+}
+/* This API is called only once at start up time */
+static int get_carrier_board_info(void)
+{
+	int ret = 0;
+	uint32_t crc32Checksum;
+	uint32_t gCbinfoArrayBackup[CBINFO_MAX_SIZE];
+	CarrierBoardInfo *pCbinfoBackup = (CarrierBoardInfo *)gCbinfoArrayBackup;
+
+	// printf("main offset:0x%d, back offset:%d\n", CARRIER_BOARD_INFO_EEPROM_MAIN_OFFSET, CARRIER_BOARD_INFO_EEPROM_BACKUP_OFFSET);
+	// printf("pgCarrier_Board_Info addr:0x%p, size:%d\n", pgCarrier_Board_Info, sizeof(CarrierBoardInfo));
+	memset((uint8_t *)pgCarrier_Board_Info, 0, sizeof(CarrierBoardInfo));
+	/* read main partintion */
+	ret = read_cbinfo(pgCarrier_Board_Info, cbinfo_main);
+	if(ret) {
+		return -1;
+	}
+	print_cbinfo(pgCarrier_Board_Info);
+	/* calculate crc32 checksum of main partition */
+	crc32Checksum = HAL_CRC_Calculate(&hcrc, (uint32_t *)gCbinfoArray, sizeof(CarrierBoardInfo)/4 - 1);
+	if (crc32Checksum != pgCarrier_Board_Info->crc32Checksum) { //main partition is bad
+		/* try to read and check the backup partition */
+		ret = read_cbinfo(pgCarrier_Board_Info, cbinfo_backup);
+		if(ret) {
+			return -1;
+		}
+		printf("Bad main checksum,0x%lx is NOT equal to calculated value:0x%lx\n", pgCarrier_Board_Info->crc32Checksum, crc32Checksum);
+		crc32Checksum = HAL_CRC_Calculate(&hcrc, (uint32_t *)gCbinfoArray, sizeof(CarrierBoardInfo)/4 - 1);
+		if (crc32Checksum != pgCarrier_Board_Info->crc32Checksum) { // backup patition is also bad
+			/* restore to factory settings */
+			printf("Bad backup checksum,0x%lx is NOT equal to calculated value:0x%lx\n", pgCarrier_Board_Info->crc32Checksum, crc32Checksum);
+			restore_cbinfo_to_factory(gCbinfoArray);
+			printf("Restored cbinfo to factory settings\n");
+		}
+		else { // backup partion is ok
+			/* recover the main partition with the backup value */
+			printf("Recover main with backup settings\n");
+			write_cbinfo(pgCarrier_Board_Info, cbinfo_main);
+		}
+	}
+	else { // main partition is ok
+		/* check backup partion, if it's bad, recover it with main value */
+		ret = read_cbinfo(pCbinfoBackup, cbinfo_backup);
+		if(ret) {
+			return -1;
+		}
+		print_cbinfo(pCbinfoBackup);
+		crc32Checksum = HAL_CRC_Calculate(&hcrc, (uint32_t *)gCbinfoArrayBackup, sizeof(CarrierBoardInfo)/4 - 1);
+		if (crc32Checksum != pCbinfoBackup->crc32Checksum) {
+			/* recover the backup partition with the main value */
+			printf("Bad backup checksum,0x%lx is NOT equal to calculated value:0x%lx\n", pCbinfoBackup->crc32Checksum, crc32Checksum);
+			printf("Recover backup with main settings\n");
+			write_cbinfo(pgCarrier_Board_Info, cbinfo_backup);
+		}
 	}
 
 	return 0;
@@ -418,22 +541,35 @@ int es_get_carrier_borad_info(CarrierBoardInfo *pCarrier_board_info)
 		return -1;
 
 	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
-	memcpy(pCarrier_board_info, &gCarrier_Board_Info, sizeof(CarrierBoardInfo));
+	memcpy(pCarrier_board_info, pgCarrier_Board_Info, sizeof(CarrierBoardInfo));
 	esEXIT_CRITICAL(gEEPROM_Mutex);
 	return 0;
 }
 
-int es_set_carrier_borad_info(CarrierBoardInfo *pCarrier_board_info)
+int es_set_carrier_borad_info(CarrierBoardInfo *pCarrier_Board_Info)
 {
-	if (NULL == pCarrier_board_info)
+	int skip_update_eeprom = 1;
+	uint32_t cbinfoArray[CBINFO_MAX_SIZE];
+
+	if (NULL == pCarrier_Board_Info)
 		return -1;
 
+	memcpy(cbinfoArray, pCarrier_Board_Info, sizeof(CarrierBoardInfo));
+	pCarrier_Board_Info->crc32Checksum = HAL_CRC_Calculate(&hcrc, (uint32_t *)cbinfoArray, sizeof(CarrierBoardInfo)/4 - 1);
+
 	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
-	if (0 != memcmp(pCarrier_board_info, &gCarrier_Board_Info, sizeof(CarrierBoardInfo))) {
-		memcpy(&gCarrier_Board_Info, pCarrier_board_info, sizeof(CarrierBoardInfo));
-		hf_i2c_mem_write(&hi2c1, AT24C_ADDR, CARRIER_BOARD_INFO_EEPROM_OFFSET,
-				  (uint8_t *)&gCarrier_Board_Info, sizeof(CarrierBoardInfo));
+	if (0 != memcmp(pCarrier_Board_Info, pgCarrier_Board_Info, sizeof(CarrierBoardInfo))) {
+		memcpy(pgCarrier_Board_Info, pCarrier_Board_Info, sizeof(CarrierBoardInfo));
+		skip_update_eeprom = 0;
 		eeprom_debug("Updated CarrierBoardInfo in EEPROM!\n");
+	}
+
+	if (!skip_update_eeprom) {
+		/* write to main partition */
+		write_cbinfo(pCarrier_Board_Info, cbinfo_main);
+
+		/* write to backup partition */
+		write_cbinfo(pCarrier_Board_Info, cbinfo_backup);
 	}
 	esEXIT_CRITICAL(gEEPROM_Mutex);
 
@@ -446,7 +582,7 @@ int es_get_mcu_mac(uint8_t *p_mac_address)
 		return -1;
 
 	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
-	memcpy(p_mac_address, gCarrier_Board_Info.ethernetMAC3, sizeof(gCarrier_Board_Info.ethernetMAC3));
+	memcpy(p_mac_address, pgCarrier_Board_Info->ethernetMAC3, sizeof(pgCarrier_Board_Info->ethernetMAC3));
 	esEXIT_CRITICAL(gEEPROM_Mutex);
 
 	return 0;
@@ -462,10 +598,13 @@ int es_set_mcu_mac(uint8_t *p_mac_address)
 	}
 
 	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
-	if (0 != memcmp(gCarrier_Board_Info.ethernetMAC3, p_mac_address, sizeof(gCarrier_Board_Info.ethernetMAC3))) {
-		memcpy(gCarrier_Board_Info.ethernetMAC3, p_mac_address, sizeof(gCarrier_Board_Info.ethernetMAC3));
-		hf_i2c_mem_write(&hi2c1, AT24C_ADDR, CARRIER_BOARD_INFO_EEPROM_OFFSET,
-					(uint8_t *)&gCarrier_Board_Info, sizeof(CarrierBoardInfo));
+	if (0 != memcmp(pgCarrier_Board_Info->ethernetMAC3, p_mac_address, sizeof(pgCarrier_Board_Info->ethernetMAC3))) {
+		memcpy(pgCarrier_Board_Info->ethernetMAC3, p_mac_address, sizeof(pgCarrier_Board_Info->ethernetMAC3));
+		hf_i2c_mem_write(&hi2c1, AT24C_ADDR, CARRIER_BOARD_INFO_EEPROM_MAIN_OFFSET,
+					(uint8_t *)pgCarrier_Board_Info, sizeof(CarrierBoardInfo));
+
+		hf_i2c_mem_write(&hi2c1, AT24C_ADDR, CARRIER_BOARD_INFO_EEPROM_BACKUP_OFFSET,
+					(uint8_t *)pgCarrier_Board_Info, sizeof(CarrierBoardInfo));
 	}
 	esEXIT_CRITICAL(gEEPROM_Mutex);
 
@@ -894,7 +1033,7 @@ int es_eeprom_info_test(void)
 	CarrierBoardInfo carrier_board_info;
 
 	eeprom_debug("\n----es_eeprom_info_test-----\n");
-	eeprom_debug("CarrierBoardInfo offset:0x%x\n", CARRIER_BOARD_INFO_EEPROM_OFFSET);
+	eeprom_debug("CarrierBoardInfo offset:0x%x\n", CARRIER_BOARD_INFO_EEPROM_MAIN_OFFSET);
 	eeprom_debug("MCUServerInfo offset:0x%x\n", MCU_SERVER_INFO_EEPROM_OFFSET);
 	eeprom_debug("SomPwrMgtDIPInfo offset:0x%x\n", SOM_PWRMGT_DIP_INFO_EEPROM_OFFSET);
 	/* carrierboad info test */
@@ -1193,5 +1332,46 @@ uint32_t es_autoboot(void)
 			return 1;
 		}
 	}
+	return 0;
+}
+
+int es_restore_userdata_to_factory(void)
+{
+	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
+
+	/* restore MCU server info */
+	memset(&gMCU_Server_Info, 0, sizeof(gMCU_Server_Info));
+	strcpy(gMCU_Server_Info.AdminName, DEFAULT_ADMIN_NAME);
+	strcpy(gMCU_Server_Info.AdminPassword, DEFAULT_ADMIN_PASSWORD);
+
+	gMCU_Server_Info.ip_address[0] = IP_ADDR0;
+	gMCU_Server_Info.ip_address[1] = IP_ADDR1;
+	gMCU_Server_Info.ip_address[2] = IP_ADDR2;
+	gMCU_Server_Info.ip_address[3] = IP_ADDR3;
+
+	gMCU_Server_Info.netmask_address[0] = NETMASK_ADDR0;
+	gMCU_Server_Info.netmask_address[1] = NETMASK_ADDR1;
+	gMCU_Server_Info.netmask_address[2] = NETMASK_ADDR2;
+	gMCU_Server_Info.netmask_address[3] = NETMASK_ADDR3;
+
+	gMCU_Server_Info.gateway_address[0] = GATEWAY_ADDR0;
+	gMCU_Server_Info.gateway_address[1] = GATEWAY_ADDR1;
+	gMCU_Server_Info.gateway_address[2] = GATEWAY_ADDR2;
+	gMCU_Server_Info.gateway_address[3] = GATEWAY_ADDR3;
+
+	hf_i2c_mem_write(&hi2c1, AT24C_ADDR, MCU_SERVER_INFO_EEPROM_OFFSET,
+		(uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo));
+
+	/* restore power and dip info */
+	gSOM_PwgMgtDIP_Info.som_pwr_lost_resume_attr = SOM_PWR_LOST_RESUME_ENABLE;
+	gSOM_PwgMgtDIP_Info.som_pwr_last_state = SOM_PWR_LAST_STATE_OFF;
+	gSOM_PwgMgtDIP_Info.som_dip_switch_soft_ctl_attr = SOM_DIP_SWITCH_SOFT_CTL_DISABLE;
+	gSOM_PwgMgtDIP_Info.som_dip_switch_soft_state = SOM_DIP_SWITCH_STATE_EMMC;
+
+	hf_i2c_mem_write(&hi2c1, AT24C_ADDR, SOM_PWRMGT_DIP_INFO_EEPROM_OFFSET,
+		(uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(SomPwrMgtDIPInfo));
+
+	esEXIT_CRITICAL(gEEPROM_Mutex);
+
 	return 0;
 }

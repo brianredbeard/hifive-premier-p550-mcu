@@ -22,6 +22,9 @@ extern uint8_t netmask_address[4];
 extern uint8_t getway_address[4];
 extern uint8_t mac_address[6];
 
+void vStopSomPowerOffTimer(void);
+void StopSomRestartTimer(void);
+
 void es_send_req(b_frame_class_t *pframe,uint8_t req_cmd, char *frame_data,uint8_t len)
 {
 	uint8_t buf[MAX_FRAME_LEN] = {0};

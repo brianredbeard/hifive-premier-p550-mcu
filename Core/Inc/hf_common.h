@@ -105,9 +105,10 @@ typedef struct {
 	uint8_t ethernetMAC1[6];	// The MAC of the SOM
 	uint8_t ethernetMAC2[6];	// The MAC of the SOM
 	uint8_t ethernetMAC3[6];	// The MAC of the MCU
+	uint8_t padding[1];		// padding one byte to make the sizeof(CarrierBoardInfo) - sizeof(crc32Checksum) align with 4bytes
 	uint32_t crc32Checksum;
 	// uint8_t padding[4];
-} CarrierBoardInfo;
+} __attribute__((packed)) CarrierBoardInfo;
 
 typedef struct {
 	char AdminName[32];
@@ -204,15 +205,34 @@ extern UART_HandleTypeDef huart3;
 #define MIN(x , y)  (((x) < (y)) ? (x) : (y))
 /* define ------------------------------------------------------------*/
 #define BMC_SOFTWARE_VERSION_MAJOR                   1
-#define BMC_SOFTWARE_VERSION_MINOR                   1
+#define BMC_SOFTWARE_VERSION_MINOR                   2
 
 #define MAGIC_NUMBER	0xF15E5045
 
 #define AT24C_ADDR (0x50<<1)
 
-#define CARRIER_BOARD_INFO_EEPROM_OFFSET	0
-#define MCU_SERVER_INFO_EEPROM_OFFSET		(CARRIER_BOARD_INFO_EEPROM_OFFSET + sizeof(CarrierBoardInfo))
+/*
+EEPROM Mapping
+-----------------------
+Type		Size(Byte)	Offset
+-----------------------
+Gap		0		256
+User Data	96		160
+Gap		16		144
+B cbinfo	64		80
+Gap		16		64
+A cbinfo	64		0
+*/
+#define CBINFO_MAX_SIZE		64
+#define GAP_SIZE		16
+#define USER_MAX_SIZE		96
+/* A, B cbinfo */
+#define CARRIER_BOARD_INFO_EEPROM_MAIN_OFFSET	0
+#define CARRIER_BOARD_INFO_EEPROM_BACKUP_OFFSET	(CARRIER_BOARD_INFO_EEPROM_MAIN_OFFSET + CBINFO_MAX_SIZE + GAP_SIZE)
+/* User data */
+#define MCU_SERVER_INFO_EEPROM_OFFSET		(CARRIER_BOARD_INFO_EEPROM_BACKUP_OFFSET + CBINFO_MAX_SIZE + GAP_SIZE)
 #define SOM_PWRMGT_DIP_INFO_EEPROM_OFFSET	(MCU_SERVER_INFO_EEPROM_OFFSET + sizeof(MCUServerInfo))
+
 
 #define DEFAULT_ADMIN_NAME	"admin"
 #define DEFAULT_ADMIN_PASSWORD	"123456"
@@ -292,6 +312,7 @@ void change_som_daemon_state(deamon_stats_t newState);
 void TriggerSomPowerOffTimer(void);
 void TriggerSomRebootTimer(void);
 void StopSomRebootTimer(void);
+void TriggerSomRestartTimer(void);
 
 void set_bootsel(uint8_t is_soft_crtl, uint8_t sel);
 int get_bootsel(int *pCtl_attr, uint8_t *pSel);
@@ -308,6 +329,8 @@ int32_t es_get_rtc_date(struct rtc_date_t *sdate);
 int32_t es_get_rtc_time(struct rtc_time_t *stime);
 power_info get_power_info(void);
 int xSOMRestartHandle(void);
+
+int es_restore_userdata_to_factory(void);
 
 #ifdef __cplusplus
 }
