@@ -85,11 +85,11 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
 	if (huart->Instance == USART3) {
-		printf("%s Size %d sizeof(UART3_RxBuf) %d\n", __func__, Size, sizeof(RxBuf));
+		// printf("uart3_rx Size %d\n", Size);
 		es_frame_put(&frame_uart3, RxBuf, Size);
 		memset(RxBuf, 0, sizeof(RxBuf) / sizeof(uint8_t));
-		HAL_UARTEx_ReceiveToIdle_DMA(&huart3, RxBuf, RxBuf_SIZE);
-		__HAL_DMA_DISABLE_IT(&hdma_usart3_rx, DMA_IT_HT);
+		HAL_UARTEx_ReceiveToIdle_IT(&huart3, RxBuf, RxBuf_SIZE);
+		// HAL_UARTEx_ReceiveToIdle_DMA(&huart3, RxBuf, RxBuf_SIZE);
 	} else if (huart->Instance == UART4) {
 		//printf("[%s %d]: Size %d sizeof(UART4_RxMsg) %d\n", __func__, __LINE__, Size, sizeof(UART4_RxMsg));
 		if (HAL_UART_RXEVENT_TC == huart->RxEventType) {

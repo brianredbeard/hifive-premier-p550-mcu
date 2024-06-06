@@ -364,7 +364,8 @@ void protocol_task(void *argument)
 	frame_uart3.uart = &huart3;
 	es_frame_init(&frame_uart3, &frame_info);
 	/* enable uart3 dma rx */
-	HAL_UARTEx_ReceiveToIdle_DMA(frame_uart3.uart, RxBuf, RxBuf_SIZE);
+	HAL_UARTEx_ReceiveToIdle_IT(frame_uart3.uart, RxBuf, RxBuf_SIZE);
+	// HAL_UARTEx_ReceiveToIdle_DMA(frame_uart3.uart, RxBuf, RxBuf_SIZE);
 	for (;;) {
 		switch (protocol_status) {
 		case CHECK_HEAD:

@@ -642,8 +642,6 @@ static void MX_GPIO_Init(void)
 	/*Configure GPIO pin Output Level */
 	HAL_GPIO_WritePin(GPIOA, SPI1_NSS_Pin, GPIO_PIN_SET);
 	HAL_GPIO_WritePin(GPIOA, JTAG_MUX_SEL_Pin | JTAG_MUX_EN_Pin, GPIO_PIN_RESET);
-	/* som jtag to pin */
-	HAL_GPIO_WritePin(GPIOA, JTAG_MUX_SEL_Pin, GPIO_PIN_SET);
 
 	/*Configure GPIO pin Output Level */
 	HAL_GPIO_WritePin(GPIOB, EEPROM_WP_Pin, GPIO_PIN_SET);
