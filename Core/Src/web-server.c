@@ -9102,14 +9102,9 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
 															data: {\n \
 																ipaddr: ipaddr,\n \
 																gateway: gateway,\n \
-																subnetwork: subnetwork, \n \
-																macaddr: macaddr \n \
+																subnetwork: subnetwork \n \
 															},\n \
 															beforeSend: function() { \n \
-																if(!(macaddr.length>0 && isValidMacAddress(macaddr))){\n \
-																	alert('macaddr illegal!' );\n \
-																	return false;\n \
-																}\n \
 																if(!(ipaddr.length>0 && validateIPAddress(ipaddr))){\n \
 																	alert('ipaddr illegal!' );\n \
 																	return false;\n \
@@ -9911,7 +9906,7 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
 										<div class=\"net-work\" > \
 											<h3>Network System</h3> \
 											<div class=\"network-row\"> \
-											<label>Mac Address:</label> <input type=\"text\" id=\"macaddr\" value=\"0\" style=\"width: 180px;\"> <br> \
+											<label>Mac Address:</label> <input type=\"text\" id=\"macaddr\" value=\"0\" style=\"width: 180px;\" disabled> <br> \
 											</div>  \
 											<div class=\"network-row\"> \
 											<label> IP Address :</label> <input type=\"text\" id=\"ipaddr\" value=\"0\" style=\"width: 180px;\"> <br> \
@@ -10570,7 +10565,7 @@ NETInfo get_net_info(void) {
 	p_addr = ip4addr_ntoa(&ip4_addr);
 	strcpy(example.gateway, p_addr);
 
-	es_get_mcu_mac(mac);
+	es_get_mcu_mac(mac, MCU_MAC_IDX);
 	memset(example.macaddr, 0, sizeof(example.macaddr));
 	snprintf(example.macaddr, sizeof(example.macaddr), "%02x:%02x:%02x:%02x:%02x:%02x",
 			mac[0],mac[1],mac[2],mac[3],mac[4],mac[5]);
@@ -10581,23 +10576,43 @@ NETInfo get_net_info(void) {
 
 int set_net_info(NETInfo netinfo) {
 	u32_t naddr;
-	uint8_t mac[6];
+	// uint8_t mac[6];
+	struct ip_t ip;
+	struct netmask_t netmask;
+	struct getway_t gw;
 
 	/* set ipaddr */
 	naddr = ipaddr_addr(netinfo.ipaddr);
 	es_set_mcu_ipaddr((uint8_t *)&naddr);
+	/* Prepare ip struct for validating eth settings */
+	ip.ip_addr0 = 0xff & naddr;
+	ip.ip_addr1 = 0xff & (naddr >> 8);
+	ip.ip_addr2 = 0xff & (naddr >> 16);
+	ip.ip_addr3 = 0xff & (naddr >> 24);
 
 	/* set netmask */
 	naddr = ipaddr_addr(netinfo.subnetwork);
 	es_set_mcu_netmask((uint8_t *)&naddr);
+	/* Prepare netmask struct for validating eth settings */
+	netmask.netmask_addr0 = 0xff & naddr;
+	netmask.netmask_addr1 = 0xff & (naddr >> 8);
+	netmask.netmask_addr2 = 0xff & (naddr >> 16);
+	netmask.netmask_addr3 = 0xff & (naddr >> 24);
 
 	/* set gateway */
 	naddr = ipaddr_addr(netinfo.gateway);
 	es_set_mcu_gateway((uint8_t *)&naddr);
+	/* Prepare gateway struct for validating eth settings */
+	gw.getway_addr0 = 0xff & naddr;
+	gw.getway_addr1 = 0xff & (naddr >> 8);
+	gw.getway_addr2 = 0xff & (naddr >> 16);
+	gw.getway_addr3 = 0xff & (naddr >> 24);
 
-	/* set mac */
-	hexstr2mac(mac, netinfo.macaddr);
-	es_set_mcu_mac(mac);
+	/* Dynamically validate eth settings finally */
+	es_set_eth(&ip, &netmask, &gw, NULL);
+	// /* set mac is not permitted throug web page */
+	// hexstr2mac(mac, netinfo.macaddr);
+	// es_set_mcu_mac(mac, MCU_MAC_IDX);
 
 	return 0;
 }
@@ -11495,7 +11510,7 @@ http_server_netconn_serve(struct netconn *conn)
 					char* ipaddr=NULL;
 					char* gateway=NULL;
 					char* subnetwork=NULL;
-					char* macaddr=NULL;
+					// char* macaddr=NULL;
 
 					kv_pair *current = params.head;
 					while (current) {
@@ -11505,23 +11520,19 @@ http_server_netconn_serve(struct netconn *conn)
 							gateway= current->value;
 						}else if(strcmp(current->key,"subnetwork")==0){
 							subnetwork= current->value;
-						}else if(strcmp(current->key,"macaddr")==0){
-							macaddr= current->value;
 						}
 						current = current->next;
 					}
-					LWIP_ASSERT("ipaddr!=NULL&&gateway!=NULL&&subnetwork!=NULL&&macaddr!=NULL", ipaddr!=NULL&&gateway!=NULL&&subnetwork!=NULL&&macaddr!=NULL);
-					unescape_colon(macaddr);
-					LWIP_ASSERT("strlen(ipaddr)<16 && strlen(macaddr)<18 &&strlen(subnetwork)<16 && strlen(gateway)<16 ", strlen(ipaddr)<16 && strlen(macaddr)<18 &&strlen(subnetwork)<16 && strlen(gateway)<16 );
+					LWIP_ASSERT("ipaddr!=NULL&&gateway!=NULL&&subnetwork!=NULL", ipaddr!=NULL&&gateway!=NULL&&subnetwork!=NULL);
+					// unescape_colon(macaddr);
+					LWIP_ASSERT("strlen(ipaddr)<16  &&strlen(subnetwork)<16 && strlen(gateway)<16 ", strlen(ipaddr)<16  &&strlen(subnetwork)<16 && strlen(gateway)<16 );
 
 					NETInfo netinfo;
 					strncpy(netinfo.ipaddr, ipaddr, strlen(ipaddr));
-					strncpy(netinfo.macaddr, macaddr, strlen(macaddr));
 					strncpy(netinfo.subnetwork, subnetwork, strlen(subnetwork));
 					strncpy(netinfo.gateway, gateway, strlen(gateway));
 
 					netinfo.ipaddr[strlen(ipaddr)] = '\0';
-					netinfo.macaddr[strlen(macaddr)] = '\0';
 					netinfo.subnetwork[strlen(subnetwork)] = '\0';
 					netinfo.gateway[strlen(gateway)] = '\0';
 

@@ -124,6 +124,13 @@ int main(void)
 
   }
 }
+static void mcu_status_led_on(uint8_t turnon)
+{
+  if (HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_4) != HAL_OK) {
+    printf("HAL_TIM_PWM_Start(&htim4,TIM_CHANNEL_4) err\n");
+    Error_Handler();
+  }
+}
 /**
   * @brief  Function implementing the defaultTask thread.
   * @param  argument: Not used
@@ -135,6 +142,9 @@ extern void hf_gpio_task (void* parameter);
 void hf_main_task(void *argument)
 {
   printf("HiFive 106SC!\n");
+  extern void power_test_dome(void);
+  mcu_status_led_on(pdTRUE);
+  power_test_dome();
 
   /* get board info from eeprom where the MAC is stored */
   if(es_init_info_in_eeprom()) {
@@ -159,7 +169,7 @@ void hf_main_task(void *argument)
   #endif
   // extern void MX_IWDG_Init(void);
   // MX_IWDG_Init();
-  set_mcu_led_status(LED_MCU_RUNING);
+
 
   for(;;)
   {

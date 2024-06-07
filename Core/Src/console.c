@@ -187,9 +187,9 @@ static const CLI_Command_Definition_t xCommands[] =
     },
     {
         "setmac",
-        "\r\nsetmac <mac,like a1:26:39:91:b0:22>: Set mac address.\r\n",
+        "\r\nsetmac <index,0-2> <mac,like a1:26:39:91:b0:22>: Set mac address.\r\n",
         prvCommandMacSet,
-        1
+        2
     },
     {
         "bootsel-g",
@@ -627,6 +627,7 @@ static BaseType_t prvCommandNetInfoGet(char *pcWriteBuffer, size_t xWriteBufferL
     char *pcWb = pcWriteBuffer;
     size_t len, size = xWriteBufferLen;
     NETInfo netInfo;
+    uint8_t mac[6];
 
     /* Read network information and fill FreeRTOS write buffer */
     netInfo = get_net_info();
@@ -640,7 +641,19 @@ static BaseType_t prvCommandNetInfoGet(char *pcWriteBuffer, size_t xWriteBufferL
     pcWb += len;
     size -= len;
 
-    len = snprintf(pcWb, size, "mac %s\r\n", netInfo.macaddr);
+    es_get_mcu_mac(mac, SOM_MAC0_IDX);
+    len = snprintf(pcWb, size, "SOM_Mac0: %02x:%02x:%02x:%02x:%02x:%02x\r\n",
+            mac[0],mac[1],mac[2],mac[3],mac[4],mac[5]);
+    pcWb += len;
+    size -= len;
+
+    es_get_mcu_mac(mac, SOM_MAC1_IDX);
+    len = snprintf(pcWb, size, "SOM_Mac1: %02x:%02x:%02x:%02x:%02x:%02x\r\n",
+            mac[0],mac[1],mac[2],mac[3],mac[4],mac[5]);
+    pcWb += len;
+    size -= len;
+
+    len = snprintf(pcWb, size, "MCU_Mac:  %s\r\n", netInfo.macaddr);
 
     return pdFALSE;
 }
@@ -707,9 +720,9 @@ static BaseType_t prvCommandNetMaskSet(char *pcWriteBuffer, size_t xWriteBufferL
 
     /* dynamically change netmask */
     netmask.netmask_addr0 = 0xff & naddr;
-    netmask.netmask_addr0 = 0xff & (naddr >> 8);
-    netmask.netmask_addr0 = 0xff & (naddr >> 16);
-    netmask.netmask_addr0 = 0xff & (naddr >> 24);
+    netmask.netmask_addr1 = 0xff & (naddr >> 8);
+    netmask.netmask_addr2 = 0xff & (naddr >> 16);
+    netmask.netmask_addr3 = 0xff & (naddr >> 24);
     es_set_eth(NULL, &netmask, NULL, NULL);
 
     snprintf(pcWriteBuffer, xWriteBufferLen, "netmask addr set to %s(0x%lx)\r\n", pcIPaddr, naddr);
@@ -764,20 +777,26 @@ out:
 static BaseType_t prvCommandMacSet(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString)
 {
     const char * pcMACaddr;
+    const char * pcMACIdx;
     BaseType_t xParamLen;
     uint8_t mac[6];
+    uint8_t mac_index;
 
-    pcMACaddr = FreeRTOS_CLIGetParameter(pcCommandString, 1, &xParamLen);
+    pcMACIdx = FreeRTOS_CLIGetParameter(pcCommandString, 1, &xParamLen);
+    mac_index = atoi(pcMACIdx);
+
+    pcMACaddr = FreeRTOS_CLIGetParameter(pcCommandString, 2, &xParamLen);
 
     /* set mac */
     hexstr2mac(mac, pcMACaddr);
-    es_set_mcu_mac(mac);
+    if (es_set_mcu_mac(mac, mac_index))
+        goto out;
 
-    snprintf(pcWriteBuffer, xWriteBufferLen, "MAC addr set to %s(%x:%x:%x:%x:%x:%x)\r\n",
-                pcMACaddr, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    snprintf(pcWriteBuffer, xWriteBufferLen, "MAC[%d] addr set to %s(%x:%x:%x:%x:%x:%x)\r\n",
+                mac_index, pcMACaddr, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
     printf("The MAC setting will be valid after rebooting the carrier board!!!\n");
-
+out:
     return pdFALSE;
 }
 

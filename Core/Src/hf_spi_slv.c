@@ -8,31 +8,31 @@ uint32_t get_regval(uint8_t reg);
 HAL_StatusTypeDef spi_transmit(uint8_t *pData, uint16_t Size)
 {
 	HAL_StatusTypeDef ret;
-	SPI2_MASTER_CS_LOW();
+	SPI2_FLASH_CS_LOW();
 	ret = HAL_SPI_Transmit(&hspi2, pData, Size, 0xff);
-	SPI2_MASTER_CS_HIGH();
+	SPI2_FLASH_CS_HIGH();
 	return ret;
 }
 
 HAL_StatusTypeDef spi_transmit_recive(uint8_t *pSndData, uint16_t SndSize, uint8_t *pRcvData, uint16_t RcvSize)
 {
 	HAL_StatusTypeDef ret;
-	SPI2_MASTER_CS_LOW();
+	SPI2_FLASH_CS_LOW();
 	ret = HAL_SPI_Transmit(&hspi2, pSndData, SndSize, 0xff);
 	if (ret != HAL_OK) {
 		return ret;
 	}
 	ret = HAL_SPI_Receive(&hspi2, pRcvData, RcvSize, 0xff);
-	SPI2_MASTER_CS_HIGH();
+	SPI2_FLASH_CS_HIGH();
 	return ret;
 }
 
 HAL_StatusTypeDef spi_recive(uint8_t *pData, uint16_t Size)
 {
 	HAL_StatusTypeDef ret;
-	SPI2_MASTER_CS_LOW();
+	SPI2_FLASH_CS_LOW();
 	ret = HAL_SPI_Receive(&hspi2, pData, Size, 0xff);
-	SPI2_MASTER_CS_HIGH();
+	SPI2_FLASH_CS_HIGH();
 	return ret;
 }
 void spi_addr_cfg(uint8_t *cmd, uint64_t addr)

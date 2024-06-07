@@ -26,7 +26,7 @@
 #define EEPROM_TEST_DEBUG 0
 #define SET_MAGIC_NUM_DEBUG 0
 
-#if 0
+#if 1
 #define esENTER_CRITICAL(MUTEX, DELAY)	xSemaphoreTake(MUTEX, DELAY)
 #define esEXIT_CRITICAL(MUTEX)		xSemaphoreGive(MUTEX)
 #else
@@ -40,7 +40,6 @@ static CarrierBoardInfo *pgCarrier_Board_Info = (CarrierBoardInfo *)gCbinfoArray
 static MCUServerInfo gMCU_Server_Info;
 static SomPwrMgtDIPInfo gSOM_PwgMgtDIP_Info;
 static SemaphoreHandle_t gEEPROM_Mutex;
-static uint32_t gMagicNumber = 0;
 
 /* function prototypes -----------------------------------------------*/
 #if EEPROM_TEST_DEBUG
@@ -258,13 +257,13 @@ static int restore_cbinfo_to_factory(uint32_t *pCbinfoArray)
 	pCarrier_Board_Info->ethernetMAC3[5] = MAC_ADDR5;
 
 	pCarrier_Board_Info->crc32Checksum = HAL_CRC_Calculate(&hcrc, (uint32_t *)pCbinfoArray, sizeof(CarrierBoardInfo)/4 - 1);
-
+#if 0
 	/* write to main partition */
 	write_cbinfo(pCarrier_Board_Info, cbinfo_main);
 
 	/* write to backup partition */
 	write_cbinfo(pCarrier_Board_Info, cbinfo_backup);
-
+#endif
 	esEXIT_CRITICAL(gEEPROM_Mutex);
 
 	return 0;
@@ -351,6 +350,7 @@ static int get_carrier_board_info(void)
 			write_cbinfo(pgCarrier_Board_Info, cbinfo_backup);
 		}
 	}
+
 	return 0;
 }
 
@@ -371,14 +371,14 @@ static int get_mcu_server_info(void)
 	}
 	eeprom_debug("print MCUServerInfo:\n");
 	print_data((uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo));
-	if ((0 == strlen(gMCU_Server_Info.AdminName)) | (gMagicNumber != MAGIC_NUMBER)) {
+	if ((0 == strlen(gMCU_Server_Info.AdminName)) || (pgCarrier_Board_Info->magicNumber != MAGIC_NUMBER)) {
 		skip_update_eeprom = 0;
 		memset(gMCU_Server_Info.AdminName, 0, sizeof(gMCU_Server_Info.AdminName));
 		strcpy(gMCU_Server_Info.AdminName, DEFAULT_ADMIN_NAME);
 		eeprom_debug("No valid admin_name in EEPROM, set to %s!\n", gMCU_Server_Info.AdminName);
 	}
 
-	if ((0 == strlen(gMCU_Server_Info.AdminPassword)) | (gMagicNumber != MAGIC_NUMBER)) {
+	if ((0 == strlen(gMCU_Server_Info.AdminPassword)) || (pgCarrier_Board_Info->magicNumber != MAGIC_NUMBER)) {
 		skip_update_eeprom = 0;
 		memset(gMCU_Server_Info.AdminPassword, 0, sizeof(gMCU_Server_Info.AdminPassword));
 		strcpy(gMCU_Server_Info.AdminPassword, DEFAULT_ADMIN_PASSWORD);
@@ -387,7 +387,7 @@ static int get_mcu_server_info(void)
 		print_data((uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo));
 	}
 
-	if ((0 == gMCU_Server_Info.ip_address[0]) | (gMagicNumber != MAGIC_NUMBER)) {
+	if ((0 == gMCU_Server_Info.ip_address[0]) || (pgCarrier_Board_Info->magicNumber != MAGIC_NUMBER)) {
 		skip_update_eeprom = 0;
 		gMCU_Server_Info.ip_address[0] = IP_ADDR0;
 		gMCU_Server_Info.ip_address[1] = IP_ADDR1;
@@ -397,7 +397,7 @@ static int get_mcu_server_info(void)
 	}
 
 	hlmask = ntohl_seq(gMCU_Server_Info.netmask_address);
-	if (!ip4_addr_netmask_valid(hlmask) | (gMagicNumber != MAGIC_NUMBER)) {
+	if (!ip4_addr_netmask_valid(hlmask) || (pgCarrier_Board_Info->magicNumber != MAGIC_NUMBER)) {
 		skip_update_eeprom = 0;
 		gMCU_Server_Info.netmask_address[0] = NETMASK_ADDR0;
 		gMCU_Server_Info.netmask_address[1] = NETMASK_ADDR1;
@@ -406,7 +406,7 @@ static int get_mcu_server_info(void)
 		eeprom_debug("No valid netmask in EEPROM, set to default!\n");
 	}
 
-	if ((0 == gMCU_Server_Info.gateway_address[0]) | (gMagicNumber != MAGIC_NUMBER)) {
+	if ((0 == gMCU_Server_Info.gateway_address[0]) || (pgCarrier_Board_Info->magicNumber != MAGIC_NUMBER)) {
 		skip_update_eeprom = 0;
 		gMCU_Server_Info.gateway_address[0] = GATEWAY_ADDR0;
 		gMCU_Server_Info.gateway_address[1] = GATEWAY_ADDR1;
@@ -575,20 +575,38 @@ int es_set_carrier_borad_info(CarrierBoardInfo *pCarrier_Board_Info)
 	return 0;
 }
 
-int es_get_mcu_mac(uint8_t *p_mac_address)
+int es_get_mcu_mac(uint8_t *p_mac_address, uint8_t index)
 {
 	if (NULL == p_mac_address)
 		return -1;
 
+	if (index > 2) {
+		printf("Invalid mac index!!! Should be within(0-2)\n");
+		return -1;
+	}
 	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
-	memcpy(p_mac_address, pgCarrier_Board_Info->ethernetMAC3, sizeof(pgCarrier_Board_Info->ethernetMAC3));
+	switch (index) {
+		case 0:
+			memcpy(p_mac_address, pgCarrier_Board_Info->ethernetMAC1, sizeof(pgCarrier_Board_Info->ethernetMAC1));
+			break;
+		case 1:
+			memcpy(p_mac_address, pgCarrier_Board_Info->ethernetMAC2, sizeof(pgCarrier_Board_Info->ethernetMAC2));
+			break;
+		case 2:
+			memcpy(p_mac_address, pgCarrier_Board_Info->ethernetMAC3, sizeof(pgCarrier_Board_Info->ethernetMAC3));
+			break;
+		default:
+			break;
+	}
 	esEXIT_CRITICAL(gEEPROM_Mutex);
 
 	return 0;
 }
 
-int es_set_mcu_mac(uint8_t *p_mac_address)
+int es_set_mcu_mac(uint8_t *p_mac_address, uint8_t index)
 {
+	int update_mac = 0;
+
 	if (NULL == p_mac_address)
 		return -1;
 
@@ -596,9 +614,41 @@ int es_set_mcu_mac(uint8_t *p_mac_address)
 		return -1;
 	}
 
+	if (index > 2) {
+		printf("Invalid mac index!!! Should be within(0-2)\n");
+		return -1;
+	}
+
 	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
-	if (0 != memcmp(pgCarrier_Board_Info->ethernetMAC3, p_mac_address, sizeof(pgCarrier_Board_Info->ethernetMAC3))) {
-		memcpy(pgCarrier_Board_Info->ethernetMAC3, p_mac_address, sizeof(pgCarrier_Board_Info->ethernetMAC3));
+	switch (index) {
+		case 0:
+			if (0 != memcmp(pgCarrier_Board_Info->ethernetMAC1, p_mac_address, sizeof(pgCarrier_Board_Info->ethernetMAC1))) {
+				memcpy(pgCarrier_Board_Info->ethernetMAC1, p_mac_address, sizeof(pgCarrier_Board_Info->ethernetMAC1));
+				update_mac = 1;
+			}
+			break;
+		case 1:
+		{
+			if (0 != memcmp(pgCarrier_Board_Info->ethernetMAC2, p_mac_address, sizeof(pgCarrier_Board_Info->ethernetMAC2))) {
+				memcpy(pgCarrier_Board_Info->ethernetMAC2, p_mac_address, sizeof(pgCarrier_Board_Info->ethernetMAC2));
+				update_mac = 1;
+			}
+			break;
+		}
+		case 2:
+		{
+			if (0 != memcmp(pgCarrier_Board_Info->ethernetMAC3, p_mac_address, sizeof(pgCarrier_Board_Info->ethernetMAC3))) {
+				memcpy(pgCarrier_Board_Info->ethernetMAC3, p_mac_address, sizeof(pgCarrier_Board_Info->ethernetMAC3));
+				update_mac = 1;
+			}
+			break;
+		}
+		default:
+			break;
+	}
+	if (update_mac) {
+		pgCarrier_Board_Info->crc32Checksum = HAL_CRC_Calculate(&hcrc, (uint32_t *)gCbinfoArray, sizeof(CarrierBoardInfo)/4 - 1);
+
 		hf_i2c_mem_write(&hi2c1, AT24C_ADDR, CARRIER_BOARD_INFO_EEPROM_MAIN_OFFSET,
 					(uint8_t *)pgCarrier_Board_Info, sizeof(CarrierBoardInfo));
 
@@ -1044,13 +1094,13 @@ int es_eeprom_info_test(void)
 	eeprom_debug("Get admin_name:%s, admin_password:%s\n", admin_name, admin_password);
 
 	/* mac test */
-	es_get_mcu_mac(mac);
+	es_get_mcu_mac(mac, MCU_MAC_IDX);
 	eeprom_debug("Get mac:%x:%x:%x:%x:%x:%x\n", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
 	mac[0] = 0xde; // original MAC_ADDR0 0x94U
-	es_set_mcu_mac(mac);
+	es_set_mcu_mac(mac, MCU_MAC_IDX);
 	eeprom_debug("Set mac:%x:%x:%x:%x:%x:%x\n", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-	es_get_mcu_mac(mac);
+	es_get_mcu_mac(mac, MCU_MAC_IDX);
 	eeprom_debug("Get mac:%x:%x:%x:%x:%x:%x\n", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
 	/* ipaddr test */
@@ -1332,33 +1382,6 @@ uint32_t es_autoboot(void)
 		}
 	}
 	return 0;
-}
-
-void set_mcu_led_status(led_status_t type)
-{
-	if( LED_MCU_RUNING == type) {
-		HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
-		HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_2);
-		HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_3);
-	}
-	else if( LED_SOM_BOOTING == type) {
-		HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
-		HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_3);
-	}
-	else if( LED_SOM_KERNEL_RUNING == type)
-	{
-		if(HAL_TIM_CHANNEL_STATE_BUSY == HAL_TIM_GetChannelState(&htim1, TIM_CHANNEL_2))
-		{
-			// HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_1);
-			HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_2);
-			HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
-		} else {
-			if(HAL_TIM_CHANNEL_STATE_BUSY == HAL_TIM_GetChannelState(&htim1, TIM_CHANNEL_3))
-				HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_3);
-			else
-				HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
-		}
-	}
 }
 
 int es_restore_userdata_to_factory(void)

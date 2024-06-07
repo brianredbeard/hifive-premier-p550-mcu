@@ -5,12 +5,12 @@
  extern "C" {
 #endif
 
-#define SPI2_MASTER_CS_LOW()                                                  \
+#define SPI2_FLASH_CS_LOW()                                                  \
 	do {                                                                     \
 		HAL_GPIO_WritePin(SPI2_NSS_GPIO_Port, SPI2_NSS_Pin, GPIO_PIN_RESET); \
 	} while (0);
 
-#define SPI2_MASTER_CS_HIGH()                                               \
+#define SPI2_FLASH_CS_HIGH()                                               \
 	do {                                                                   \
 		HAL_GPIO_WritePin(SPI2_NSS_GPIO_Port, SPI2_NSS_Pin, GPIO_PIN_SET); \
 	} while (0);

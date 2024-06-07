@@ -8,48 +8,42 @@ extern "C" {
 
 /* Includes ------------------------------------------------------------------*/
 #include <stdio.h>
-
+#include "stm32f4xx_hal.h"
 #include "FreeRTOS.h"
 #include "list.h"
-#include "queue.h"
-#include "stm32f4xx_hal.h"
 #include "task.h"
+#include "queue.h"
 
 /* types ------------------------------------------------------------*/
 typedef enum {
-	IDLE_STATE,
-	ATX_PS_ON_STATE,
-	DC_PWR_ON_STATE,
-	DC_PWR_GOOD_STATE,
-	SOM_STATUS_CHECK_STATE,
-	POWERON,
-	STOP_POWER
+  IDLE_STATE,
+  ATX_PS_ON_STATE,
+  ATX_PWR_GOOD_STATE,
+  DC_PWR_GOOD_STATE,
+  SOM_STATUS_CHECK_STATE,
+  RESET_SOM,
+  POWERON,
+  STOP_POWER
 } power_state_t;
 
 typedef enum {
-	KEY_IDLE_STATE = 0,
-	KEY_PRESS_DETECTED_STATE,
-	KEY_RELEASE_DETECTED_STATE,
-	KEY_SHORT_PRESS_STATE,
-	KEY_LONG_PRESS_STATE,
-	KEY_DOUBLE_PRESS_STATE,
-	KEY_PRESS_STATE_END
+  KEY_IDLE_STATE = 0,
+  KEY_PRESS_DETECTED_STATE,
+  KEY_RELEASE_DETECTED_STATE,
+  KEY_SHORT_PRESS_STATE,
+  KEY_LONG_PRESS_STATE,
+  KEY_DOUBLE_PRESS_STATE,
+  KEY_PRESS_STATE_END
 } button_state_t;
 
 typedef enum {
-	SOM_POWER_OFF,
-	SOM_POWER_ON
+  SOM_POWER_OFF,
+  SOM_POWER_ON
 } power_switch_t;
 
 typedef enum {
-	LED_MCU_RUNING = 0x1u,
-	LED_SOM_BOOTING,
-	LED_SOM_KERNEL_RUNING
-} led_status_t;
-
-typedef enum {
-	SOM_DAEMON_OFF,
-	SOM_DAEMON_ON,
+  SOM_DAEMON_OFF,
+  SOM_DAEMON_ON,
 } deamon_stats_t;
 
 #define FRAME_DATA_MAX 250
@@ -63,28 +57,28 @@ typedef enum {
 	CMD_PVT_INFO,
 	CMD_BOARD_STATUS,
 	CMD_POWER_INFO,
-	CMD_RESTART, // cold reboot with power off/on
-				 // You can continue adding other command types
+	CMD_RESTART,    //cold reboot with power off/on
+	// You can continue adding other command types
 } CommandType;
 
 // Message structure
 typedef struct {
-	uint32_t header;			  // Frame header
-	uint32_t xTaskToNotify;		  // id
-	uint8_t msg_type;			  // Message type
-	uint8_t cmd_type;			  // Command type
-	uint8_t cmd_result;			  // command result
-	uint8_t data_len;			  // Data length
+	uint32_t header;	// Frame header
+	uint32_t xTaskToNotify; // id
+	uint8_t msg_type; 	// Message type
+	uint8_t cmd_type; 	// Command type
+	uint8_t cmd_result;  // command result
+	uint8_t data_len; 	// Data length
 	uint8_t data[FRAME_DATA_MAX]; // Data
-	uint8_t checksum;			  // Checksum
-	uint32_t tail;				  // Frame tail
+	uint8_t checksum; 	// Checksum
+	uint32_t tail;		// Frame tail
 } __attribute__((packed)) Message;
 
 // WebCmd structure
 typedef struct {
-	ListItem_t xListItem; // FreeRTOS list item, must be the first member of the struct
+	ListItem_t xListItem; 	// FreeRTOS list item, must be the first member of the struct
 	TaskHandle_t xTaskToNotify;
-	uint8_t cmd_result;			  // command result
+	uint8_t cmd_result;  // command result
 	uint8_t data[FRAME_DATA_MAX]; // command result Data
 } WebCmd;
 
@@ -106,7 +100,7 @@ typedef struct {
 	uint8_t pcbRevision;
 	uint8_t bomRevision;
 	uint8_t bomVariant;
-	char boardSerialNumber[18]; // 18 bytes of serial number, excluding string terminator
+	char boardSerialNumber[18];	// 18 bytes of serial number, excluding string terminator
 	uint8_t manufacturingTestStatus;
 	uint8_t ethernetMAC1[6];	// The MAC of the SOM
 	uint8_t ethernetMAC2[6];	// The MAC of the SOM
@@ -126,12 +120,10 @@ typedef struct {
 } MCUServerInfo;
 
 typedef struct {
-	uint8_t som_pwr_lost_resume_attr;	  // enable(0xE) or disable(0xD) the last power state of the SOM
-	uint8_t som_pwr_last_state;			  // record the latest power state of the SOM: POWER ON(0xE), POWER OFF(0xD)
-	uint8_t som_dip_switch_soft_ctl_attr; // determin whether the bootsel of the SOM is controlled by software(0xE) via
-										  // GPIO or by hardware switch(0xD)
-	uint8_t som_dip_switch_soft_state; // record the DIP Switch software state of the SOM, it is used for SOM bootsel,
-									   // bit0---bit3 stand for the DIP0---DIP3
+	uint8_t som_pwr_lost_resume_attr;	// enable(0xE) or disable(0xD) the last power state of the SOM
+	uint8_t som_pwr_last_state;		// record the latest power state of the SOM: POWER ON(0xE), POWER OFF(0xD)
+	uint8_t som_dip_switch_soft_ctl_attr;	// determin whether the bootsel of the SOM is controlled by software(0xE) via GPIO or by hardware switch(0xD)
+	uint8_t som_dip_switch_soft_state;	// record the DIP Switch software state of the SOM, it is used for SOM bootsel, bit0---bit3 stand for the DIP0---DIP3
 } SomPwrMgtDIPInfo;
 
 struct gpio_cmd {
@@ -182,10 +174,10 @@ struct spi_slv_w32_t {
 };
 
 struct rtc_date_t {
-	uint16_t Year;
-	uint8_t Month;
-	uint8_t Date;
-	uint8_t WeekDay;
+  uint16_t Year;
+  uint8_t Month;
+  uint8_t Date;
+  uint8_t WeekDay;
 };
 
 struct rtc_time_t {
@@ -195,22 +187,26 @@ struct rtc_time_t {
 };
 
 typedef struct {
-	int dip01; // 0 on,1 off
-	int dip02;
-	int dip03;
+    int dip01;//0 on,1 off
+    int dip02;
+    int dip03;
 	int dip04;
-	int swctrl; // 0 hw,1,sw
+	int swctrl;//0 hw,1,sw
 } DIPSwitchInfo;
 /* constants --------------------------------------------------------*/
 extern UART_HandleTypeDef huart3;
 
 /* macro ------------------------------------------------------------*/
-#define __ALIGN_KERNEL(x, a) __ALIGN_KERNEL_MASK(x, (typeof(x))(a)-1)
-#define __ALIGN_KERNEL_MASK(x, mask) (((x) + (mask)) & ~(mask))
-#define ALIGN(x, a) __ALIGN_KERNEL((x), (a))
+#define __ALIGN_KERNEL(x, a)		__ALIGN_KERNEL_MASK(x, (typeof(x))(a) - 1)
+#define __ALIGN_KERNEL_MASK(x, mask)	(((x) + (mask)) & ~(mask))
+#define ALIGN(x, a)		__ALIGN_KERNEL((x), (a))
 
-#define MAX(x, y) (((x) > (y)) ? (x) : (y))
-#define MIN(x, y) (((x) < (y)) ? (x) : (y))
+#define MAX(x , y)  (((x) > (y)) ? (x) : (y))
+#define MIN(x , y)  (((x) < (y)) ? (x) : (y))
+
+#define SOM_MAC0_IDX	0
+#define SOM_MAC1_IDX	1
+#define MCU_MAC_IDX	2
 /* define ------------------------------------------------------------*/
 #define BMC_SOFTWARE_VERSION_MAJOR                   1
 #define BMC_SOFTWARE_VERSION_MINOR                   2
@@ -245,26 +241,26 @@ A cbinfo	64		0
 #define DEFAULT_ADMIN_NAME	"admin"
 #define DEFAULT_ADMIN_PASSWORD	"123456"
 
-#define SOM_PWR_LOST_RESUME_ENABLE 0xE // the eeprom internal value. For outside users, the corresponding value is TURE
-#define SOM_PWR_LOST_RESUME_DISABLE 0xD
+#define SOM_PWR_LOST_RESUME_ENABLE	0xE // the eeprom internal value. For outside users, the corresponding value is TURE
+#define SOM_PWR_LOST_RESUME_DISABLE	0xD
 
-#define SOM_PWR_LAST_STATE_ON 0xE // the eeprom internal value. For outside users, the corresponding value is TURE
-#define SOM_PWR_LAST_STATE_OFF 0xD
+#define SOM_PWR_LAST_STATE_ON	0xE // the eeprom internal value. For outside users, the corresponding value is TURE
+#define SOM_PWR_LAST_STATE_OFF	0xD
 
-#define SOM_DIP_SWITCH_SOFT_CTL_ENABLE \
-	0xE // the eeprom internal value. For outside users, the corresponding value is TURE
-#define SOM_DIP_SWITCH_SOFT_CTL_DISABLE 0xD
+#define SOM_DIP_SWITCH_SOFT_CTL_ENABLE	0xE // the eeprom internal value. For outside users, the corresponding value is TURE
+#define SOM_DIP_SWITCH_SOFT_CTL_DISABLE	0xD
 
-#define SOM_DIP_SWITCH_STATE_EMMC 0xE1 // the eeprom internal value. For outside users, the corresponding value is 0x1
+#define SOM_DIP_SWITCH_STATE_EMMC	0xE1 // the eeprom internal value. For outside users, the corresponding value is 0x1
+
 
 #define ES_EEPROM_INFO_TEST 0
 /* CLI console settings */
-#define CONSOLE_INSTANCE USART3
-#define CONSOLE_TASK_PRIORITY 1
-#define CONSOLE_STACK_SIZE 1024 // 3000
-#define consoleHandle huart3
+#define CONSOLE_INSTANCE		USART3
+#define CONSOLE_TASK_PRIORITY		1
+#define CONSOLE_STACK_SIZE		1024//3000
+#define consoleHandle			huart3
 
-#define ES_PRODUCTION_LINE_TEST 0
+#define ES_PRODUCTION_LINE_TEST		0
 
 /* functions prototypes ---------------------------------------------*/
 void hexstr2mac(uint8_t *mac, const char *hexstr);
@@ -279,9 +275,8 @@ int es_init_info_in_eeprom(void);
 
 int es_get_carrier_borad_info(CarrierBoardInfo *pCarrier_board_info);
 int es_set_carrier_borad_info(CarrierBoardInfo *pCarrier_board_info);
-
-int es_get_mcu_mac(uint8_t *p_mac_address);
-int es_set_mcu_mac(uint8_t *p_mac_address);
+int es_get_mcu_mac(uint8_t *p_mac_address, uint8_t index);
+int es_set_mcu_mac(uint8_t *p_mac_address, uint8_t index);
 
 int es_get_mcu_ipaddr(uint8_t *p_ip_address);
 int es_set_mcu_ipaddr(uint8_t *p_ip_address);
@@ -340,7 +335,6 @@ power_info get_power_info(void);
 int xSOMRestartHandle(void);
 int xSOMRebootHandle(void);
 
-void set_mcu_led_status(led_status_t type);
 int es_restore_userdata_to_factory(void);
 
 /* Dynamically change eth */

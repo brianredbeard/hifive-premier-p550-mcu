@@ -21,7 +21,7 @@ void eth_get_address(void)
 
   es_get_mcu_netmask(netmask_address);
 
-  es_get_mcu_mac(mac_address);
+  es_get_mcu_mac(mac_address, MCU_MAC_IDX);
 }
 
 extern struct netif gnetif;
