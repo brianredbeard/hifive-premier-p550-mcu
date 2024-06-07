@@ -305,6 +305,7 @@ int es_set_som_dip_switch_soft_state_all(int som_dip_switch_soft_ctl_attr, uint8
 int es_eeprom_info_test(void);
 power_switch_t get_som_power_state(void);
 void change_som_power_state(power_switch_t newState);
+int change_power_status(int status);
 void vRestartSOM(void);
 deamon_stats_t get_som_daemon_state(void);
 void change_som_daemon_state(deamon_stats_t newState);
@@ -329,8 +330,12 @@ int32_t es_get_rtc_date(struct rtc_date_t *sdate);
 int32_t es_get_rtc_time(struct rtc_time_t *stime);
 power_info get_power_info(void);
 int xSOMRestartHandle(void);
+int xSOMRebootHandle(void);
 
 int es_restore_userdata_to_factory(void);
+
+/* Dynamically change eth */
+int32_t es_set_eth(struct ip_t *ip, struct netmask_t *netmask, struct getway_t *gw, struct eth_mac_t *mac);
 
 #ifdef __cplusplus
 }

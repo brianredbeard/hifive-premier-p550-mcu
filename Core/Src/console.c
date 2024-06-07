@@ -658,15 +658,26 @@ static BaseType_t prvCommandIPSet(char *pcWriteBuffer, size_t xWriteBufferLen, c
     uint32_t naddr;
     const char * pcIPaddr;
     BaseType_t xParamLen;
+    struct ip_t ip;
 
     pcIPaddr = FreeRTOS_CLIGetParameter(pcCommandString, 1, &xParamLen);
 
-    /* set ipaddr */
+    /* store ipaddr to eeprom*/
     naddr = ipaddr_addr(pcIPaddr);
-    es_set_mcu_ipaddr((uint8_t *)&naddr);
+    if(es_set_mcu_ipaddr((uint8_t *)&naddr)) {
+        snprintf(pcWriteBuffer, xWriteBufferLen, "Invalid ip addr %s\r\n", pcIPaddr);
+        goto out;
+    }
+
+    /* dynamically change ip addr */
+    ip.ip_addr0 = 0xff & naddr;
+    ip.ip_addr1 = 0xff & (naddr >> 8);
+    ip.ip_addr2 = 0xff & (naddr >> 16);
+    ip.ip_addr3 = 0xff & (naddr >> 24);
+    es_set_eth(&ip, NULL, NULL, NULL);
 
     snprintf(pcWriteBuffer, xWriteBufferLen, "ip addr set to %s(0x%lx)\r\n", pcIPaddr, naddr);
-
+out:
     return pdFALSE;
 }
 
@@ -683,15 +694,26 @@ static BaseType_t prvCommandNetMaskSet(char *pcWriteBuffer, size_t xWriteBufferL
     uint32_t naddr;
     const char * pcIPaddr;
     BaseType_t xParamLen;
+    struct netmask_t netmask;
 
     pcIPaddr = FreeRTOS_CLIGetParameter(pcCommandString, 1, &xParamLen);
 
-    /* set ipaddr */
+    /* store netmask to eeprom*/
     naddr = ipaddr_addr(pcIPaddr);
-    es_set_mcu_netmask((uint8_t *)&naddr);
+    if (es_set_mcu_netmask((uint8_t *)&naddr)) {
+        snprintf(pcWriteBuffer, xWriteBufferLen, "Invalid netmask addr %s\r\n", pcIPaddr);
+        goto out;
+    }
+
+    /* dynamically change netmask */
+    netmask.netmask_addr0 = 0xff & naddr;
+    netmask.netmask_addr0 = 0xff & (naddr >> 8);
+    netmask.netmask_addr0 = 0xff & (naddr >> 16);
+    netmask.netmask_addr0 = 0xff & (naddr >> 24);
+    es_set_eth(NULL, &netmask, NULL, NULL);
 
     snprintf(pcWriteBuffer, xWriteBufferLen, "netmask addr set to %s(0x%lx)\r\n", pcIPaddr, naddr);
-
+out:
     return pdFALSE;
 }
 
@@ -708,15 +730,26 @@ static BaseType_t prvCommandGateWaySet(char *pcWriteBuffer, size_t xWriteBufferL
     uint32_t naddr;
     const char * pcIPaddr;
     BaseType_t xParamLen;
+    struct getway_t gw;
 
     pcIPaddr = FreeRTOS_CLIGetParameter(pcCommandString, 1, &xParamLen);
 
-    /* set ipaddr */
+    /* store gateway to eeprom */
     naddr = ipaddr_addr(pcIPaddr);
-    es_set_mcu_gateway((uint8_t *)&naddr);
+    if (es_set_mcu_gateway((uint8_t *)&naddr)) {
+        snprintf(pcWriteBuffer, xWriteBufferLen, "Invalid gateway addr %s\r\n", pcIPaddr);
+        goto out;
+    }
+
+    /* dynamically change gateway */
+    gw.getway_addr0 = 0xff & naddr;
+    gw.getway_addr1 = 0xff & (naddr >> 8);
+    gw.getway_addr2 = 0xff & (naddr >> 16);
+    gw.getway_addr3 = 0xff & (naddr >> 24);
+    es_set_eth(NULL, NULL, &gw, NULL);
 
     snprintf(pcWriteBuffer, xWriteBufferLen, "gateway addr set to %s(0x%lx)\r\n", pcIPaddr, naddr);
-
+out:
     return pdFALSE;
 }
 
@@ -742,6 +775,8 @@ static BaseType_t prvCommandMacSet(char *pcWriteBuffer, size_t xWriteBufferLen, 
 
     snprintf(pcWriteBuffer, xWriteBufferLen, "MAC addr set to %s(%x:%x:%x:%x:%x:%x)\r\n",
                 pcMACaddr, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+
+    printf("The MAC setting will be valid after rebooting the carrier board!!!\n");
 
     return pdFALSE;
 }
@@ -1055,7 +1090,6 @@ static BaseType_t prvCommandSomPwrStatusGet(char *pcWriteBuffer, size_t xWriteBu
 */
 static BaseType_t prvCommandSomPwrStatusSet(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString)
 {
-    int ret = 0;
     const char *cPwrOnOff;
     BaseType_t xParamLen;
     uint8_t powerOnOff;
@@ -1064,25 +1098,7 @@ static BaseType_t prvCommandSomPwrStatusSet(char *pcWriteBuffer, size_t xWriteBu
     powerOnOff = atoi(cPwrOnOff);
 
     /* change som power */
-    if (0 == powerOnOff) {
-        if (SOM_POWER_ON == get_som_power_state()) {
-            ret = web_cmd_handle(CMD_POWER_OFF, NULL, 0, 2000);
-            if (HAL_OK != ret) {
-                change_som_power_state(SOM_POWER_OFF);
-                printf("Poweroff SOM error(ret %d), force shutdown it!\n", ret);
-            }
-            // Trigger the Som timer to enusre SOM could poweroff in 5 senconds
-            TriggerSomPowerOffTimer();
-        } else {
-            printf("SOM already power off!\n");
-        }
-    } else {
-        if (SOM_POWER_OFF == get_som_power_state()) {
-            change_som_power_state(SOM_POWER_ON);
-        } else {
-            printf("SOM already power on!\n");
-        }
-    }
+    change_power_status(powerOnOff);
 
     return pdFALSE;
 }
@@ -1114,7 +1130,6 @@ static BaseType_t prvCommandSomSwWorkStatusGet(char *pcWriteBuffer, size_t xWrit
 */
 static BaseType_t prvCommandReboot(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString)
 {
-    int ret = HAL_OK;
     const char * pcCtlAttr;
     BaseType_t xParamLen;
     int ctl_attr;
@@ -1134,15 +1149,7 @@ static BaseType_t prvCommandReboot(char *pcWriteBuffer, size_t xWriteBufferLen, 
 
     if (SOM_POWER_ON == get_som_power_state()) {
         if (0 == ctl_attr) { // warm reboot
-        ret = web_cmd_handle(CMD_REBOOT, NULL, 0, 2000);
-            if (HAL_OK != ret) {
-                som_reset_control(pdTRUE);
-                osDelay(10);
-                som_reset_control(pdFALSE);
-                printf("Faild to reboot SOM(ret %d), force reset SOM!\n", ret);
-            }
-            // Trigger the Som timer to enusre SOM could reboot in 5 senconds
-            TriggerSomRebootTimer();
+            xSOMRebootHandle();
         }
         else { // cold reboot
             xSOMRestartHandle();

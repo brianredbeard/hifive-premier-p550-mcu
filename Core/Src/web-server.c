@@ -10459,7 +10459,7 @@ static int get_power_status()
 }
 
 //status 0:power off,1:power on
-static int change_power_status(int status)
+int change_power_status(int status)
 {
 	int ret = 0;
 
@@ -10495,7 +10495,7 @@ int change_power_lost_resume_attr(int status){//status 0:power off,1:power on
 	return es_set_som_pwr_lost_resume_attr(status);
 }
 
-int xSOMRebootHandle()
+int xSOMRebootHandle(void)
 {
 	int ret = HAL_OK;
 
