@@ -10,14 +10,15 @@
 
 /* Private define ------------------------------------------------------------*/
 #define SHORT_CLICK_THRESHOLD 50
-#define LONG_PRESS_THRESHOLD 3000
+#define LONG_PRESS_THRESHOLD 4000
 #define PRESS_Time 50
 #define BUTTON_ERROR_Time 10000
 
-#define FLAGS_KEY 0x00000001U
-#define FLAGS_SOM_RST_OUT 0x00000010U
-#define FLAGS_MCU_RESET_SOM 0x00000100U
-#define FLAGS_ALL 0x00000FFFU
+#define FLAGS_KEY			0x00000001U
+#define FLAGS_SOM_RST_OUT	0x00000010U
+#define FLAGS_MCU_RESET_SOM	0x00000100U
+#define FLAGS_KEY_USER_RST	0x00001000U
+#define FLAGS_ALL			0x00000FFFU
 
 #define KEY_PUSHDOWN GPIO_PIN_RESET
 #define KEY_RELEASE GPIO_PIN_SET
@@ -45,6 +46,8 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 	} else if (MCU_RESET_SOM_N_Pin == GPIO_Pin) {
 		// printf("MCU_RESET_SOM_N_Pin it   som key reset\n");
 		osEventFlagsSet(gpio_eventflags_id, FLAGS_MCU_RESET_SOM);
+	} else if (KEY_USER_RST_Pin == GPIO_Pin) {
+		osEventFlagsSet(gpio_eventflags_id, FLAGS_KEY_USER_RST);
 	}
 }
 
@@ -155,6 +158,49 @@ static void som_rst_feedback_process(void)
 	som_reset_control(pdFALSE);
 }
 
+#define USER_RST_THRESHOLD 10000
+static void key_user_rst_process(void)
+{
+	uint8_t key_status = KEY_PUSHDOWN;
+	button_state_t button_state = KEY_IDLE_STATE;
+	TickType_t pressStartTime = 0;
+	TickType_t currentTime = 0;
+	int ret = 0;
+
+	while (key_status == KEY_PUSHDOWN) {
+		currentTime = xTaskGetTickCount();
+		switch (button_state) {
+		case KEY_IDLE_STATE:
+			button_state = KEY_PRESS_DETECTED_STATE;
+			pressStartTime = currentTime;
+			break;
+		case KEY_PRESS_DETECTED_STATE:
+			if (get_key_status() == KEY_RELEASE) {
+				button_state = KEY_RELEASE_DETECTED_STATE;
+			} else if((currentTime - pressStartTime) > USER_RST_THRESHOLD) {
+				button_state = KEY_RELEASE_DETECTED_STATE;
+			}
+			break;
+		case KEY_RELEASE_DETECTED_STATE:
+			if((currentTime - pressStartTime) >= USER_RST_THRESHOLD)
+			{
+				// TODO : user reset function
+				es_restore_userdata_to_factory();
+			}
+			button_state = KEY_PRESS_STATE_END;
+			break;
+		case KEY_PRESS_STATE_END:
+			if (get_key_status() == KEY_RELEASE) {
+				// printf("sw IDLE_STATE\n");
+				key_status = KEY_RELEASE;
+				button_state = IDLE_STATE;
+			}
+			break;
+		}
+		osDelay(1);
+	}
+}
+
 void hf_gpio_task(void *parameter)
 {
 	int flags = 0;
@@ -169,6 +215,8 @@ void hf_gpio_task(void *parameter)
 				som_rst_feedback_process();
 			if (FLAGS_MCU_RESET_SOM & flags)
 				mcu_reset_som_process();
+			if (FLAGS_KEY_USER_RST & flags)
+				key_user_rst_process();
 		}
 	}
 }
