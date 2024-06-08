@@ -255,7 +255,7 @@ static int restore_cbinfo_to_factory(CarrierBoardInfo *pCarrier_Board_Info)
 	pCarrier_Board_Info->ethernetMAC3[4] = MAC_ADDR4;
 	pCarrier_Board_Info->ethernetMAC3[5] = MAC_ADDR5;
 
-	pCarrier_Board_Info->crc32Checksum = sifive_crc32((uint8_t *)pCarrier_Board_Info, sizeof(CarrierBoardInfo)/4 - 1);
+	pCarrier_Board_Info->crc32Checksum = sifive_crc32((uint8_t *)pCarrier_Board_Info, sizeof(CarrierBoardInfo) - 4);
 #if 0
 	/* write to main partition */
 	write_cbinfo(pCarrier_Board_Info, cbinfo_main);
@@ -313,7 +313,7 @@ static int get_carrier_board_info(void)
 	print_cbinfo(&gCarrier_Board_Info);
 	print_data((uint8_t *)&gCarrier_Board_Info, sizeof(CarrierBoardInfo));
 	/* calculate crc32 checksum of main partition */
-	crc32Checksum = sifive_crc32((uint8_t *)&gCarrier_Board_Info, sizeof(CarrierBoardInfo)/4 - 1);
+	crc32Checksum = sifive_crc32((uint8_t *)&gCarrier_Board_Info, sizeof(CarrierBoardInfo) - 4);
 	if (crc32Checksum != gCarrier_Board_Info.crc32Checksum) { //main partition is bad
 		printf("Bad main checksum,0x%lx is NOT equal to calculated value:0x%lx\n", gCarrier_Board_Info.crc32Checksum, crc32Checksum);
 		eeprom_debug("%s:%d\n", __func__, __LINE__);
@@ -324,7 +324,7 @@ static int get_carrier_board_info(void)
 			return -1;
 		}
 
-		crc32Checksum = sifive_crc32((uint8_t *)&gCarrier_Board_Info, sizeof(CarrierBoardInfo)/4 - 1);
+		crc32Checksum = sifive_crc32((uint8_t *)&gCarrier_Board_Info, sizeof(CarrierBoardInfo) - 4);
 		if (crc32Checksum != gCarrier_Board_Info.crc32Checksum) { // backup patition is also bad
 			/* restore to factory settings */
 			printf("Bad backup checksum,0x%lx is NOT equal to calculated value:0x%lx\n", gCarrier_Board_Info.crc32Checksum, crc32Checksum);
@@ -344,7 +344,7 @@ static int get_carrier_board_info(void)
 			return -1;
 		}
 		print_cbinfo(&CbinfoBackup);
-		crc32Checksum = sifive_crc32((uint8_t *)&CbinfoBackup, sizeof(CarrierBoardInfo)/4 - 1);
+		crc32Checksum = sifive_crc32((uint8_t *)&CbinfoBackup, sizeof(CarrierBoardInfo) - 4);
 		if (crc32Checksum != CbinfoBackup.crc32Checksum) {
 			/* recover the backup partition with the main value */
 			printf("Bad backup checksum,0x%lx is NOT equal to calculated value:0x%lx\n", CbinfoBackup.crc32Checksum, crc32Checksum);
@@ -555,7 +555,7 @@ int es_set_carrier_borad_info(CarrierBoardInfo *pCarrier_Board_Info)
 	if (NULL == pCarrier_Board_Info)
 		return -1;
 
-	pCarrier_Board_Info->crc32Checksum = sifive_crc32((uint8_t *)pCarrier_Board_Info, sizeof(CarrierBoardInfo)/4 - 1);
+	pCarrier_Board_Info->crc32Checksum = sifive_crc32((uint8_t *)pCarrier_Board_Info, sizeof(CarrierBoardInfo) - 4);
 
 	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
 	if (0 != memcmp(pCarrier_Board_Info, &gCarrier_Board_Info, sizeof(CarrierBoardInfo))) {
@@ -648,7 +648,7 @@ int es_set_mcu_mac(uint8_t *p_mac_address, uint8_t index)
 			break;
 	}
 	if (update_mac) {
-		gCarrier_Board_Info.crc32Checksum = sifive_crc32((uint8_t *)&gCarrier_Board_Info, sizeof(CarrierBoardInfo)/4 - 1);
+		gCarrier_Board_Info.crc32Checksum = sifive_crc32((uint8_t *)&gCarrier_Board_Info, sizeof(CarrierBoardInfo) - 4);
 
 		hf_i2c_mem_write(&hi2c1, AT24C_ADDR, CARRIER_BOARD_INFO_EEPROM_MAIN_OFFSET,
 					(uint8_t *)&gCarrier_Board_Info, sizeof(CarrierBoardInfo));
