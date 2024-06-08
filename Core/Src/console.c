@@ -106,6 +106,12 @@ static BaseType_t prvCommandSomPwrLostResumeGet(char *pcWriteBuffer, size_t xWri
 // set the power lost resume attribute: enable or disable
 static BaseType_t prvCommandSomPwrLostResumeSet(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString);
 
+// get the power last state from eeprom: 1 on , 0 off
+static BaseType_t prvCommandSomPwrLastStateGet(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString);
+
+// eeprom write protect pin set
+static BaseType_t prvCommandCBWpEEPROM(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString);
+
 /**
 *   @brief  This function is executed in case of error occurrence.
 *   @retval None
@@ -279,6 +285,18 @@ static const CLI_Command_Definition_t xCommands[] =
         "powerlost-s",
         "\r\npowerlost-s <1/0>: (1)Enable or (0)Disable.\r\n",
         prvCommandSomPwrLostResumeSet,
+        1
+    },
+    {
+        "pwrlast-g",
+        "\r\npwrlast-g: Get the som power last state. 1 or 0.\r\n",
+        prvCommandSomPwrLastStateGet,
+        0
+    },
+    {
+        "eepromwp-s",
+        "",
+        prvCommandCBWpEEPROM,
         1
     },
     {
@@ -1298,6 +1316,56 @@ static BaseType_t prvCommandSomPwrLostResumeSet(char *pcWriteBuffer, size_t xWri
 
     /* set som power lost attr*/
     es_set_som_pwr_lost_resume_attr(isResumePwrLost);
+
+    return pdFALSE;
+}
+
+
+/**
+* @brief Get the som power last state from eeprom: 1 on or 0 off
+* @param *pcWriteBuffer FreeRTOS CLI write buffer.
+* @param xWriteBufferLen Length of write buffer.
+* @param *pcCommandString pointer to the command name.
+* @retval FreeRTOS status
+*/
+static BaseType_t prvCommandSomPwrLastStateGet(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString)
+{
+    int pwr_last_state = 0;
+
+    /* pwr last state test */
+    es_get_som_pwr_last_state(&pwr_last_state);
+
+    snprintf(pcWriteBuffer, xWriteBufferLen, "pwr_last_state: %d\r\n", pwr_last_state);
+
+    return pdFALSE;
+}
+
+
+/**
+* @brief CarrierBoard EEPROM Write protect eeprom or disable write protect
+* @param *pcWriteBuffer FreeRTOS CLI write buffer.
+* @param xWriteBufferLen Length of write buffer.
+* @param *pcCommandString pointer to the command name.
+* @retval FreeRTOS status
+*/
+static BaseType_t prvCommandCBWpEEPROM(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString)
+{
+    const char *cEEPROM_WP;
+    BaseType_t xParamLen;
+    uint8_t WP_En;
+
+    cEEPROM_WP = FreeRTOS_CLIGetParameter(pcCommandString, 1, &xParamLen);
+    WP_En = atoi(cEEPROM_WP);
+
+    /* change write protect pin value */
+    if (!WP_En) {
+        HAL_GPIO_WritePin(EEPROM_WP_GPIO_Port, EEPROM_WP_Pin, GPIO_PIN_RESET);
+        snprintf(pcWriteBuffer, xWriteBufferLen, "EEPROM Write protect disabled!\r\n");
+    }
+    else {
+        HAL_GPIO_WritePin(EEPROM_WP_GPIO_Port, EEPROM_WP_Pin, GPIO_PIN_SET);
+        snprintf(pcWriteBuffer, xWriteBufferLen, "EEPROM Write protect enabled!\r\n");
+    }
 
     return pdFALSE;
 }
