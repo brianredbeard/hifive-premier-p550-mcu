@@ -111,7 +111,6 @@ typedef struct {
 	uint8_t ethernetMAC1[6];	// The MAC of the SOM
 	uint8_t ethernetMAC2[6];	// The MAC of the SOM
 	uint8_t ethernetMAC3[6];	// The MAC of the MCU
-	uint8_t padding[1];		// padding one byte to make the sizeof(CarrierBoardInfo) - sizeof(crc32Checksum) align with 4bytes
 	uint32_t crc32Checksum;
 	// uint8_t padding[4];
 } __attribute__((packed)) CarrierBoardInfo;
@@ -219,7 +218,7 @@ extern UART_HandleTypeDef huart3;
 #define BMC_SOFTWARE_VERSION_MAJOR                   1
 #define BMC_SOFTWARE_VERSION_MINOR                   2
 
-#define MAGIC_NUMBER	0xF15E5045
+#define MAGIC_NUMBER	0x45505EF1
 
 #define AT24C_ADDR (0x50<<1)
 
