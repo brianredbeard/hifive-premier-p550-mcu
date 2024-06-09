@@ -131,13 +131,20 @@ int main(void)
   */
 extern void hf_power_task (void* parameter);
 extern void hf_gpio_task (void* parameter);
-
+int retry_count = 10;
 void hf_main_task(void *argument)
 {
+  int ret = 0;
   printf("HiFive 106SC!\n");
 
   /* get board info from eeprom where the MAC is stored */
-  if(es_init_info_in_eeprom()) {
+  do
+  {
+    osDelay(220);
+    ret = es_init_info_in_eeprom();
+  } while (ret && (retry_count--));
+  
+  if(ret || retry_count <=0) {
     printf("severe error: get info from eeprom failed!!!");
     while(1);
   }
