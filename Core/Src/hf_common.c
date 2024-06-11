@@ -362,7 +362,7 @@ static int get_mcu_server_info(void)
 {
 	int ret = 0;
 	int skip_update_eeprom = 1;
-	u32_t hlmask;
+	uint32_t crc32Checksum;
 
 	memset((uint8_t *)&gMCU_Server_Info, 0, sizeof(MCUServerInfo));
 	eeprom_debug("print MCUServerInfo:\n");
@@ -374,53 +374,35 @@ static int get_mcu_server_info(void)
 	}
 	eeprom_debug("print MCUServerInfo:\n");
 	print_data((uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo));
-	if ((0 == strlen(gMCU_Server_Info.AdminName)) || (gCarrier_Board_Info.magicNumber != MAGIC_NUMBER)) {
+	crc32Checksum = sifive_crc32((uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo) - 4);
+
+	if (crc32Checksum != gMCU_Server_Info.crc32Checksum) {
 		skip_update_eeprom = 0;
 		memset(gMCU_Server_Info.AdminName, 0, sizeof(gMCU_Server_Info.AdminName));
 		strcpy(gMCU_Server_Info.AdminName, DEFAULT_ADMIN_NAME);
-		eeprom_debug("No valid admin_name in EEPROM, set to %s!\n", gMCU_Server_Info.AdminName);
-	}
 
-	if ((0 == strlen(gMCU_Server_Info.AdminPassword)) || (gCarrier_Board_Info.magicNumber != MAGIC_NUMBER)) {
-		skip_update_eeprom = 0;
 		memset(gMCU_Server_Info.AdminPassword, 0, sizeof(gMCU_Server_Info.AdminPassword));
 		strcpy(gMCU_Server_Info.AdminPassword, DEFAULT_ADMIN_PASSWORD);
-		eeprom_debug("No valid admin_password in EEPROM, set to %s!\n", gMCU_Server_Info.AdminPassword);
-		eeprom_debug("print MCUServerInfo:\n");
-		print_data((uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo));
-	}
 
-	if ((0 == gMCU_Server_Info.ip_address[0]) || (gCarrier_Board_Info.magicNumber != MAGIC_NUMBER)) {
-		skip_update_eeprom = 0;
 		gMCU_Server_Info.ip_address[0] = IP_ADDR0;
 		gMCU_Server_Info.ip_address[1] = IP_ADDR1;
 		gMCU_Server_Info.ip_address[2] = IP_ADDR2;
 		gMCU_Server_Info.ip_address[3] = IP_ADDR3;
-		eeprom_debug("No valid ipaddr in EEPROM, set to default!\n");
-	}
 
-	hlmask = ntohl_seq(gMCU_Server_Info.netmask_address);
-	if (!ip4_addr_netmask_valid(hlmask) || (gCarrier_Board_Info.magicNumber != MAGIC_NUMBER)) {
-		skip_update_eeprom = 0;
 		gMCU_Server_Info.netmask_address[0] = NETMASK_ADDR0;
 		gMCU_Server_Info.netmask_address[1] = NETMASK_ADDR1;
 		gMCU_Server_Info.netmask_address[2] = NETMASK_ADDR2;
 		gMCU_Server_Info.netmask_address[3] = NETMASK_ADDR3;
-		eeprom_debug("No valid netmask in EEPROM, set to default!\n");
-	}
 
-	if ((0 == gMCU_Server_Info.gateway_address[0]) || (gCarrier_Board_Info.magicNumber != MAGIC_NUMBER)) {
-		skip_update_eeprom = 0;
 		gMCU_Server_Info.gateway_address[0] = GATEWAY_ADDR0;
 		gMCU_Server_Info.gateway_address[1] = GATEWAY_ADDR1;
 		gMCU_Server_Info.gateway_address[2] = GATEWAY_ADDR2;
 		gMCU_Server_Info.gateway_address[3] = GATEWAY_ADDR3;
-		eeprom_debug("No valid gateway in EEPROM, set to default!\n");
+
+		gMCU_Server_Info.crc32Checksum = sifive_crc32((uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo) - 4);
+		printf("Invalid checksum of mcu server info, update it with default value!\n");
 	}
 
-
-	eeprom_debug("print MCUServerInfo:\n");
-	print_data((uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo));
 	if (skip_update_eeprom == 0) {
 		eeprom_debug("Update admin_name:%s, password:%s\n",
 			gMCU_Server_Info.AdminName, gMCU_Server_Info.AdminPassword);
@@ -435,7 +417,7 @@ static int get_mcu_server_info(void)
 	eeprom_debug("print MCUServerInfo:\n");
 	print_data((uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo));
 
-	eeprom_debug("get_mcu_server_info Successfully!\n");
+	printf("get_mcu_server_info Successfully!\n");
 
 	return 0;
 }
@@ -686,6 +668,7 @@ int es_set_mcu_ipaddr(uint8_t *p_ip_address)
 	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
 	if (0 != memcmp(gMCU_Server_Info.ip_address, p_ip_address, sizeof(gMCU_Server_Info.ip_address))) {
 		memcpy(gMCU_Server_Info.ip_address, p_ip_address, sizeof(gMCU_Server_Info.ip_address));
+		gMCU_Server_Info.crc32Checksum = sifive_crc32((uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo) - 4);
 		hf_i2c_mem_write(&hi2c1, AT24C_ADDR, MCU_SERVER_INFO_EEPROM_OFFSET,
 			(uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo));
 	}
@@ -722,6 +705,7 @@ int es_set_mcu_netmask(uint8_t *p_netmask_address)
 	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
 	if (0 != memcmp(gMCU_Server_Info.netmask_address, p_netmask_address, sizeof(gMCU_Server_Info.netmask_address))) {
 		memcpy(gMCU_Server_Info.netmask_address, p_netmask_address, sizeof(gMCU_Server_Info.netmask_address));
+		gMCU_Server_Info.crc32Checksum = sifive_crc32((uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo) - 4);
 		hf_i2c_mem_write(&hi2c1, AT24C_ADDR, MCU_SERVER_INFO_EEPROM_OFFSET,
 			(uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo));
 	}
@@ -754,6 +738,7 @@ int es_set_mcu_gateway(uint8_t *p_gateway_address)
 	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
 	if (0 != memcmp(gMCU_Server_Info.gateway_address, p_gateway_address, sizeof(gMCU_Server_Info.gateway_address))) {
 		memcpy(gMCU_Server_Info.gateway_address, p_gateway_address, sizeof(gMCU_Server_Info.gateway_address));
+		gMCU_Server_Info.crc32Checksum = sifive_crc32((uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo) - 4);
 		hf_i2c_mem_write(&hi2c1, AT24C_ADDR, MCU_SERVER_INFO_EEPROM_OFFSET,
 			(uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo));
 	}
@@ -799,6 +784,7 @@ int es_set_username_password(const char *p_admin_name, const char *p_admin_passw
 	if ((0 != strcmp(gMCU_Server_Info.AdminName, p_admin_name)) || (0 != strcmp(gMCU_Server_Info.AdminPassword, p_admin_password))) {
 		strcpy(gMCU_Server_Info.AdminName, p_admin_name);
 		strcpy(gMCU_Server_Info.AdminPassword, p_admin_password);
+		gMCU_Server_Info.crc32Checksum = sifive_crc32((uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo) - 4);
 		hf_i2c_mem_write(&hi2c1, AT24C_ADDR, MCU_SERVER_INFO_EEPROM_OFFSET,
 			(uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo));
 	}

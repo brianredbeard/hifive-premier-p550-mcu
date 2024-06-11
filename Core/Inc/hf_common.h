@@ -121,7 +121,7 @@ typedef struct {
 	uint8_t ip_address[4];
 	uint8_t netmask_address[4];
 	uint8_t gateway_address[4];
-	// uint8_t padding[4];
+	uint32_t crc32Checksum;
 } MCUServerInfo;
 
 typedef struct {
