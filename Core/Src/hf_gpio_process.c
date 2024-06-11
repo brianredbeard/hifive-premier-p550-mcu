@@ -153,9 +153,11 @@ static void mcu_reset_som_process(void)
 static void som_rst_feedback_process(void)
 {
 	printf("%s %d som reset\n", __func__, __LINE__);
-	som_reset_control(pdTRUE);
-	osDelay(2);
-	som_reset_control(pdFALSE);
+	if (get_som_power_state() == SOM_DAEMON_ON) {
+		som_reset_control(pdTRUE);
+		osDelay(2);
+		som_reset_control(pdFALSE);
+	}
 }
 
 #define USER_RST_THRESHOLD 10000
