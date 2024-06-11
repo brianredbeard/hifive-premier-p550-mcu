@@ -10463,7 +10463,7 @@ int change_power_status(int status)
 			ret = web_cmd_handle(CMD_POWER_OFF, NULL, 0, 2000);
 			if (HAL_OK != ret) {
 				change_som_power_state(SOM_POWER_OFF);
-				web_debug("Poweroff SOM error(ret %d), force shutdown it!\n", ret);
+				printf("Poweroff SOM error(ret %d), force shutdown it!\n", ret);
 				ret = HAL_OK;
 				return ret;
 			}
@@ -10500,7 +10500,7 @@ int xSOMRebootHandle(void)
 		som_reset_control(pdTRUE);
 		osDelay(10);
 		som_reset_control(pdFALSE);
-		web_debug("Faild to reboot SOM(ret %d), force reset SOM!\n", ret);
+		printf("Faild to reboot SOM(ret %d), force reset SOM!\n", ret);
 		ret = HAL_OK;
 		return ret;
 	}
@@ -10516,7 +10516,7 @@ int xSOMRestartHandle(void)
 
 	ret = web_cmd_handle(CMD_RESTART, NULL, 0, 2000);
 	if (HAL_OK != ret) {
-		web_debug("Faild to restart SOM(ret %d), force restart SOM!\n", ret);
+		printf("Faild to restart SOM(ret %d), force restart SOM!\n", ret);
 		vRestartSOM();
 		ret = HAL_OK;
 		return ret;
@@ -10532,10 +10532,15 @@ power_info get_power_info(void)
 	power_info power_info = {0};
 	int ret = HAL_OK;
 
+#if 0
 	ret = web_cmd_handle(CMD_POWER_INFO, &power_info, sizeof(power_info), 1000);
 	if (HAL_OK != ret) {
 		web_debug("Failed to get power info %d\n", ret);
 	}
+#else
+	if (get_power_status())
+		get_board_power(&power_info.voltage,&power_info.current,&power_info.consumption);
+#endif
 	web_debug("web call get_power_info, consumption %d, current %d, voltage %d, ret %d\n",
 		power_info->consumption, power_info->current, power_info->voltage, ret);
 	return power_info;

@@ -59,7 +59,7 @@ static void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
 static void MX_I2C1_Init(void);
-static void MX_I2C3_Init(void);
+void MX_I2C3_Init(void);
 static void MX_SPI2_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_WWDG_Init(void);
@@ -240,7 +240,7 @@ static void MX_I2C1_Init(void)
  * @param None
  * @retval None
  */
-static void MX_I2C3_Init(void)
+void MX_I2C3_Init(void)
 {
 	hi2c3.Instance = I2C3;
 	hi2c3.Init.ClockSpeed = 100000;

@@ -1088,12 +1088,19 @@ static BaseType_t prvCommandTempGet(char *pcWriteBuffer, size_t xWriteBufferLen,
 static BaseType_t prvCommandPwrDissipationGet(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString)
 {
     uint32_t millivolt = 0, milliCur = 0, microWatt = 0; //millivolt, milliCurrent, milliwatt
+#if 0
     power_info power_info = {0};
-
     power_info = get_power_info();
     millivolt = power_info.voltage;
     milliCur = power_info.current;
     microWatt = power_info.consumption;
+#else
+    int pwrStaus;
+    pwrStaus = get_som_power_state();
+    if (pwrStaus == SOM_POWER_ON) {
+        get_board_power(&millivolt, &milliCur, &microWatt);
+    }
+#endif
     snprintf(pcWriteBuffer, xWriteBufferLen,"consumption:%ld.%3.3ld(W)  voltage:%ld.%03ld(V)  current:%ld.%03ld(A)\n",
         microWatt / 1000000, microWatt % 1000000, millivolt / 1000, millivolt % 1000, milliCur / 1000, milliCur % 1000);
     return pdFALSE;
