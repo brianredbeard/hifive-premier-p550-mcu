@@ -215,8 +215,8 @@ extern UART_HandleTypeDef huart3;
 #define SOM_MAC1_IDX	1
 #define MCU_MAC_IDX	2
 /* define ------------------------------------------------------------*/
-#define BMC_SOFTWARE_VERSION_MAJOR                   1
-#define BMC_SOFTWARE_VERSION_MINOR                   2
+#define BMC_SOFTWARE_VERSION_MAJOR                   2
+#define BMC_SOFTWARE_VERSION_MINOR                   0
 
 #define MAGIC_NUMBER	0x45505EF1
 
