@@ -111,6 +111,7 @@ static void key_process(void)
 			printf("KEY_SHORT_PRESS_STATE time %ld\n", currentTime - pressStartTime);
 			button_state = KEY_PRESS_STATE_END;
 			if (get_som_power_state() != SOM_POWER_ON) {
+				vStopSomPowerOffTimer();
 				change_som_power_state(SOM_POWER_ON);
 			}
 			break;

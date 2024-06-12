@@ -10474,6 +10474,7 @@ int change_power_status(int status)
 		}
 	} else {
 		if (SOM_POWER_OFF == get_som_power_state()) {
+			vStopSomPowerOffTimer();
 			change_som_power_state(SOM_POWER_ON);
 		} else {
 			web_debug("SOM already power on!\n");
