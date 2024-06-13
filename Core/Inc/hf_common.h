@@ -44,7 +44,8 @@ typedef enum {
 typedef enum {
 	LED_MCU_RUNING = 0x1u,
 	LED_SOM_BOOTING,
-	LED_SOM_KERNEL_RUNING
+	LED_SOM_KERNEL_RUNING,
+	LED_USER_INFO_RESET
 } led_status_t;
 
 typedef enum {
@@ -322,6 +323,7 @@ deamon_stats_t get_som_daemon_state(void);
 void change_som_daemon_state(deamon_stats_t newState);
 
 void TriggerSomPowerOffTimer(void);
+void vStopSomPowerOffTimer(void);
 void TriggerSomRebootTimer(void);
 void StopSomRebootTimer(void);
 void TriggerSomRestartTimer(void);

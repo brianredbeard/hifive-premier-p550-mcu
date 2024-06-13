@@ -1370,23 +1370,27 @@ uint32_t es_autoboot(void)
 	}
 	return 0;
 }
+led_status_t led_status_type = LED_MCU_RUNING;
+int get_mcu_led_status(void)
+{
+	return led_status_type;
+}
 
 void set_mcu_led_status(led_status_t type)
 {
-	if( LED_MCU_RUNING == type) {
+	led_status_type = type;
+	if( LED_MCU_RUNING == led_status_type) {
 		HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
 		HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_2);
 		HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_3);
-	}
-	else if( LED_SOM_BOOTING == type) {
+	} else if( LED_SOM_BOOTING == type) {
+		HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_1);
 		HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
 		HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_3);
-	}
-	else if( LED_SOM_KERNEL_RUNING == type)
-	{
-		if(HAL_TIM_CHANNEL_STATE_BUSY == HAL_TIM_GetChannelState(&htim1, TIM_CHANNEL_2))
-		{
-			// HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_1);
+	} else if( LED_SOM_KERNEL_RUNING == led_status_type) {
+		if((HAL_TIM_CHANNEL_STATE_BUSY == HAL_TIM_GetChannelState(&htim1, TIM_CHANNEL_2)) || 
+			    HAL_TIM_CHANNEL_STATE_BUSY == HAL_TIM_GetChannelState(&htim1, TIM_CHANNEL_1)) {
+			HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_1);
 			HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_2);
 			HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
 		} else {
@@ -1395,6 +1399,10 @@ void set_mcu_led_status(led_status_t type)
 			else
 				HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
 		}
+	} else if( LED_USER_INFO_RESET == led_status_type) {
+		HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+		HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
+		HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
 	}
 }
 

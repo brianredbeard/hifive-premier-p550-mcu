@@ -18,7 +18,7 @@
 #define FLAGS_SOM_RST_OUT	0x00000010U
 #define FLAGS_MCU_RESET_SOM	0x00000100U
 #define FLAGS_KEY_USER_RST	0x00001000U
-#define FLAGS_ALL			0x00000FFFU
+#define FLAGS_ALL			0x0000FFFFU
 
 #define KEY_PUSHDOWN GPIO_PIN_RESET
 #define KEY_RELEASE GPIO_PIN_SET
@@ -161,6 +161,10 @@ static void som_rst_feedback_process(void)
 	}
 }
 
+static uint8_t get_user_key_status(void)
+{
+	return HAL_GPIO_ReadPin(KEY_USER_RST_GPIO_Port, KEY_USER_RST_Pin);
+}
 #define USER_RST_THRESHOLD 10000
 static void key_user_rst_process(void)
 {
@@ -169,6 +173,7 @@ static void key_user_rst_process(void)
 	TickType_t pressStartTime = 0;
 	TickType_t currentTime = 0;
 	int ret = 0;
+	int led_type = 0;
 
 	while (key_status == KEY_PUSHDOWN) {
 		currentTime = xTaskGetTickCount();
@@ -178,23 +183,27 @@ static void key_user_rst_process(void)
 			pressStartTime = currentTime;
 			break;
 		case KEY_PRESS_DETECTED_STATE:
-			if (get_key_status() == KEY_RELEASE) {
+			if((currentTime - pressStartTime) > USER_RST_THRESHOLD) {
 				button_state = KEY_RELEASE_DETECTED_STATE;
-			} else if((currentTime - pressStartTime) > USER_RST_THRESHOLD) {
-				button_state = KEY_RELEASE_DETECTED_STATE;
+			} else if (get_user_key_status() == KEY_RELEASE) {
+				button_state = KEY_PRESS_STATE_END;
 			}
 			break;
 		case KEY_RELEASE_DETECTED_STATE:
 			if((currentTime - pressStartTime) >= USER_RST_THRESHOLD)
 			{
+				printf("restore userdata to factory\n");
 				// TODO : user reset function
+				led_type = get_mcu_led_status();
+				set_mcu_led_status(LED_USER_INFO_RESET);
 				es_restore_userdata_to_factory();
 			}
 			button_state = KEY_PRESS_STATE_END;
 			break;
 		case KEY_PRESS_STATE_END:
-			if (get_key_status() == KEY_RELEASE) {
+			if (get_user_key_status() == KEY_RELEASE) {
 				// printf("sw IDLE_STATE\n");
+				set_mcu_led_status(led_type);
 				key_status = KEY_RELEASE;
 				button_state = IDLE_STATE;
 			}

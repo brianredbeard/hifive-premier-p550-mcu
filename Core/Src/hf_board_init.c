@@ -138,7 +138,7 @@ int board_init(void)
 	MX_RTC_Init();
 	MX_TIM4_Init();
 	// MX_SPI1_Init();
-	// MX_CRC_Init();
+	MX_CRC_Init();
 	// MX_RNG_Init();
 	MX_TIM1_Init();
 	MX_TIM9_Init();

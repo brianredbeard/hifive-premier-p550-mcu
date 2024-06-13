@@ -625,7 +625,8 @@ void deamon_keeplive_task(void *argument)
 			}
 		} else {
 			change_som_daemon_state(SOM_DAEMON_ON);
-			set_mcu_led_status(LED_SOM_KERNEL_RUNING);
+			if(LED_USER_INFO_RESET != get_mcu_led_status())
+				set_mcu_led_status(LED_SOM_KERNEL_RUNING);
 			count = 0;
 		}
 		if (old_status != get_som_daemon_state()) {
