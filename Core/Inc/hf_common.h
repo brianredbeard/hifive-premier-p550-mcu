@@ -350,6 +350,7 @@ int es_restore_userdata_to_factory(void);
 
 /* Dynamically change eth */
 int32_t es_set_eth(struct ip_t *ip, struct netmask_t *netmask, struct getway_t *gw, struct eth_mac_t *mac);
+void MX_I2C3_Init(void);
 
 #ifdef __cplusplus
 }

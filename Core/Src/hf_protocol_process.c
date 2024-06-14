@@ -11,6 +11,7 @@
 #include "semphr.h"
 #include "timers.h"
 #include "hf_spi_slv.h"
+#include "web-server.h"
 
 #define head_meg "\xA5\x5A\xAA\x55"
 #define end_msg "\x0D\x0A\x0D\x0A"
