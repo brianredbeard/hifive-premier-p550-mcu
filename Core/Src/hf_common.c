@@ -1391,6 +1391,10 @@ uint32_t es_autoboot(void)
 			printf("pwr enable and last state is power on\n");
 			return 1;
 		}
+		else {
+			printf("pwr enable and last state is power off\n");
+
+		}
 	}
 	return 0;
 }
