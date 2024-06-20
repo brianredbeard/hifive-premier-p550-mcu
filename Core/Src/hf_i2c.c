@@ -53,9 +53,6 @@ int hf_i2c_reg_write(I2C_HandleTypeDef *hi2c, uint8_t slave_addr,
 		hf_i2c_reinit(hi2c);
 		return status;
 	}
-	while (HAL_I2C_GetState(hi2c) != HAL_I2C_STATE_READY);
-	while (HAL_I2C_IsDeviceReady(hi2c, slave_addr, 0xff, 0xff) == HAL_TIMEOUT);
-	while (HAL_I2C_GetState(hi2c) != HAL_I2C_STATE_READY);
 	return status;
 }
 
@@ -63,7 +60,6 @@ int hf_i2c_reg_read(I2C_HandleTypeDef *hi2c, uint8_t slave_addr,
 					uint8_t reg_addr, uint8_t *data_ptr)
 {
 	HAL_StatusTypeDef status = HAL_OK;
-	while (HAL_I2C_GetState(hi2c) != HAL_I2C_STATE_READY);
 	status = HAL_I2C_Mem_Read(hi2c, slave_addr, reg_addr, I2C_MEMADD_SIZE_8BIT,
 							  data_ptr, 0x1, 0xff);
 	if (status != HAL_OK){
@@ -71,9 +67,6 @@ int hf_i2c_reg_read(I2C_HandleTypeDef *hi2c, uint8_t slave_addr,
 		hf_i2c_reinit(hi2c);
 		return status;
 	}
-	while (HAL_I2C_GetState(hi2c) != HAL_I2C_STATE_READY);
-	while (HAL_I2C_IsDeviceReady(hi2c, slave_addr, 0xff, 0xff) == HAL_TIMEOUT);
-	while (HAL_I2C_GetState(hi2c) != HAL_I2C_STATE_READY);
 	return status;
 }
 
@@ -82,7 +75,6 @@ int hf_i2c_mem_read(I2C_HandleTypeDef *hi2c, uint8_t slave_addr,
 {
 	HAL_StatusTypeDef status = HAL_OK;
 
-	while (HAL_I2C_GetState(hi2c) != HAL_I2C_STATE_READY);
 	status = HAL_I2C_Mem_Read(hi2c, slave_addr, reg_addr, I2C_MEMADD_SIZE_8BIT,
 					data_ptr, len, 1000);
 	if (status != HAL_OK)
@@ -91,8 +83,6 @@ int hf_i2c_mem_read(I2C_HandleTypeDef *hi2c, uint8_t slave_addr,
 		hf_i2c_reinit(hi2c);
 		return status;
 	}
-	while (HAL_I2C_GetState(hi2c) != HAL_I2C_STATE_READY);
-	while (HAL_I2C_IsDeviceReady(hi2c, slave_addr, 0xff, 0xff) == HAL_TIMEOUT);
 	return status;
 }
 
@@ -120,7 +110,6 @@ int hf_i2c_mem_write(I2C_HandleTypeDef *hi2c, uint8_t slave_addr,
 			goto out;
 		}
 		while (HAL_I2C_IsDeviceReady(hi2c, slave_addr, 0xff, 0xff) == HAL_TIMEOUT);
-		while (HAL_I2C_GetState(hi2c) != HAL_I2C_STATE_READY);
 	}
 	offset = i;
 	// 8 bytes page write
@@ -136,7 +125,6 @@ int hf_i2c_mem_write(I2C_HandleTypeDef *hi2c, uint8_t slave_addr,
 			goto out;
 		}
 		while (HAL_I2C_IsDeviceReady(hi2c, slave_addr, 0xff, 0xff) == HAL_TIMEOUT);
-		while (HAL_I2C_GetState(hi2c) != HAL_I2C_STATE_READY);
 		i = i + 8;
 	}
 	offset = offset + i;
@@ -153,7 +141,6 @@ int hf_i2c_mem_write(I2C_HandleTypeDef *hi2c, uint8_t slave_addr,
 			goto out;
 		}
 		while (HAL_I2C_IsDeviceReady(hi2c, slave_addr, 0xff, 0xff) == HAL_TIMEOUT);
-		while (HAL_I2C_GetState(hi2c) != HAL_I2C_STATE_READY);
 	}
 out:
 	if (hi2c->Instance == I2C1)
@@ -173,8 +160,6 @@ int hf_i2c_reg_write_block(I2C_HandleTypeDef *hi2c, uint8_t slave_addr,
 		hf_i2c_reinit(hi2c);
 		return status;
 	}
-	while (HAL_I2C_GetState(hi2c) != HAL_I2C_STATE_READY);
-	while (HAL_I2C_IsDeviceReady(hi2c, slave_addr, 0xff, 0xff) == HAL_TIMEOUT);
 	return status;
 }
 
@@ -182,7 +167,6 @@ int hf_i2c_reg_read_block(I2C_HandleTypeDef *hi2c, uint8_t slave_addr,
 					uint8_t reg_addr, uint8_t *data_ptr, uint8_t len)
 {
 	HAL_StatusTypeDef status = HAL_OK;
-	while (HAL_I2C_GetState(hi2c) != HAL_I2C_STATE_READY);
 	status = HAL_I2C_Mem_Read(hi2c, slave_addr, reg_addr, I2C_MEMADD_SIZE_8BIT,
 							  data_ptr, len, pdMS_TO_TICKS(100));
 	if (status != HAL_OK){
@@ -190,7 +174,5 @@ int hf_i2c_reg_read_block(I2C_HandleTypeDef *hi2c, uint8_t slave_addr,
 		hf_i2c_reinit(hi2c);
 		return status;
 	}
-	while (HAL_I2C_GetState(hi2c) != HAL_I2C_STATE_READY);
-	while (HAL_I2C_IsDeviceReady(hi2c, slave_addr, 0xff, 0xff) == HAL_TIMEOUT);
 	return status;
 }
