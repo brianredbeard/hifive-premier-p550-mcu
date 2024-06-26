@@ -463,7 +463,7 @@ static int get_som_pwrmgt_dip_info(void)
 		skip_update_eeprom = 0;
 		eeprom_debug("Invalid pwr lost resume attr(0x%x) in EEPROM, set to SOM_PWR_LOST_RESUME_ENABLE!\n",
 				gSOM_PwgMgtDIP_Info.som_pwr_lost_resume_attr);
-		gSOM_PwgMgtDIP_Info.som_pwr_lost_resume_attr = SOM_PWR_LOST_RESUME_ENABLE;
+		gSOM_PwgMgtDIP_Info.som_pwr_lost_resume_attr = SOM_PWR_LOST_RESUME_DISABLE;
 	}
 
 	if ((gSOM_PwgMgtDIP_Info.som_pwr_last_state != SOM_PWR_LAST_STATE_ON) &&
