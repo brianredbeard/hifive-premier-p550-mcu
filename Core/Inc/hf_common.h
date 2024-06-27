@@ -157,6 +157,7 @@ typedef struct {
 										  // GPIO or by hardware switch(0xD)
 	uint8_t som_dip_switch_soft_state; // record the DIP Switch software state of the SOM, it is used for SOM bootsel,
 									   // bit0---bit3 stand for the DIP0---DIP3
+	uint32_t crc32Checksum;
 } SomPwrMgtDIPInfo;
 
 struct gpio_cmd {
@@ -248,6 +249,18 @@ extern UART_HandleTypeDef huart3;
 
 #define AT24C_ADDR (0x50<<1)
 
+#define BMC_DEBUG_EN	0
+#define bmc_fmt(fmt)	"[%s-BMC]: " fmt
+#define bmc_dbg_fmt(fmt)	bmc_fmt("%s[%d]: " fmt), "DEBUG",	\
+		        __func__, __LINE__
+#if BMC_DEBUG_EN
+#define bmc_debug(fmt, args...) \
+	do {							\
+		printf(bmc_dbg_fmt(fmt), ##args);	\
+	} while (0)
+#else
+#define bmc_debug(fmt, args...)
+#endif
 /*
 EEPROM Mapping
 -----------------------
@@ -270,6 +283,7 @@ A cbinfo	64		0
 #define MCU_SERVER_INFO_EEPROM_OFFSET		(CARRIER_BOARD_INFO_EEPROM_BACKUP_OFFSET + CBINFO_MAX_SIZE + GAP_SIZE)
 #define SOM_PWRMGT_DIP_INFO_EEPROM_OFFSET	(MCU_SERVER_INFO_EEPROM_OFFSET + sizeof(MCUServerInfo))
 
+#define USER_DATA_USED_SIZE			(sizeof(MCUServerInfo) + sizeof(SomPwrMgtDIPInfo))
 
 #define DEFAULT_ADMIN_NAME	"admin"
 #define DEFAULT_ADMIN_PASSWORD	"123456"

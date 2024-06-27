@@ -135,7 +135,8 @@ int retry_count = 10;
 void hf_main_task(void *argument)
 {
   int ret = 0;
-  printf("HiFive 106SC!\n");
+  printf("HiFive 106SC, BMC Version:%d.%d!\n",
+    (uint8_t)(BMC_SOFTWARE_VERSION_MAJOR), (uint8_t)(BMC_SOFTWARE_VERSION_MINOR));
 
   /* get board info from eeprom where the MAC is stored */
   do

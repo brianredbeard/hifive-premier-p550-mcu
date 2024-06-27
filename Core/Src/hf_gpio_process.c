@@ -126,13 +126,13 @@ static void key_process(void)
 				// printf("short currentTime - pressStartTime %ld\n",currentTime - ReleaseTime);
 				button_state = KEY_SHORT_PRESS_STATE;
 			} else {
-				printf("other ReleaseTime - pressStartTime %ld\n", ReleaseTime - pressStartTime);
-				printf("other currentTime - ReleaseTime %ld\n", currentTime - ReleaseTime);
+				bmc_debug("other ReleaseTime - pressStartTime %ld\n", ReleaseTime - pressStartTime);
+				bmc_debug("other currentTime - ReleaseTime %ld\n", currentTime - ReleaseTime);
 				button_state = KEY_DOUBLE_PRESS_STATE;
 			}
 			break;
 		case KEY_SHORT_PRESS_STATE:
-			printf("KEY_SHORT_PRESS_STATE time %ld\n", currentTime - pressStartTime);
+			bmc_debug("KEY_SHORT_PRESS_STATE time %ld\n", currentTime - pressStartTime);
 			button_state = KEY_PRESS_STATE_END;
 			if (get_som_power_state() != SOM_POWER_ON) {
 				vStopSomPowerOffTimer();
@@ -140,7 +140,7 @@ static void key_process(void)
 			}
 			break;
 		case KEY_LONG_PRESS_STATE:
-			printf("KEY_LONG_PRESS_STATE time %ld\n", currentTime - pressStartTime);
+			bmc_debug("KEY_LONG_PRESS_STATE time %ld\n", currentTime - pressStartTime);
 			button_state = KEY_PRESS_STATE_END;
 			if (get_som_power_state() == SOM_POWER_ON) {
 				ret = web_cmd_handle(CMD_POWER_OFF, NULL, 0, 2000);
@@ -171,13 +171,13 @@ static void key_process(void)
 
 static void mcu_reset_som_process(void)
 {
-	printf("%s %d mcu reset som\n", __func__, __LINE__);
+	bmc_debug("%s %d mcu reset som\n", __func__, __LINE__);
 	StopSomRebootTimer();
 }
 
 static void som_rst_feedback_process(void)
 {
-	printf("%s %d som reset\n", __func__, __LINE__);
+	bmc_debug("%s %d som reset\n", __func__, __LINE__);
 	if (get_som_power_state() == SOM_DAEMON_ON) {
 		som_reset_control(pdTRUE);
 		osDelay(2);

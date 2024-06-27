@@ -92,7 +92,7 @@ int hf_i2c_mem_write(I2C_HandleTypeDef *hi2c, uint8_t slave_addr,
 	int i, j = 0, offset;
 	int unaligned_bytes = 0, aligned_bytes; // the reg_addr offset that is not aligned with 8Bytes
 	HAL_StatusTypeDef status = HAL_OK;
-	printf("slave_addr %x, reg_addr %x len %ld\n",slave_addr, reg_addr, len);
+	// printf("slave_addr %x, reg_addr %x len %ld\n",slave_addr, reg_addr, len);
 	if (hi2c->Instance == I2C1)
 		HAL_GPIO_WritePin(EEPROM_WP_GPIO_Port, EEPROM_WP_Pin, GPIO_PIN_RESET);
 
