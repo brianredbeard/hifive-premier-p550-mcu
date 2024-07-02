@@ -26,7 +26,7 @@ TARGET = STM32F407VET6_BMC
 # building variables
 ######################################
 # debug build?
-DEBUG = 1
+DEBUG = 0
 # optimization
 OPT = -Og
 # OPT = -O2
