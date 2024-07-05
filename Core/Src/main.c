@@ -159,6 +159,7 @@ void hf_main_task(void *argument)
   uart4_protocol_task_handle = osThreadNew(uart4_protocol_task, NULL, &protocol_task_attributes);
   daemon_keelive_task_handle = osThreadNew(deamon_keeplive_task, NULL, &daemon_keeplive_task_attributes);
   #if ES_PRODUCTION_LINE_TEST
+  printf("***Production Line Test Mode!***\n");
   protocol_task_handle = osThreadNew(protocol_task, NULL, &protocol_task_attributes);
   #else
   if (pdTRUE != xbspConsoleInit(CONSOLE_STACK_SIZE, CONSOLE_TASK_PRIORITY, &consoleHandle)) {
