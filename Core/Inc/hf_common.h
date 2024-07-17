@@ -241,9 +241,17 @@ extern UART_HandleTypeDef huart3;
 #define SOM_MAC0_IDX	0
 #define SOM_MAC1_IDX	1
 #define MCU_MAC_IDX	2
+
+#if 1
+#define esENTER_CRITICAL(MUTEX, DELAY)	xSemaphoreTake(MUTEX, DELAY)
+#define esEXIT_CRITICAL(MUTEX)		xSemaphoreGive(MUTEX)
+#else
+#define esENTER_CRITICAL(MUTEX, DELAY)	taskENTER_CRITICAL()
+#define esEXIT_CRITICAL(MUTEX)		taskEXIT_CRITICAL()
+#endif
 /* define ------------------------------------------------------------*/
 #define BMC_SOFTWARE_VERSION_MAJOR                   2
-#define BMC_SOFTWARE_VERSION_MINOR                   4
+#define BMC_SOFTWARE_VERSION_MINOR                   5
 
 #define MAGIC_NUMBER	0x45505EF1
 
@@ -384,6 +392,7 @@ power_info get_power_info(void);
 int xSOMRestartHandle(void);
 int xSOMRebootHandle(void);
 
+int get_mcu_led_status(void);
 void set_mcu_led_status(led_status_t type);
 int es_restore_userdata_to_factory(void);
 

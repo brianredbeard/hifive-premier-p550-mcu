@@ -830,5 +830,8 @@ static void MX_GPIO_Init(void)
 	HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
 
 	HAL_NVIC_SetPriority(EXTI15_10_IRQn, 5, 0);
-	HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+	/* The interrupt of the som power button will be enabled later in the hf_gpio_task
+	 * when it is ready to handle the button key press
+	*/
+	// HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 }

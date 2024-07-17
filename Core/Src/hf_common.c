@@ -51,13 +51,7 @@
 #define EEPROM_TEST_DEBUG 0
 #define SET_MAGIC_NUM_DEBUG 0
 
-#if 1
-#define esENTER_CRITICAL(MUTEX, DELAY)	xSemaphoreTake(MUTEX, DELAY)
-#define esEXIT_CRITICAL(MUTEX)		xSemaphoreGive(MUTEX)
-#else
-#define esENTER_CRITICAL(MUTEX, DELAY)	taskENTER_CRITICAL()
-#define esEXIT_CRITICAL(MUTEX)		taskEXIT_CRITICAL()
-#endif
+
 /* variables ---------------------------------------------------------*/
 static CarrierBoardInfo gCarrier_Board_Info;
 

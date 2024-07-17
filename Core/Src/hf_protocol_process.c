@@ -634,7 +634,6 @@ void deamon_keeplive_task(void *argument)
 	static uint8_t count = 0;
 	struct rtc_date_t date = {0};
 	struct rtc_time_t time = {0};
-
 	for (;;) {
 		old_status = get_som_daemon_state();
 		if (SOM_POWER_ON != get_som_power_state()) {
