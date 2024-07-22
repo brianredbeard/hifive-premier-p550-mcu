@@ -1,27 +1,13 @@
-/************************************************************************************
-* Copyright 2024, Beijing ESWIN Computing Technology Co., Ltd.. All rights reserved.
-* 
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License at
-* 
-* http://www.apache.org/licenses/LICENSE-2.0
-* 
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*************************************************************************************/
-
-/************************************************************************************
-* SPDX-License-Identifier: MIT, Apache
-* 
-* Author: xuxiang@eswincomputing.com
-* 
-* File Description: hf_http_process.c
-*  Http server task
-************************************************************************************/
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Http server task
+ *
+ * Copyright 2024 Beijing ESWIN Computing Technology Co., Ltd.
+ *   Authors:
+ *    XuXiang<xuxiang@eswincomputing.com>
+ *    YuanJunHui<yuanjunhui@eswincomputing.com>
+ *
+ */
 /* Includes ------------------------------------------------------------------*/
 #include <string.h>
 #include "main.h"
@@ -31,6 +17,7 @@
 #include "dhcp.h"
 #include "hf_common.h"
 #include "web-server.h"
+#include "telnet_som_console.h"
 extern struct netif gnetif;
 struct dhcp *dhcp;
 uint8_t ip_address[4] = {0};
@@ -72,14 +59,9 @@ void dynamic_change_eth(void)
 
 void hf_http_task(void *argument)
 {
-	printf("hf_http_task started!!!\r\n");
+	printf("hf_http_task started!!!\n");
 
-  /* init code for LWIP */
-  eth_get_address();
-  MX_LWIP_Init();
-  // httpd_init();
-  // /* Infinite loop */
-  osDelay(5000);
+  // osDelay(5000);
   dhcp = netif_dhcp_data(&gnetif);
   printf("Static IP address: %s\n", ip4addr_ntoa(&gnetif.ip_addr));
   printf("Subnet mask: %s\n", ip4addr_ntoa(&gnetif.netmask));

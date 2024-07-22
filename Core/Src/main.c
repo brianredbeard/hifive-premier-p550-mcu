@@ -12,6 +12,9 @@
   * in the root directory of this software component.
   * If no LICENSE file comes with this software, it is provided AS-IS.
   *
+  * Copyright 2024 Beijing ESWIN Computing Technology Co., Ltd.
+  *   Authors:
+  *   XuXiang<xuxiang@eswincomputing.com>
   ******************************************************************************
   */
 /* Includes ------------------------------------------------------------------*/
@@ -19,7 +22,10 @@
 #include "cmsis_os.h"
 #include <stdio.h>
 #include "stm32f4xx_hal_iwdg.h"
+#include "lwip.h"
 #include "console.h"
+#include "telnet_server.h"
+#include "telnet_som_console.h"
 
 /* Private includes ----------------------------------------------------------*/
 #include "hf_common.h"
@@ -56,7 +62,7 @@ const osThreadAttr_t protocol_task_attributes = {
 osThreadId_t power_task_handle;
 const osThreadAttr_t power_task_attributes = {
   .name = "PowerTask",
-  .stack_size = 1024 * 4,
+  .stack_size = 1024 * 2,
   .priority = (osPriority_t) osPriorityNormal,
 };
 
@@ -153,6 +159,10 @@ void hf_main_task(void *argument)
   es_eeprom_info_test();
   #endif
 
+  /* init code for LWIP */
+  eth_get_address();
+  MX_LWIP_Init();
+
   power_task_handle = osThreadNew(hf_power_task, NULL, &power_task_attributes);
   http_task_handle = osThreadNew(hf_http_task, NULL, &http_task_attributes);
   key_task_handle = osThreadNew(hf_gpio_task, NULL, &gpio_task_attributes);
@@ -165,14 +175,13 @@ void hf_main_task(void *argument)
   if (pdTRUE != xbspConsoleInit(CONSOLE_STACK_SIZE, CONSOLE_TASK_PRIORITY, &consoleHandle)) {
     printf("Err:Failed to create CLI!\n");
   }
+  telnet_create(23, telenet_receiver_callback, NULL);
   #endif
-  // extern void MX_IWDG_Init(void);
-  // MX_IWDG_Init();
+
   set_mcu_led_status(LED_MCU_RUNING);
 
   for(;;)
   {
-    // HAL_IWDG_Refresh(&hiwdg);
     osDelay(800);
   }
 }

@@ -1,10 +1,14 @@
 
-/**
- ******************************************************************************
- * @file         console.c
- * @author       Aaron Escoboza, Github account: https://github.com/aaron-ev
- * @brief        Command Line Interpreter based on FreeRTOS and STM32 HAL layer
- ******************************************************************************
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * console.c
+ * Command Line Interpreter based on FreeRTOS and STM32 HAL layer
+ * Originally from:Aaron Escoboza, Github account: https://github.com/aaron-ev
+ *
+ * Copyright 2024 Beijing ESWIN Computing Technology Co., Ltd.
+ *   Authors:
+ *    LinMin<linmin@eswincomputing.com>
+ *
  */
 #include "lwip/opt.h"
 #include "lwip/arch.h"
@@ -23,6 +27,7 @@
 #include "web-server.h"
 #include "hf_power_process.h"
 #include "hf_spi_slv.h"
+#include "telnet_som_console.h"
 
 #define CONSOLE_VERSION_MAJOR                   1
 #define CONSOLE_VERSION_MINOR                   0
@@ -112,6 +117,11 @@ static BaseType_t prvCommandSomPwrLastStateGet(char *pcWriteBuffer, size_t xWrit
 // eeprom write protect pin set
 static BaseType_t prvCommandCBWpEEPROM(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString);
 
+// get the som console configuration: UART or Telnet
+static BaseType_t prvCommandSomConsoleGet(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString);
+// set the som console: via UART or via Telnet
+static BaseType_t prvCommandSomConsoleSet(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString);
+
 /**
 *   @brief  This function is executed in case of error occurrence.
 *   @retval None
@@ -175,19 +185,19 @@ static const CLI_Command_Definition_t xCommands[] =
     },
     {
         "setip",
-        "\r\nsetip <ipaddrr>: Set ip address.\r\n",
+        "\r\nsetip <ipaddr>: Set ip address.\r\n",
         prvCommandIPSet,
         1
     },
     {
         "setmask",
-        "\r\nsetmask <netmask>: Set netmask address.\r\n",
+        "\r\nsetmask <ipaddr>: Set netmask address.\r\n",
         prvCommandNetMaskSet,
         1
     },
     {
         "setgateway",
-        "\r\nsetgateway <netmask>: Set gateway address.\r\n",
+        "\r\nsetgateway <ipaddr>: Set gateway address.\r\n",
         prvCommandGateWaySet,
         1
     },
@@ -297,6 +307,18 @@ static const CLI_Command_Definition_t xCommands[] =
         "eepromwp-s",
         "",
         prvCommandCBWpEEPROM,
+        1
+    },
+    {
+        "somconsole-g",
+        "\r\nsomconsole-g: Get the som console configuration. UART or Telnet\r\n",
+        prvCommandSomConsoleGet,
+        0
+    },
+    {
+        "somconsole-s",
+        "\r\nsomconsole-s: Set the som console configuration. 0(via UART), 1(via Telnet).\r\n",
+        prvCommandSomConsoleSet,
         1
     },
     {
@@ -1378,6 +1400,45 @@ static BaseType_t prvCommandCBWpEEPROM(char *pcWriteBuffer, size_t xWriteBufferL
 }
 
 /**
+* @brief Get the som console setting: uart or telnet
+* @param *pcWriteBuffer FreeRTOS CLI write buffer.
+* @param xWriteBufferLen Length of write buffer.
+* @param *pcCommandString pointer to the command name.
+* @retval FreeRTOS status
+*/
+static BaseType_t prvCommandSomConsoleGet(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString)
+{
+    int somConsoleCfg = 0;
+
+    es_get_som_console_cfg(&somConsoleCfg);
+    snprintf(pcWriteBuffer, xWriteBufferLen, "Som Console: %s\n", (somConsoleCfg == 0)?"UART":"Telnet");
+
+    return pdFALSE;
+}
+
+/**
+* @brief Set the som som console: uart or telnet
+* @param *pcWriteBuffer FreeRTOS CLI write buffer.
+* @param xWriteBufferLen Length of write buffer.
+* @param *pcCommandString pointer to the command name.
+* @retval FreeRTOS status
+*/
+static BaseType_t prvCommandSomConsoleSet(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString)
+{
+    const char *cSomConCfg;
+    BaseType_t xParamLen;
+    int somConsoleCfg;
+
+    cSomConCfg = FreeRTOS_CLIGetParameter(pcCommandString, 1, &xParamLen);
+    somConsoleCfg = atoi(cSomConCfg);
+
+    /* set som console */
+    es_set_som_console_cfg(somConsoleCfg);
+
+    return pdFALSE;
+}
+
+/**
 * @brief Reads from UART RX buffer. Reads one bye at the time.
 * @param *cReadChar pointer to where data will be stored.
 * @retval FreeRTOS status
@@ -1582,10 +1643,21 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
     BaseType_t pxHigherPriorityTaskWoken = pdFALSE;
 
-    if (xQueueRxHandle != NULL)
-    {
-        xQueueSendToBackFromISR(xQueueRxHandle, &cRxData, &pxHigherPriorityTaskWoken);
+    if (huart == pxUartDevHandle) {
+        if (xQueueRxHandle != NULL)
+        {
+            xQueueSendToBackFromISR(xQueueRxHandle, &cRxData, &pxHigherPriorityTaskWoken);
+        }
+        vConsoleEnableRxInterrupt();
     }
-    vConsoleEnableRxInterrupt();
+    #if 1
+    else if (huart == pTelSomConUartDevHandle) {
+        if (telSomConQueueRxHandle != NULL)
+        {
+            xQueueSendToBackFromISR(telSomConQueueRxHandle, &cTelSomConcRxData, &pxHigherPriorityTaskWoken);
+        }
+        telSomConsEnableRxInterrupt();
+    }
+    #endif
 }
 #endif

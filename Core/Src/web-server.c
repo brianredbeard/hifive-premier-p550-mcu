@@ -1,27 +1,12 @@
-/************************************************************************************
-* Copyright 2024, Beijing ESWIN Computing Technology Co., Ltd.. All rights reserved.
-* 
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License at
-* 
-* http://www.apache.org/licenses/LICENSE-2.0
-* 
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*************************************************************************************/
-
-/************************************************************************************
-* SPDX-License-Identifier: MIT, Apache
-* 
-* Author: yuanjunhui@eswincomputing.com
-* 
-* File Description: web-server.c
-*  BMC web server
-************************************************************************************/
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * BMC web server
+ *
+ * Copyright 2024 Beijing ESWIN Computing Technology Co., Ltd.
+ *   Authors:
+ *    YuanJunHui<yuanjunhui@eswincomputing.com>
+ *
+ */
 #include <stdlib.h>
 #include "lwip/opt.h"
 #include "lwip/arch.h"
@@ -9669,6 +9654,48 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
 													$('input[name=\"swctrl\"]').change(function() {\n \
 														toggleDipRadios($(this).val() === '1');//select button is sw and last dip-switch data is sw data \n \
 													});\n \
+													$(\"input[name='somconsole_method']\").change(function() { \n \
+														var selected_som_method = $(this).val();  \n \
+														$.ajax({ \n \
+															url: '/somconsole', \n \
+															type: 'POST', \n \
+															data: { method: selected_som_method }, \n \
+															success: function(response) { \n \
+																if(response.status===0){\n \ 
+																	alert(\"update success!\");\n \
+																}else{\n \
+																	$('input[name=\"somconsole_method\"][value=\"' + selected_som_method + '\"]').prop('checked', true);\n \
+																	alert(response.message);\n \
+																}\n \
+																console.log('somconsole settings updated successfully.');\n \
+															}, \n \
+															error: function() { \n \
+																console.log('Error sending data'); \n \
+															} \n \
+														}); \n \
+													}); \n \
+													$('#somconsole-refresh-hid').click(function() {\n \
+														$.ajax({\n \
+															async: false,\n \
+															url: '/somconsole',\n \
+															type: 'GET',\n \
+															data: {\n \
+																byhand: \"0\",\n \
+															},\
+															contentType: 'application/x-www-form-urlencoded', \n \
+															success: function(response) {\n \
+																if(response.status===0){\n \
+																	$('input[name=\"somconsole_method\"][value=\"' + response.data.method + '\"]').prop('checked', true);\n \
+																	$('#somconsole_uart').prop('disabled', false);\n \
+																	$('#somconsole_telnet').prop('disabled', false);\n \
+																} \n \
+																console.log('somconsole refreshed successfully.');\n \
+															},\n \
+															error: function(xhr, status, error) {\n \
+																console.error('Error refreshing somconsole:', error);\n \
+															}\n \
+														});\n\
+													});\n\
 													$('#logoutForm').submit(function(event) { \n \
 														event.preventDefault();  \n \
 														$.ajax({ \n \
@@ -9700,6 +9727,25 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
 													$('#board-info-cb-refresh').click(); \n \
 													$('#rtc-refresh-hid').click(); \n \
 													$('#soc-refresh-hid').click(); \n \
+													$('#somconsole-refresh-hid').click();\n \
+													$.ajax({\n \
+															async: false,\n \
+															url: '/bmc_version',\n \
+															type: 'GET',\n \
+															data: {\n \
+																byhand: \"0\",\n \
+															},\
+															contentType: 'application/x-www-form-urlencoded', \n \
+															success: function(response) {\n \
+																if(response.status===0){\n \
+																	$(\"#version-info\").text(response.data.version);\n \
+																} \n \
+																console.log('somconsole refreshed successfully.');\n \
+															},\n \
+															error: function(xhr, status, error) {\n \
+																console.error('Error refreshing somconsole:', error);\n \
+															}\n \
+														});\n\
 													setInterval(function() { \n \
 														power_on_change_countdown--; \n \
 													}, 1000);  \n \
@@ -9754,6 +9800,11 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
 											.option-row label {\
 												margin-right: 20px;\
 											}\
+											.container-right { \
+												display: flex; \
+												justify-content: center; \
+												padding: 10px; \
+											}\
 											</style> \
 									</head> \
 									<body> \
@@ -9764,6 +9815,9 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
 											<form class=\"logout-form\" action=\"/logout\" id=\"logoutForm\" method=\"post\"> \
 												<button type=\"submit\">Exit</button> \
 											</form> \
+										</div> \
+										<div class=\"container-right\"> \
+											<h3 id='version-info'>BMC Version:</h3> \
 										</div> \
 										<div> \
 											<h3>Board Information</h3> \
@@ -9972,6 +10026,15 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
 											</div> \
 											<button id=\"rtc-refresh\">refresh</button> <button id=\"rtc-update\">update</button> \
 											<button id=\"rtc-refresh-hid\" value=\"0\" style=\"display:none;\">refresh</button> \
+										</div> \
+										<div class=\"somconsole\" > \
+											<h3>SOM Console</h3> \
+											<div class=\"network-row\"> \
+											<label>Redirect to:</label>  <br> \
+											<input type=\"radio\" id=\"somconsole_uart\" name=\"somconsole_method\" value=\"0\" checked disabled><label for=\"somconsole_uart\">UART</label><br> \
+											<input type=\"radio\" id=\"somconsole_telnet\" name=\"somconsole_method\" value=\"1\" disabled><label for=\"somconsole_telnet\">TELNET</label><br> \
+											<button id=\"somconsole-refresh-hid\" value=\"0\">refresh</button> \
+											</div> \
 										</div> \
 									</body> \
 									</html> ";
@@ -10566,8 +10629,27 @@ power_info get_power_info(void)
 		get_board_power(&power_info.voltage,&power_info.current,&power_info.consumption);
 #endif
 	web_debug("web call get_power_info, consumption %d, current %d, voltage %d, ret %d\n",
-		power_info->consumption, power_info->current, power_info->voltage, ret);
+		power_info.consumption, power_info.current, power_info.voltage, ret);
 	return power_info;
+}
+
+// ret:0(via UART), 1(via Telnet).
+int get_somconsole(void){
+    int method = 0;
+    es_get_som_console_cfg(&method);
+	// printf("#### get_somconsole %d \n",method);
+	return method;
+}
+
+// method:0(via UART), 1(via Telnet).
+// ret:todo
+int set_somconsole(int method){
+    int ret = 0;
+	LWIP_ASSERT("method is 0 or 1",method==0 || method== 1);
+    /* set som console */
+    ret = es_set_som_console_cfg(method);
+	// printf("#### set_somconsole %d \n",method);
+	return ret;
 }
 
 NETInfo get_net_info(void) {
@@ -11154,6 +11236,43 @@ http_server_netconn_serve(struct netconn *conn)
 
 				netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
 				netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
+			}else if(strcmp(path, "/somconsole")==0){
+				web_debug("GET location: somconsole \n");
+				int ret=get_somconsole();
+
+				char json_response[BUF_SIZE_128]={0};
+				char *json_response_patt = "{\"status\":0,\"message\":\"success\",\"data\":{\"method\":\"%d\"}}";
+				sprintf(json_response, json_response_patt,ret);
+
+				char response_header[BUF_SIZE_256];
+				if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 && byhand ){
+					found_session->tick_value=HAL_GetTick();
+					sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",sidValue,MAX_AGE);
+					sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
+				}else{
+					sprintf(response_header, json_header, strlen(json_response));
+				}
+
+				netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
+				netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
+			}else if(strcmp(path, "/bmc_version")==0){
+				web_debug("GET location: bmc_version \n");
+
+				char json_response[BUF_SIZE_128]={0};
+				char *json_response_patt = "{\"status\":0,\"message\":\"success\",\"data\":{\"version\":\"BMC Version:%d.%d\"}}";
+				sprintf(json_response, json_response_patt,(uint8_t)(BMC_SOFTWARE_VERSION_MAJOR),(uint8_t)(BMC_SOFTWARE_VERSION_MINOR));
+
+				char response_header[BUF_SIZE_256];
+				if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 && byhand ){
+					found_session->tick_value=HAL_GetTick();
+					sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",sidValue,MAX_AGE);
+					sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
+				}else{
+					sprintf(response_header, json_header, strlen(json_response));
+				}
+
+				netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
+				netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
 			}else{
 				web_debug("ERROR unsupport get path \n");
 				send_response_200(conn);
@@ -11638,6 +11757,45 @@ http_server_netconn_serve(struct netconn *conn)
 					netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
 					netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
 
+				}else if(strcmp(path, "/somconsole")==0 ){	//rtc
+					web_debug("POST location: somconsole \n");
+					char *method_str=NULL;
+
+					kv_pair *current = params.head;
+					while (current) {
+						if(strcmp(current->key,"method")==0){
+							method_str= current->value;
+							break;
+						}
+						current = current->next;
+					}
+					LWIP_ASSERT("method_str!=NULL", method_str!=NULL);
+
+					int method = strcmp(method_str,"0")==0 ? 0 : 1;
+					int set_ret=set_somconsole(method);
+
+					char *json_response_patt =NULL;
+					char json_response[BUF_SIZE_128]={0};
+					if(set_ret==0){
+						json_response_patt="{\"status\":%d,\"message\":\"success!\",\"data\":{}}";//0 success, msg
+						sprintf(json_response, json_response_patt,  set_ret);
+					}else{
+						json_response_patt="{\"status\":%d,\"message\":\"%s\",\"data\":{}}";//0 success, msg
+						sprintf(json_response, json_response_patt, set_ret,"Can not switch to telnet console,please power on som first.");
+					}
+
+					char response_header[BUF_SIZE_256];
+					if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 ){
+						found_session->tick_value=HAL_GetTick();
+						sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",sidValue,MAX_AGE);
+						sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
+					}else{
+						sprintf(response_header, json_header, strlen(json_response));
+					}
+
+					netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
+					netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
+
 				}else{
 					send_response_200(conn);
 				}
@@ -11694,10 +11852,7 @@ http_server_netconn_thread(void *arg)
 			netconn_delete(newconn);
 		}else{
 			web_debug("http_server_netconn_thread:err %d \n",err);
-			netconn_close(newconn);
-			netconn_delete(newconn);
 		}
-		// osDelay(1000);
 	}
 	while (1);
 	netconn_close(conn);

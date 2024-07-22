@@ -1,28 +1,13 @@
-/************************************************************************************
-* Copyright 2024, Beijing ESWIN Computing Technology Co., Ltd.. All rights reserved.
-* 
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License at
-* 
-* http://www.apache.org/licenses/LICENSE-2.0
-* 
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*************************************************************************************/
-
-/************************************************************************************
-* SPDX-License-Identifier: MIT, Apache
-* 
-* Author: linmin@eswincomputing.com
-* 
-* File Description: hf_common.h
-*  Declaration of the cbinfo structure and common api, such as power and
-   rtc operations.
-************************************************************************************/
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Declaration of the cbinfo structure and common api, such as power and rtc
+ * operations.
+ *
+ * Copyright 2024 Beijing ESWIN Computing Technology Co., Ltd.
+ *   Authors:
+ *    LinMin<linmin@eswincomputing.com>
+ *
+ */
 /* Define to prevent recursive inclusion -------------------------------------*/
 #ifndef __HF_COMMON_H
 #define __HF_COMMON_H
@@ -40,7 +25,7 @@ extern "C" {
 #include "stm32f4xx_hal.h"
 #include "task.h"
 
-/* types ------------------------------------------------------------*/
+/* types ---------------------------------------------------------------------*/
 typedef enum {
 	IDLE_STATE,
 	ATX_PS_ON_STATE,
@@ -229,6 +214,7 @@ typedef struct {
 } DIPSwitchInfo;
 /* constants --------------------------------------------------------*/
 extern UART_HandleTypeDef huart3;
+extern UART_HandleTypeDef huart6;
 
 /* macro ------------------------------------------------------------*/
 #define __ALIGN_KERNEL(x, a) __ALIGN_KERNEL_MASK(x, (typeof(x))(a)-1)
@@ -314,6 +300,7 @@ A cbinfo	64		0
 #define CONSOLE_TASK_PRIORITY 1
 #define CONSOLE_STACK_SIZE 1024 // 3000
 #define consoleHandle huart3
+#define telnetSomConsoleHandle huart6
 
 #define ES_PRODUCTION_LINE_TEST 0
 
@@ -326,6 +313,9 @@ void es_eeprom_wp(uint8_t flag);
 void som_reset_control(uint8_t reset);
 int web_cmd_handle(CommandType cmd, void *data, int data_len, uint32_t timeout);
 
+void eth_get_address(void);
+
+/* eeprom APIs */
 int es_init_info_in_eeprom(void);
 
 int es_get_carrier_borad_info(CarrierBoardInfo *pCarrier_board_info);
@@ -360,6 +350,10 @@ int es_set_som_dip_switch_soft_state(uint8_t som_dip_switch_soft_state);
 
 int es_get_som_dip_switch_soft_state_all(int *p_som_dip_switch_soft_ctl_attr, uint8_t *p_som_dip_switch_soft_state);
 int es_set_som_dip_switch_soft_state_all(int som_dip_switch_soft_ctl_attr, uint8_t som_dip_switch_soft_state);
+
+int es_get_som_console_cfg(int *p_som_console_cfg);
+int es_set_som_console_cfg(int som_console_cfg);
+
 
 int es_eeprom_info_test(void);
 power_switch_t get_som_power_state(void);

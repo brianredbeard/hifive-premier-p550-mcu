@@ -14,6 +14,9 @@
   * in the root directory of this software component.
   * If no LICENSE file comes with this software, it is provided AS-IS.
   *
+  * Copyright 2024 Beijing ESWIN Computing Technology Co., Ltd.
+  *   Authors:
+  *   XuXiang<xuxiang@eswincomputing.com>
   ******************************************************************************
   */
 /* USER CODE END Header */
@@ -50,7 +53,6 @@ extern TIM_HandleTypeDef htim4;
 extern TIM_HandleTypeDef htim9;
 extern TIM_HandleTypeDef htim12;
 extern UART_HandleTypeDef huart4;
-extern UART_HandleTypeDef huart6;
 extern WWDG_HandleTypeDef hwwdg;
 extern IWDG_HandleTypeDef hiwdg;
 

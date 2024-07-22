@@ -1,33 +1,18 @@
-/************************************************************************************
-* Copyright 2024, Beijing ESWIN Computing Technology Co., Ltd.. All rights reserved.
-* 
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License at
-* 
-* http://www.apache.org/licenses/LICENSE-2.0
-* 
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*************************************************************************************/
-
-/************************************************************************************
-* SPDX-License-Identifier: MIT, Apache
-* 
-* Author: linmin@eswincomputing.com
-* 
-* File Description: hf_common.c
-*  operation on the information stored in the eeprom
-************************************************************************************/
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * operation on the information stored in the eeprom
+ *
+ * Copyright 2024 Beijing ESWIN Computing Technology Co., Ltd.
+ *   Authors:
+ *    LinMin<linmin@eswincomputing.com>
+ *
+ */
 /* Includes ------------------------------------------------------------------*/
 #include <stdlib.h>
 #include <string.h>
 #include "lwip.h"
 #include "hf_common.h"
-#include "sifive_crc32.h"
+#include "hf_crc32.h"
 
 #include "cmsis_os.h"
 #include "semphr.h"
@@ -58,6 +43,8 @@ static CarrierBoardInfo gCarrier_Board_Info;
 static MCUServerInfo gMCU_Server_Info;
 static SomPwrMgtDIPInfo gSOM_PwgMgtDIP_Info;
 static SemaphoreHandle_t gEEPROM_Mutex;
+
+static int gSOM_ConsoleCfg = 0; //0: The default console of SOM is uart; 1: Telnet SOM Console
 
 /* function prototypes -----------------------------------------------*/
 #if EEPROM_TEST_DEBUG
@@ -273,7 +260,7 @@ static int restore_cbinfo_to_factory(CarrierBoardInfo *pCarrier_Board_Info)
 	pCarrier_Board_Info->ethernetMAC3[4] = MAC_ADDR4;
 	pCarrier_Board_Info->ethernetMAC3[5] = MAC_ADDR5;
 
-	pCarrier_Board_Info->crc32Checksum = sifive_crc32((uint8_t *)pCarrier_Board_Info, sizeof(CarrierBoardInfo) - 4);
+	pCarrier_Board_Info->crc32Checksum = hf_crc32((uint8_t *)pCarrier_Board_Info, sizeof(CarrierBoardInfo) - 4);
 #if 0
 	/* write to main partition */
 	write_cbinfo(pCarrier_Board_Info, cbinfo_main);
@@ -331,7 +318,7 @@ static int get_carrier_board_info(void)
 	print_cbinfo(&gCarrier_Board_Info);
 	print_data((uint8_t *)&gCarrier_Board_Info, sizeof(CarrierBoardInfo));
 	/* calculate crc32 checksum of main partition */
-	crc32Checksum = sifive_crc32((uint8_t *)&gCarrier_Board_Info, sizeof(CarrierBoardInfo) - 4);
+	crc32Checksum = hf_crc32((uint8_t *)&gCarrier_Board_Info, sizeof(CarrierBoardInfo) - 4);
 	if (crc32Checksum != gCarrier_Board_Info.crc32Checksum) { //main partition is bad
 		printf("Bad main checksum,0x%lx is NOT equal to calculated value:0x%lx\n", gCarrier_Board_Info.crc32Checksum, crc32Checksum);
 		eeprom_debug("%s:%d\n", __func__, __LINE__);
@@ -342,7 +329,7 @@ static int get_carrier_board_info(void)
 			return -1;
 		}
 
-		crc32Checksum = sifive_crc32((uint8_t *)&gCarrier_Board_Info, sizeof(CarrierBoardInfo) - 4);
+		crc32Checksum = hf_crc32((uint8_t *)&gCarrier_Board_Info, sizeof(CarrierBoardInfo) - 4);
 		if (crc32Checksum != gCarrier_Board_Info.crc32Checksum) { // backup patition is also bad
 			/* restore to factory settings */
 			printf("Bad backup checksum,0x%lx is NOT equal to calculated value:0x%lx\n", gCarrier_Board_Info.crc32Checksum, crc32Checksum);
@@ -362,7 +349,7 @@ static int get_carrier_board_info(void)
 			return -1;
 		}
 		print_cbinfo(&CbinfoBackup);
-		crc32Checksum = sifive_crc32((uint8_t *)&CbinfoBackup, sizeof(CarrierBoardInfo) - 4);
+		crc32Checksum = hf_crc32((uint8_t *)&CbinfoBackup, sizeof(CarrierBoardInfo) - 4);
 		if (crc32Checksum != CbinfoBackup.crc32Checksum) {
 			/* recover the backup partition with the main value */
 			printf("Bad backup checksum,0x%lx is NOT equal to calculated value:0x%lx\n", CbinfoBackup.crc32Checksum, crc32Checksum);
@@ -392,7 +379,7 @@ static int get_mcu_server_info(void)
 	}
 	eeprom_debug("print MCUServerInfo:\n");
 	print_data((uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo));
-	crc32Checksum = sifive_crc32((uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo) - 4);
+	crc32Checksum = hf_crc32((uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo) - 4);
 
 	if (crc32Checksum != gMCU_Server_Info.crc32Checksum) {
 		skip_update_eeprom = 0;
@@ -417,7 +404,7 @@ static int get_mcu_server_info(void)
 		gMCU_Server_Info.gateway_address[2] = GATEWAY_ADDR2;
 		gMCU_Server_Info.gateway_address[3] = GATEWAY_ADDR3;
 
-		gMCU_Server_Info.crc32Checksum = sifive_crc32((uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo) - 4);
+		gMCU_Server_Info.crc32Checksum = hf_crc32((uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo) - 4);
 		printf("Invalid checksum of mcu server info, update it with default value!\n");
 	}
 
@@ -454,7 +441,7 @@ static int get_som_pwrmgt_dip_info(void)
 		return -1;
 	}
 
-	crc32Checksum = sifive_crc32((uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(gSOM_PwgMgtDIP_Info) - 4);
+	crc32Checksum = hf_crc32((uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(gSOM_PwgMgtDIP_Info) - 4);
 
 	if (crc32Checksum != gSOM_PwgMgtDIP_Info.crc32Checksum) {
 		printf("Invalid checksum of SomPwrMgtDIPInfo, init with default value!!!\n");
@@ -463,7 +450,7 @@ static int get_som_pwrmgt_dip_info(void)
 		gSOM_PwgMgtDIP_Info.som_pwr_last_state = SOM_PWR_LAST_STATE_OFF;
 		gSOM_PwgMgtDIP_Info.som_dip_switch_soft_ctl_attr = SOM_DIP_SWITCH_SOFT_CTL_DISABLE;
 		gSOM_PwgMgtDIP_Info.som_dip_switch_soft_state = SOM_DIP_SWITCH_STATE_EMMC;
-		gSOM_PwgMgtDIP_Info.crc32Checksum = sifive_crc32((uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(gSOM_PwgMgtDIP_Info) - 4);
+		gSOM_PwgMgtDIP_Info.crc32Checksum = hf_crc32((uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(gSOM_PwgMgtDIP_Info) - 4);
 	}
 
 	if (skip_update_eeprom == 0) {
@@ -544,7 +531,7 @@ int es_set_carrier_borad_info(CarrierBoardInfo *pCarrier_Board_Info)
 	if (NULL == pCarrier_Board_Info)
 		return -1;
 
-	pCarrier_Board_Info->crc32Checksum = sifive_crc32((uint8_t *)pCarrier_Board_Info, sizeof(CarrierBoardInfo) - 4);
+	pCarrier_Board_Info->crc32Checksum = hf_crc32((uint8_t *)pCarrier_Board_Info, sizeof(CarrierBoardInfo) - 4);
 
 	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
 	if (0 != memcmp(pCarrier_Board_Info, &gCarrier_Board_Info, sizeof(CarrierBoardInfo))) {
@@ -637,7 +624,7 @@ int es_set_mcu_mac(uint8_t *p_mac_address, uint8_t index)
 			break;
 	}
 	if (update_mac) {
-		gCarrier_Board_Info.crc32Checksum = sifive_crc32((uint8_t *)&gCarrier_Board_Info, sizeof(CarrierBoardInfo) - 4);
+		gCarrier_Board_Info.crc32Checksum = hf_crc32((uint8_t *)&gCarrier_Board_Info, sizeof(CarrierBoardInfo) - 4);
 
 		hf_i2c_mem_write(&hi2c1, AT24C_ADDR, CARRIER_BOARD_INFO_EEPROM_MAIN_OFFSET,
 					(uint8_t *)&gCarrier_Board_Info, sizeof(CarrierBoardInfo));
@@ -675,7 +662,7 @@ int es_set_mcu_ipaddr(uint8_t *p_ip_address)
 	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
 	if (0 != memcmp(gMCU_Server_Info.ip_address, p_ip_address, sizeof(gMCU_Server_Info.ip_address))) {
 		memcpy(gMCU_Server_Info.ip_address, p_ip_address, sizeof(gMCU_Server_Info.ip_address));
-		gMCU_Server_Info.crc32Checksum = sifive_crc32((uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo) - 4);
+		gMCU_Server_Info.crc32Checksum = hf_crc32((uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo) - 4);
 		hf_i2c_mem_write(&hi2c1, AT24C_ADDR, MCU_SERVER_INFO_EEPROM_OFFSET,
 			(uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo));
 	}
@@ -712,7 +699,7 @@ int es_set_mcu_netmask(uint8_t *p_netmask_address)
 	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
 	if (0 != memcmp(gMCU_Server_Info.netmask_address, p_netmask_address, sizeof(gMCU_Server_Info.netmask_address))) {
 		memcpy(gMCU_Server_Info.netmask_address, p_netmask_address, sizeof(gMCU_Server_Info.netmask_address));
-		gMCU_Server_Info.crc32Checksum = sifive_crc32((uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo) - 4);
+		gMCU_Server_Info.crc32Checksum = hf_crc32((uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo) - 4);
 		hf_i2c_mem_write(&hi2c1, AT24C_ADDR, MCU_SERVER_INFO_EEPROM_OFFSET,
 			(uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo));
 	}
@@ -745,7 +732,7 @@ int es_set_mcu_gateway(uint8_t *p_gateway_address)
 	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
 	if (0 != memcmp(gMCU_Server_Info.gateway_address, p_gateway_address, sizeof(gMCU_Server_Info.gateway_address))) {
 		memcpy(gMCU_Server_Info.gateway_address, p_gateway_address, sizeof(gMCU_Server_Info.gateway_address));
-		gMCU_Server_Info.crc32Checksum = sifive_crc32((uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo) - 4);
+		gMCU_Server_Info.crc32Checksum = hf_crc32((uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo) - 4);
 		hf_i2c_mem_write(&hi2c1, AT24C_ADDR, MCU_SERVER_INFO_EEPROM_OFFSET,
 			(uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo));
 	}
@@ -791,7 +778,7 @@ int es_set_username_password(const char *p_admin_name, const char *p_admin_passw
 	if ((0 != strcmp(gMCU_Server_Info.AdminName, p_admin_name)) || (0 != strcmp(gMCU_Server_Info.AdminPassword, p_admin_password))) {
 		strcpy(gMCU_Server_Info.AdminName, p_admin_name);
 		strcpy(gMCU_Server_Info.AdminPassword, p_admin_password);
-		gMCU_Server_Info.crc32Checksum = sifive_crc32((uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo) - 4);
+		gMCU_Server_Info.crc32Checksum = hf_crc32((uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo) - 4);
 		hf_i2c_mem_write(&hi2c1, AT24C_ADDR, MCU_SERVER_INFO_EEPROM_OFFSET,
 			(uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo));
 	}
@@ -839,7 +826,7 @@ int es_set_som_pwr_lost_resume_attr(int isResumePwrLost)
 	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
 	if (som_pwr_lost_resume_attr != gSOM_PwgMgtDIP_Info.som_pwr_lost_resume_attr) {
 		gSOM_PwgMgtDIP_Info.som_pwr_lost_resume_attr = som_pwr_lost_resume_attr;
-		gSOM_PwgMgtDIP_Info.crc32Checksum = sifive_crc32((uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(gSOM_PwgMgtDIP_Info) - 4);
+		gSOM_PwgMgtDIP_Info.crc32Checksum = hf_crc32((uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(gSOM_PwgMgtDIP_Info) - 4);
 		hf_i2c_mem_write(&hi2c1, AT24C_ADDR, SOM_PWRMGT_DIP_INFO_EEPROM_OFFSET,
 			(uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(SomPwrMgtDIPInfo));
 		eeprom_debug("Update SomPwrMgtDIPInfo in EEPROM for lost_resume_attr\n");
@@ -881,7 +868,7 @@ int es_set_som_pwr_last_state(int som_pwr_last_state)
 	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
 	if (som_pwr_last_state_internal_fmt != gSOM_PwgMgtDIP_Info.som_pwr_last_state) {
 		gSOM_PwgMgtDIP_Info.som_pwr_last_state = som_pwr_last_state_internal_fmt;
-		gSOM_PwgMgtDIP_Info.crc32Checksum = sifive_crc32((uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(gSOM_PwgMgtDIP_Info) - 4);
+		gSOM_PwgMgtDIP_Info.crc32Checksum = hf_crc32((uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(gSOM_PwgMgtDIP_Info) - 4);
 		hf_i2c_mem_write(&hi2c1, AT24C_ADDR, SOM_PWRMGT_DIP_INFO_EEPROM_OFFSET,
 			(uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(SomPwrMgtDIPInfo));
 	}
@@ -922,7 +909,7 @@ int es_set_som_dip_switch_soft_ctl_attr(int som_dip_switch_soft_ctl_attr)
 	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
 	if (som_dip_swtich_soft_ctl_attr_internal_fmt != gSOM_PwgMgtDIP_Info.som_dip_switch_soft_ctl_attr) {
 		gSOM_PwgMgtDIP_Info.som_dip_switch_soft_ctl_attr = som_dip_swtich_soft_ctl_attr_internal_fmt;
-		gSOM_PwgMgtDIP_Info.crc32Checksum = sifive_crc32((uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(gSOM_PwgMgtDIP_Info) - 4);
+		gSOM_PwgMgtDIP_Info.crc32Checksum = hf_crc32((uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(gSOM_PwgMgtDIP_Info) - 4);
 		hf_i2c_mem_write(&hi2c1, AT24C_ADDR, SOM_PWRMGT_DIP_INFO_EEPROM_OFFSET,
 			(uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(SomPwrMgtDIPInfo));
 	}
@@ -955,7 +942,7 @@ int es_set_som_dip_switch_soft_state(uint8_t som_dip_switch_soft_state)
 	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
 	if (som_dip_switch_soft_state_internal_fmt != gSOM_PwgMgtDIP_Info.som_dip_switch_soft_state) {
 		gSOM_PwgMgtDIP_Info.som_dip_switch_soft_state = som_dip_switch_soft_state_internal_fmt;
-		gSOM_PwgMgtDIP_Info.crc32Checksum = sifive_crc32((uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(gSOM_PwgMgtDIP_Info) - 4);
+		gSOM_PwgMgtDIP_Info.crc32Checksum = hf_crc32((uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(gSOM_PwgMgtDIP_Info) - 4);
 		hf_i2c_mem_write(&hi2c1, AT24C_ADDR, SOM_PWRMGT_DIP_INFO_EEPROM_OFFSET,
 			(uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(SomPwrMgtDIPInfo));
 	}
@@ -1000,7 +987,7 @@ int es_set_som_dip_switch_soft_state_all(int som_dip_switch_soft_ctl_attr, uint8
 	    (som_dip_switch_soft_state_internal_fmt != gSOM_PwgMgtDIP_Info.som_dip_switch_soft_state)) {
 		gSOM_PwgMgtDIP_Info.som_dip_switch_soft_ctl_attr = som_dip_swtich_soft_ctl_attr_internal_fmt;
 		gSOM_PwgMgtDIP_Info.som_dip_switch_soft_state = som_dip_switch_soft_state_internal_fmt;
-		gSOM_PwgMgtDIP_Info.crc32Checksum = sifive_crc32((uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(gSOM_PwgMgtDIP_Info) - 4);
+		gSOM_PwgMgtDIP_Info.crc32Checksum = hf_crc32((uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(gSOM_PwgMgtDIP_Info) - 4);
 		hf_i2c_mem_write(&hi2c1, AT24C_ADDR, SOM_PWRMGT_DIP_INFO_EEPROM_OFFSET,
 			(uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(SomPwrMgtDIPInfo));
 	}
@@ -1450,7 +1437,7 @@ int es_restore_userdata_to_factory(void)
 	gMCU_Server_Info.gateway_address[2] = GATEWAY_ADDR2;
 	gMCU_Server_Info.gateway_address[3] = GATEWAY_ADDR3;
 
-	gMCU_Server_Info.crc32Checksum = sifive_crc32((uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo) - 4);
+	gMCU_Server_Info.crc32Checksum = hf_crc32((uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo) - 4);
 
 	hf_i2c_mem_write(&hi2c1, AT24C_ADDR, MCU_SERVER_INFO_EEPROM_OFFSET,
 		(uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo));
@@ -1460,7 +1447,7 @@ int es_restore_userdata_to_factory(void)
 	gSOM_PwgMgtDIP_Info.som_pwr_last_state = SOM_PWR_LAST_STATE_OFF;
 	gSOM_PwgMgtDIP_Info.som_dip_switch_soft_ctl_attr = SOM_DIP_SWITCH_SOFT_CTL_DISABLE;
 	gSOM_PwgMgtDIP_Info.som_dip_switch_soft_state = SOM_DIP_SWITCH_STATE_EMMC;
-	gSOM_PwgMgtDIP_Info.crc32Checksum = sifive_crc32((uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(gSOM_PwgMgtDIP_Info) - 4);
+	gSOM_PwgMgtDIP_Info.crc32Checksum = hf_crc32((uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(gSOM_PwgMgtDIP_Info) - 4);
 
 	hf_i2c_mem_write(&hi2c1, AT24C_ADDR, SOM_PWRMGT_DIP_INFO_EEPROM_OFFSET,
 		(uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(SomPwrMgtDIPInfo));
@@ -1487,6 +1474,48 @@ int es_restore_userdata_to_factory(void)
 
 	es_set_eth(&ip, &netmask, &gw, NULL);
 
+	esEXIT_CRITICAL(gEEPROM_Mutex);
+
+	return 0;
+}
+
+/* get the som console configuration
+   *p_som_console_cfg: return the som console cfg, 0 means via uart, 1 means via telnet
+*/
+int es_get_som_console_cfg(int *p_som_console_cfg)
+{
+	if (NULL == p_som_console_cfg)
+		return -1;
+
+	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
+	*p_som_console_cfg = gSOM_ConsoleCfg;
+	esEXIT_CRITICAL(gEEPROM_Mutex);
+
+	return 0;
+}
+
+/* set the som console configuration
+   som_console_cfg: som console cfg, 0 means via uart, 1 means via telnet
+*/
+int es_set_som_console_cfg(int som_console_cfg)
+{
+	if (som_console_cfg == 1) {
+		#if 0
+		if (SOM_POWER_ON != get_som_power_state()) {
+			printf("Can't set SOM console to telnet, please power on SOM first!!!\n");
+			return -1;
+		}
+		#endif
+		/* Mux High Level: som debug uart is connected with mcu uart6, i.e. output to telnet */
+		HAL_GPIO_WritePin(UART_MUX_SEL_GPIO_Port, UART_MUX_SEL_Pin, GPIO_PIN_SET);
+	}
+	else {
+		/* Mux Low  Level: som debug uart is connect with FT4232 UART, i.e. output to serial port */
+		HAL_GPIO_WritePin(UART_MUX_SEL_GPIO_Port, UART_MUX_SEL_Pin, GPIO_PIN_RESET);
+	}
+
+	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
+	gSOM_ConsoleCfg = som_console_cfg;
 	esEXIT_CRITICAL(gEEPROM_Mutex);
 
 	return 0;

@@ -215,7 +215,7 @@ uint32_t crc32_no_comp(uint32_t crc, const uint8_t *buf, uint32_t len)
     return le32_to_cpu(crc);
 }
 
-uint32_t sifive_crc32(const uint8_t *p, uint32_t len)
+uint32_t hf_crc32(const uint8_t *p, uint32_t len)
 {
     uint32_t crc = 0xFFFFFFFF;
 
