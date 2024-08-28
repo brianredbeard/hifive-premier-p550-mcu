@@ -155,11 +155,16 @@ static void mcu_reset_som_process(void)
 {
 	bmc_debug("%s %d mcu reset som\n", __func__, __LINE__);
 	StopSomRebootTimer();
+	/* Check the carrier board info once the SOM is powered up. If the carrier board info
+	   in the EEPROM is corrupted, it will be recoverd with the backup.
+	*/
+	es_check_carrier_board_info();
 }
 
 static void som_rst_feedback_process(void)
 {
-	bmc_debug("%s %d som reset\n", __func__, __LINE__);
+	bmc_debug("%s %d som reset, get_som_power_state()=%d\n",
+		__func__, __LINE__, get_som_power_state());
 	if (get_som_power_state() == SOM_DAEMON_ON) {
 		som_reset_control(pdTRUE);
 		osDelay(2);

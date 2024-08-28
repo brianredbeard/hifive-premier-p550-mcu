@@ -11,6 +11,8 @@
 #include "stm32f4xx_hal.h"
 #include "main.h"
 #include <stdio.h>
+#include "cmsis_os.h"
+
 void hf_i2c_reinit(I2C_HandleTypeDef *hi2c)
 {
 	if (hi2c->Instance == I2C1)
@@ -60,24 +62,31 @@ int hf_i2c_mem_read(I2C_HandleTypeDef *hi2c, uint8_t slave_addr,
 					uint8_t reg_addr, uint8_t *data_ptr, uint32_t len)
 {
 	HAL_StatusTypeDef status = HAL_OK;
+	uint32_t retry_cnt = 0;
 
-	status = HAL_I2C_Mem_Read(hi2c, slave_addr, reg_addr, I2C_MEMADD_SIZE_8BIT,
+	do {
+		retry_cnt++;
+		status = HAL_I2C_Mem_Read(hi2c, slave_addr, reg_addr, I2C_MEMADD_SIZE_8BIT,
 					data_ptr, len, 1000);
-	if (status != HAL_OK)
-	{
-		printf("I2Cx_read_Error(%x) reg %x; status %x\r\n", slave_addr, reg_addr, status);
-		hf_i2c_reinit(hi2c);
-		return status;
-	}
+		if ((status != HAL_OK))
+		{
+			printf("I2Cx_read_Error(%x) reg %x; status %x, tried times: %ld\r\n", slave_addr, reg_addr, status, retry_cnt);
+			osDelay(pdMS_TO_TICKS(50));
+			hf_i2c_reinit(hi2c);
+		}
+	}while((HAL_OK != status) && (retry_cnt < 10));
+
 	return status;
 }
 
 int hf_i2c_mem_write(I2C_HandleTypeDef *hi2c, uint8_t slave_addr,
 					  uint8_t reg_addr, uint8_t *data_ptr, uint32_t len)
 {
-	int i, j = 0, offset;
+	int i, offset;
 	int unaligned_bytes = 0, aligned_bytes; // the reg_addr offset that is not aligned with 8Bytes
 	HAL_StatusTypeDef status = HAL_OK;
+	uint32_t retry_cnt = 6;
+
 	// printf("slave_addr %x, reg_addr %x len %ld\n",slave_addr, reg_addr, len);
 	if (hi2c->Instance == I2C1)
 		HAL_GPIO_WritePin(EEPROM_WP_GPIO_Port, EEPROM_WP_Pin, GPIO_PIN_RESET);
@@ -86,47 +95,66 @@ int hf_i2c_mem_write(I2C_HandleTypeDef *hi2c, uint8_t slave_addr,
 	unaligned_bytes = ALIGN(reg_addr, 8) - reg_addr;
 	unaligned_bytes = MIN(unaligned_bytes, len);
 	for (i = 0; i < unaligned_bytes; i++) {
-		status = HAL_I2C_Mem_Write(hi2c, slave_addr, reg_addr + i,
-								I2C_MEMADD_SIZE_8BIT, data_ptr + i, 1,
-								1000);
-		if (status != HAL_OK)
-		{
-			printf("I2Cx_write_Error(slave_addr:%x, errcode:%d) %d;\r\n", slave_addr, status, j);
-			hf_i2c_reinit(hi2c);
+		retry_cnt = 0;
+		do {
+			retry_cnt++;
+			status = HAL_I2C_Mem_Write(hi2c, slave_addr, reg_addr + i,
+									I2C_MEMADD_SIZE_8BIT, data_ptr + i, 1,
+									1000);
+			if (status != HAL_OK)
+			{
+				printf("I2Cx_write_Error(%x) reg %x; status %x, tried times: %ld\r\n", slave_addr, reg_addr + i, status, retry_cnt);
+				osDelay(pdMS_TO_TICKS(50));
+				hf_i2c_reinit(hi2c);
+			}
+		}while((HAL_OK != status) && (retry_cnt < 6));
+		// while (HAL_I2C_IsDeviceReady(hi2c, slave_addr, 0xff, 0xff) == HAL_TIMEOUT);
+		if (HAL_OK != status)
 			goto out;
-		}
-		while (HAL_I2C_IsDeviceReady(hi2c, slave_addr, 0xff, 0xff) == HAL_TIMEOUT);
 	}
 	offset = i;
 	// 8 bytes page write
 	aligned_bytes = ((len - unaligned_bytes) / 8) * 8;
 	for (i = 0; i < aligned_bytes;) {
-		status = HAL_I2C_Mem_Write(hi2c, slave_addr, reg_addr + offset + i,
-								I2C_MEMADD_SIZE_8BIT, data_ptr + offset + i, 8,
-								1000);
-		if (status != HAL_OK)
-		{
-			printf("I2Cx_write_Error(slave_addr:%x, errcode:%d) %d;\r\n", slave_addr, status, j);
-			hf_i2c_reinit(hi2c);
+		retry_cnt = 0;
+		do {
+			retry_cnt++;
+			status = HAL_I2C_Mem_Write(hi2c, slave_addr, reg_addr + offset + i,
+									I2C_MEMADD_SIZE_8BIT, data_ptr + offset + i, 8,
+									1000);
+			if (status != HAL_OK)
+			{
+				printf("I2Cx_write_Error(%x) reg %x; status %x, tried times: %ld\r\n", slave_addr, reg_addr + offset + i, status, retry_cnt);
+				osDelay(pdMS_TO_TICKS(50));
+				hf_i2c_reinit(hi2c);
+			}
+		}while((HAL_OK != status) && (retry_cnt < 6));
+		// while (HAL_I2C_IsDeviceReady(hi2c, slave_addr, 0xff, 0xff) == HAL_TIMEOUT);
+		if (HAL_OK != status)
 			goto out;
-		}
-		while (HAL_I2C_IsDeviceReady(hi2c, slave_addr, 0xff, 0xff) == HAL_TIMEOUT);
+
 		i = i + 8;
 	}
 	offset = offset + i;
 	// the left bytes
 	unaligned_bytes = len - unaligned_bytes - aligned_bytes;
 	for (i = 0; i < unaligned_bytes; i++) {
-		status = HAL_I2C_Mem_Write(hi2c, slave_addr, reg_addr + offset + i,
-								I2C_MEMADD_SIZE_8BIT, data_ptr + offset + i, 1,
-								1000);
-		if (status != HAL_OK)
-		{
-			printf("I2Cx_write_Error(slave_addr:%x, errcode:%d) %d;\r\n", slave_addr, status, j);
-			hf_i2c_reinit(hi2c);
+		retry_cnt = 0;
+		do {
+			retry_cnt++;
+			status = HAL_I2C_Mem_Write(hi2c, slave_addr, reg_addr + offset + i,
+									I2C_MEMADD_SIZE_8BIT, data_ptr + offset + i, 1,
+									1000);
+			if (status != HAL_OK)
+			{
+				printf("I2Cx_write_Error(%x) reg %x; status %x, tried times: %ld\r\n", slave_addr, reg_addr + offset + i, status, retry_cnt);
+				osDelay(pdMS_TO_TICKS(50));
+				hf_i2c_reinit(hi2c);
+			}
+		}while((HAL_OK != status) && (retry_cnt < 6));
+		// while (HAL_I2C_IsDeviceReady(hi2c, slave_addr, 0xff, 0xff) == HAL_TIMEOUT);
+		if (HAL_OK != status)
 			goto out;
-		}
-		while (HAL_I2C_IsDeviceReady(hi2c, slave_addr, 0xff, 0xff) == HAL_TIMEOUT);
 	}
 out:
 	if (hi2c->Instance == I2C1)

@@ -237,7 +237,7 @@ extern UART_HandleTypeDef huart6;
 #endif
 /* define ------------------------------------------------------------*/
 #define BMC_SOFTWARE_VERSION_MAJOR                   2
-#define BMC_SOFTWARE_VERSION_MINOR                   5
+#define BMC_SOFTWARE_VERSION_MINOR                   6
 
 #define MAGIC_NUMBER	0x45505EF1
 
@@ -317,6 +317,7 @@ void eth_get_address(void);
 
 /* eeprom APIs */
 int es_init_info_in_eeprom(void);
+int es_check_carrier_board_info(void);
 
 int es_get_carrier_borad_info(CarrierBoardInfo *pCarrier_board_info);
 int es_set_carrier_borad_info(CarrierBoardInfo *pCarrier_board_info);

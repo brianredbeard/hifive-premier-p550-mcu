@@ -273,6 +273,36 @@ static int restore_cbinfo_to_factory(CarrierBoardInfo *pCarrier_Board_Info)
 	return 0;
 }
 
+static int restore_cbinfo_to_factory_without_mutext(CarrierBoardInfo *pCarrier_Board_Info)
+{
+	char sn[] = "sn1234567890abcdef";
+
+	memset(pCarrier_Board_Info, 0, sizeof(CarrierBoardInfo));
+	pCarrier_Board_Info->magicNumber = MAGIC_NUMBER;
+
+	pCarrier_Board_Info->formatVersionNumber = 0x3;
+	pCarrier_Board_Info->productIdentifier = 0x4;
+	pCarrier_Board_Info->pcbRevision = 0x10;
+	pCarrier_Board_Info->bomRevision = 0x10;
+	pCarrier_Board_Info->bomVariant = 0x10;
+
+	memcpy(pCarrier_Board_Info->boardSerialNumber, sn, sizeof(pCarrier_Board_Info->boardSerialNumber));
+
+	pCarrier_Board_Info->manufacturingTestStatus = 0x10;
+
+	pCarrier_Board_Info->ethernetMAC3[0] = MAC_ADDR0;
+	pCarrier_Board_Info->ethernetMAC3[1] = MAC_ADDR1;
+	pCarrier_Board_Info->ethernetMAC3[2] = MAC_ADDR2;
+	pCarrier_Board_Info->ethernetMAC3[3] = MAC_ADDR3;
+	pCarrier_Board_Info->ethernetMAC3[4] = MAC_ADDR4;
+	pCarrier_Board_Info->ethernetMAC3[5] = MAC_ADDR5;
+
+	pCarrier_Board_Info->crc32Checksum = hf_crc32((uint8_t *)pCarrier_Board_Info, sizeof(CarrierBoardInfo) - 4);
+
+
+	return 0;
+}
+
 static int print_cbinfo(CarrierBoardInfo *pCarrierBoardInfo)
 {
 	char boardSn[19] = {0};
@@ -1519,4 +1549,93 @@ int es_set_som_console_cfg(int som_console_cfg)
 	esEXIT_CRITICAL(gEEPROM_Mutex);
 
 	return 0;
+}
+
+/* This API is called every time when som is powered up */
+int es_check_carrier_board_info(void)
+{
+	int ret = 0;
+	uint32_t crc32Checksum;
+	CarrierBoardInfo CbinfoMain;
+	CarrierBoardInfo CbinfoBackup;
+	uint8_t reg_addr = 0;
+
+	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
+	/* read main partintion */
+	reg_addr = CARRIER_BOARD_INFO_EEPROM_MAIN_OFFSET;
+	ret = hf_i2c_mem_read(&hi2c1, AT24C_ADDR, reg_addr,
+				(uint8_t *)&CbinfoMain, sizeof(CarrierBoardInfo));
+	if(ret) {
+		printf("Failed to read cbinfo_main\n");
+		goto out;
+	}
+	print_cbinfo(&CbinfoMain);
+	print_data((uint8_t *)&CbinfoMain, sizeof(CarrierBoardInfo));
+	/* calculate crc32 checksum of main partition */
+	crc32Checksum = hf_crc32((uint8_t *)&CbinfoMain, sizeof(CarrierBoardInfo) - 4);
+	if (crc32Checksum != CbinfoMain.crc32Checksum) { //main partition is bad
+		printf("Bad main checksum,0x%lx is NOT equal to calculated value:0x%lx\n", CbinfoMain.crc32Checksum, crc32Checksum);
+		eeprom_debug("%s:%d\n", __func__, __LINE__);
+		print_data((uint8_t *)&CbinfoMain, sizeof(CarrierBoardInfo));
+		/* try to read and check the backup partition */
+		reg_addr = CARRIER_BOARD_INFO_EEPROM_BACKUP_OFFSET;
+		ret = hf_i2c_mem_read(&hi2c1, AT24C_ADDR, reg_addr,
+					(uint8_t *)&CbinfoBackup, sizeof(CarrierBoardInfo));
+		if(ret) {
+			printf("Failed to read cbinfo_backup\n");
+			goto out;
+		}
+
+		crc32Checksum = hf_crc32((uint8_t *)&CbinfoBackup, sizeof(CarrierBoardInfo) - 4);
+		if (crc32Checksum != CbinfoBackup.crc32Checksum) { // backup patition is also bad
+			/* restore to factory settings */
+			printf("Bad backup checksum,0x%lx is also NOT equal to calculated value:0x%lx\n", CbinfoBackup.crc32Checksum, crc32Checksum);
+			restore_cbinfo_to_factory_without_mutext(&gCarrier_Board_Info);
+			printf("Restored cbinfo to factory settings\n");
+		}
+		else { // backup partion is ok
+			/* recover the main partition with the backup value */
+			printf("Recover main with backup settings\n");
+			/* update the global variable gCarrier_Board_Info with the backup value */
+			memcpy(&gCarrier_Board_Info, &CbinfoBackup, sizeof(CarrierBoardInfo));
+			/* recover main partion with the values of backup */
+			reg_addr = CARRIER_BOARD_INFO_EEPROM_MAIN_OFFSET;
+			ret = hf_i2c_mem_write(&hi2c1, AT24C_ADDR, reg_addr,
+						(uint8_t *)&CbinfoBackup, sizeof(CarrierBoardInfo));
+			if(ret) {
+				printf("Failed to write cbinfo_main\n");
+				goto out;
+			}
+		}
+	}
+	else { // main partition is ok
+		/* check backup partion, if it's bad, recover it with main value */
+		reg_addr = CARRIER_BOARD_INFO_EEPROM_BACKUP_OFFSET;
+		ret = hf_i2c_mem_read(&hi2c1, AT24C_ADDR, reg_addr,
+					(uint8_t *)&CbinfoBackup, sizeof(CarrierBoardInfo));
+		if(ret) {
+			printf("Failed to read cbinfo_backup\n");
+			goto out;
+		}
+		print_cbinfo(&CbinfoBackup);
+		crc32Checksum = hf_crc32((uint8_t *)&CbinfoBackup, sizeof(CarrierBoardInfo) - 4);
+		if (crc32Checksum != CbinfoBackup.crc32Checksum) {
+			/* recover the backup partition with the main value */
+			printf("Bad backup checksum,0x%lx is NOT equal to calculated value:0x%lx\n", CbinfoBackup.crc32Checksum, crc32Checksum);
+			printf("Recover backup with main settings\n");
+			reg_addr = CARRIER_BOARD_INFO_EEPROM_BACKUP_OFFSET;
+			ret = hf_i2c_mem_write(&hi2c1, AT24C_ADDR, reg_addr,
+						(uint8_t *)&CbinfoMain, sizeof(CarrierBoardInfo));
+			if(ret) {
+				printf("Failed to write cbinfo_backup\n");
+				goto out;
+			}
+		}
+		else {
+			printf("cbinfo checksum ok!!!!\n");
+		}
+	}
+out:
+	esEXIT_CRITICAL(gEEPROM_Mutex);
+	return ret;
 }
