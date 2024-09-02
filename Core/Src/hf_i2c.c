@@ -111,6 +111,9 @@ int hf_i2c_mem_write(I2C_HandleTypeDef *hi2c, uint8_t slave_addr,
 		// while (HAL_I2C_IsDeviceReady(hi2c, slave_addr, 0xff, 0xff) == HAL_TIMEOUT);
 		if (HAL_OK != status)
 			goto out;
+
+		/* tWR=5ms is the time from a valid Stop condition of a write sequence to the end of the internal clear/write cycle*/
+		osDelay(pdMS_TO_TICKS(5));
 	}
 	offset = i;
 	// 8 bytes page write
@@ -134,6 +137,7 @@ int hf_i2c_mem_write(I2C_HandleTypeDef *hi2c, uint8_t slave_addr,
 			goto out;
 
 		i = i + 8;
+		osDelay(pdMS_TO_TICKS(5));
 	}
 	offset = offset + i;
 	// the left bytes
@@ -155,6 +159,8 @@ int hf_i2c_mem_write(I2C_HandleTypeDef *hi2c, uint8_t slave_addr,
 		// while (HAL_I2C_IsDeviceReady(hi2c, slave_addr, 0xff, 0xff) == HAL_TIMEOUT);
 		if (HAL_OK != status)
 			goto out;
+
+		osDelay(pdMS_TO_TICKS(5));
 	}
 out:
 	if (hi2c->Instance == I2C1)

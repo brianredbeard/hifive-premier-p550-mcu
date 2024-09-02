@@ -102,6 +102,9 @@ static void print_data(uint8_t *p_buf, int len)
 	#if EEPROM_DEBUG_EN
 	int i;
 	for (i = 0; i < len; i++) {
+		if (0 == (i%8))
+			printf("0x%02x:", i);
+
 		printf(" %02x", p_buf[i]);
 		if (0 == ((i+1)%8))
 			printf("\n");
@@ -569,6 +572,7 @@ int es_set_carrier_borad_info(CarrierBoardInfo *pCarrier_Board_Info)
 		skip_update_eeprom = 0;
 		eeprom_debug("Updated CarrierBoardInfo in EEPROM!\n");
 	}
+	esEXIT_CRITICAL(gEEPROM_Mutex);
 
 	if (!skip_update_eeprom) {
 		/* write to main partition */
@@ -577,7 +581,6 @@ int es_set_carrier_borad_info(CarrierBoardInfo *pCarrier_Board_Info)
 		/* write to backup partition */
 		write_cbinfo(pCarrier_Board_Info, cbinfo_backup);
 	}
-	esEXIT_CRITICAL(gEEPROM_Mutex);
 
 	return 0;
 }
