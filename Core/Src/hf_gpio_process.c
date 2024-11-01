@@ -160,7 +160,7 @@ static void mcu_reset_som_process(void)
 	*/
 	es_check_carrier_board_info();
 }
-
+/*
 static void som_rst_feedback_process(void)
 {
 	bmc_debug("%s %d som reset, get_som_power_state()=%d\n",
@@ -171,7 +171,7 @@ static void som_rst_feedback_process(void)
 		som_reset_control(pdFALSE);
 	}
 }
-
+*/
 static uint8_t get_user_key_status(void)
 {
 	return HAL_GPIO_ReadPin(KEY_USER_RST_GPIO_Port, KEY_USER_RST_Pin);
@@ -232,8 +232,14 @@ void hf_gpio_task(void *parameter)
 		if (flags > 0) {
 			if (flags & FLAGS_KEY)
 				key_process();
+			/*
+			The MCU does not need to handle the RST_OUT signal issued by the EIC770x;
+			otherwise, it may cause the MCPU’s debug module to reset.
+			*/
+			/*
 			if (FLAGS_SOM_RST_OUT & flags)
 				som_rst_feedback_process();
+			*/
 			if (FLAGS_MCU_RESET_SOM & flags)
 				mcu_reset_som_process();
 			if (FLAGS_KEY_USER_RST & flags)

@@ -237,7 +237,7 @@ extern UART_HandleTypeDef huart6;
 #endif
 /* define ------------------------------------------------------------*/
 #define BMC_SOFTWARE_VERSION_MAJOR                   2
-#define BMC_SOFTWARE_VERSION_MINOR                   6
+#define BMC_SOFTWARE_VERSION_MINOR                   7
 
 #define MAGIC_NUMBER	0x45505EF1
 
