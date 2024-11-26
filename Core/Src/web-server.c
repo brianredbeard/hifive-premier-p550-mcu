@@ -11817,7 +11817,8 @@ http_server_netconn_serve(struct netconn *conn)
 		free(buf_copy);
 		free(found_session_user_name);
 	}else{
-		LWIP_ASSERT("receive ret err != ERR_OK",0);
+		// LWIP_ASSERT("receive ret err != ERR_OK",0);
+		printf("web-server receive ret err:%d \n",err);
 	}
 
 	netbuf_delete(inbuf);

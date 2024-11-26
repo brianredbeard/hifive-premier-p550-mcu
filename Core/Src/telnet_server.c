@@ -205,21 +205,27 @@ static void wrt_task (void *arg)
 		  netconn_close (instance->newconn);
 		  netconn_delete(instance->newconn);
 
+START_LISTEN_AGAIN:
 		  // Start listening again
 		  netconn_delete(instance->conn);
+RETRY_CREATE_NETCONN:
 		  vTaskDelay( 1000 ); // Delay for a while to make sure connection has been deleted eventually
 		  instance->conn = netconn_new_with_callback(NETCONN_TCP, netconn_cb);
-		  if( instance->conn == NULL )
-		  		return;
+		  if( instance->conn == NULL ) {
+			printf("%s: failed to create TCP connection!!!\n", __func__);
+			goto RETRY_CREATE_NETCONN;
+		  }
 
-		  	err = netconn_bind(instance->conn, NULL, instance->tcp_port);
-		  	if ( err != ERR_OK )
-		  		return;
+		err = netconn_bind(instance->conn, NULL, instance->tcp_port);
+		if ( err != ERR_OK ) {
+			printf("%s: err %d, failed to bind TCP!!!\n", __func__, err);
+			goto START_LISTEN_AGAIN;
+		}
 
-		  	netconn_listen(instance->conn);
+		netconn_listen(instance->conn);
 
-		  	// No connection still established
-		  	instance->status = TELNET_CONN_STATUS_NONE;
+		// No connection still established
+		instance->status = TELNET_CONN_STATUS_NONE;
 	  }
   }
 }
