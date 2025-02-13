@@ -28,6 +28,10 @@
 #include "hf_power_process.h"
 #include "hf_spi_slv.h"
 #include "telnet_som_console.h"
+#include "console.h"
+#include "semphr.h"
+
+extern SemaphoreHandle_t gEEPROM_Mutex;
 
 #define CONSOLE_VERSION_MAJOR                   1
 #define CONSOLE_VERSION_MINOR                   0
@@ -35,16 +39,6 @@
 #define MAX_IN_STR_LEN                          300
 #define MAX_OUT_STR_LEN                         600
 #define MAX_RX_QUEUE_LEN                        300
-
-                                                      /* ASCII code definition */
-#define ASCII_TAB                               '\t'  /* Tabulate              */
-#define ASCII_CR                                '\r'  /* Carriage return       */
-#define ASCII_LF                                '\n'  /* Line feed             */
-#define ASCII_BACKSPACE                         '\b'  /* Back space            */
-#define ASCII_FORM_FEED                         '\f'  /* Form feed             */
-#define ASCII_DEL                               127   /* Delete                */
-#define ASCII_CTRL_PLUS_C                         3   /* CTRL + C              */
-#define ASCII_NACK                               21   /* Negative acknowledge  */
 
 char cRxData;
 QueueHandle_t xQueueRxHandle;
@@ -727,7 +721,9 @@ static BaseType_t prvCommandIPSet(char *pcWriteBuffer, size_t xWriteBufferLen, c
     ip.ip_addr1 = 0xff & (naddr >> 8);
     ip.ip_addr2 = 0xff & (naddr >> 16);
     ip.ip_addr3 = 0xff & (naddr >> 24);
+    esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
     es_set_eth(&ip, NULL, NULL, NULL);
+    esEXIT_CRITICAL(gEEPROM_Mutex);
 
     snprintf(pcWriteBuffer, xWriteBufferLen, "ip addr set to %s(0x%lx)\r\n", pcIPaddr, naddr);
 out:
@@ -763,7 +759,9 @@ static BaseType_t prvCommandNetMaskSet(char *pcWriteBuffer, size_t xWriteBufferL
     netmask.netmask_addr1 = 0xff & (naddr >> 8);
     netmask.netmask_addr2 = 0xff & (naddr >> 16);
     netmask.netmask_addr3 = 0xff & (naddr >> 24);
+    esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
     es_set_eth(NULL, &netmask, NULL, NULL);
+    esEXIT_CRITICAL(gEEPROM_Mutex);
 
     snprintf(pcWriteBuffer, xWriteBufferLen, "netmask addr set to %s(0x%lx)\r\n", pcIPaddr, naddr);
 out:
@@ -799,7 +797,9 @@ static BaseType_t prvCommandGateWaySet(char *pcWriteBuffer, size_t xWriteBufferL
     gw.getway_addr1 = 0xff & (naddr >> 8);
     gw.getway_addr2 = 0xff & (naddr >> 16);
     gw.getway_addr3 = 0xff & (naddr >> 24);
+    esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
     es_set_eth(NULL, NULL, &gw, NULL);
+    esEXIT_CRITICAL(gEEPROM_Mutex);
 
     snprintf(pcWriteBuffer, xWriteBufferLen, "gateway addr set to %s(0x%lx)\r\n", pcIPaddr, naddr);
 out:
@@ -1304,11 +1304,12 @@ static BaseType_t prvCommandDevmemWrite(char *pcWriteBuffer, size_t xWriteBuffer
     cValue = FreeRTOS_CLIGetParameter(pcCommandString, 2, &xParamLen);
     value = atoh(cValue, xParamLen);
 
+    esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
     /* Write memory/io and fill FreeRTOS write buffer */
     if (HAL_OK != es_spi_write((uint8_t *)&value, memAddr, 4)) {
         snprintf(pcWriteBuffer, xWriteBufferLen, "Failed to write mem/io at 0x%lx%lx\n", memAddrHigh, memAddrLow);
     }
-
+    esEXIT_CRITICAL(gEEPROM_Mutex);
     return pdFALSE;
 }
 
@@ -1386,6 +1387,7 @@ static BaseType_t prvCommandCBWpEEPROM(char *pcWriteBuffer, size_t xWriteBufferL
     cEEPROM_WP = FreeRTOS_CLIGetParameter(pcCommandString, 1, &xParamLen);
     WP_En = atoi(cEEPROM_WP);
 
+    esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
     /* change write protect pin value */
     if (!WP_En) {
         HAL_GPIO_WritePin(EEPROM_WP_GPIO_Port, EEPROM_WP_Pin, GPIO_PIN_RESET);
@@ -1395,7 +1397,7 @@ static BaseType_t prvCommandCBWpEEPROM(char *pcWriteBuffer, size_t xWriteBufferL
         HAL_GPIO_WritePin(EEPROM_WP_GPIO_Port, EEPROM_WP_Pin, GPIO_PIN_SET);
         snprintf(pcWriteBuffer, xWriteBufferLen, "EEPROM Write protect enabled!\r\n");
     }
-
+    esEXIT_CRITICAL(gEEPROM_Mutex);
     return pdFALSE;
 }
 
@@ -1540,6 +1542,7 @@ void vTaskConsole(void *pvParams)
                 {
                     vConsoleWrite("\r\n");
                     strncpy(pcPrevInputString, pcInputString, MAX_IN_STR_LEN);
+                    FreeRTOS_CLILock();
                     do
                     {
                         xMoreDataToProcess = FreeRTOS_CLIProcessCommand
@@ -1550,6 +1553,7 @@ void vTaskConsole(void *pvParams)
                                             );
                         vConsoleWrite(pcOutputString);
                     } while (xMoreDataToProcess != pdFALSE);
+                    FreeRTOS_CLIUnLock();
                 }
                 uInputIndex = 0;
                 memset(pcInputString, 0x00, MAX_IN_STR_LEN);

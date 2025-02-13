@@ -26,7 +26,8 @@
 #include "console.h"
 #include "telnet_server.h"
 #include "telnet_som_console.h"
-
+#include "telnet_mcu_console.h"
+#include "telnet_mcu_server.h"
 /* Private includes ----------------------------------------------------------*/
 #include "hf_common.h"
 /* Private typedef -----------------------------------------------------------*/
@@ -69,7 +70,7 @@ const osThreadAttr_t power_task_attributes = {
 osThreadId_t key_task_handle;
 const osThreadAttr_t gpio_task_attributes = {
   .name = "KeyTask",
-  .stack_size = 1024 * 2,
+  .stack_size = 256 * 3,
   .priority = (osPriority_t) osPriorityNormal,
 };
 
@@ -177,7 +178,7 @@ void hf_main_task(void *argument)
   }
   telnet_create(23, telenet_receiver_callback, NULL);
   #endif
-
+  telnet_mcu_create(25);
   set_mcu_led_status(LED_MCU_RUNING);
 
   for(;;)

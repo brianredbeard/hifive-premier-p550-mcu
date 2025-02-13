@@ -94,6 +94,16 @@ char *FreeRTOS_CLIGetOutputBuffer( void );
  */
 const char *FreeRTOS_CLIGetParameter( const char *pcCommandString, UBaseType_t uxWantedParameter, BaseType_t *pxParameterStringLength );
 
+/*
+ * Lock the critical resource for current process.
+ */
+void FreeRTOS_CLILock(void);
+
+/*
+ * UnLock the critical resource for current process.
+ */
+void FreeRTOS_CLIUnLock(void);
+
 /* *INDENT-OFF* */
 #ifdef __cplusplus
     }

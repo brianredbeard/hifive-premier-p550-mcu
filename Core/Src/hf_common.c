@@ -42,7 +42,7 @@ static CarrierBoardInfo gCarrier_Board_Info;
 
 static MCUServerInfo gMCU_Server_Info;
 static SomPwrMgtDIPInfo gSOM_PwgMgtDIP_Info;
-static SemaphoreHandle_t gEEPROM_Mutex;
+SemaphoreHandle_t gEEPROM_Mutex;
 
 static int gSOM_ConsoleCfg = 0; //0: The default console of SOM is uart; 1: Telnet SOM Console
 
@@ -1224,6 +1224,7 @@ int es_eeprom_info_test(void)
 void set_bootsel(uint8_t is_soft_crtl, uint8_t sel)
 {
 	GPIO_InitTypeDef GPIO_InitStruct = {0};
+	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
 	if(is_soft_crtl){
 		/*Configure GPIO pins : BOOT_SEL0_Pin BOOT_SEL1_Pin BOOT_SEL2_Pin BOOT_SEL3_Pin*/
 		GPIO_InitStruct.Pin = BOOT_SEL0_Pin | BOOT_SEL1_Pin | BOOT_SEL2_Pin | BOOT_SEL3_Pin;
@@ -1249,6 +1250,7 @@ void set_bootsel(uint8_t is_soft_crtl, uint8_t sel)
 		GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
 		HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 	}
+	esEXIT_CRITICAL(gEEPROM_Mutex);
 }
 
 int get_bootsel(int *pCtl_attr, uint8_t *pSel)
@@ -1340,8 +1342,12 @@ int32_t es_set_rtc_date(struct rtc_date_t *sdate)
 	sDate.WeekDay = sdate->WeekDay;
 
 	printf("yy/mm/dd  %04d/%02d/%02d %02d\r\n", sDate.Year + 2000, sDate.Month, sDate.Date,sDate.WeekDay);
-	if (HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BIN) != HAL_OK)
+	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
+	if (HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BIN) != HAL_OK) {
+		esEXIT_CRITICAL(gEEPROM_Mutex);
 		return HAL_ERROR;
+	}
+	esEXIT_CRITICAL(gEEPROM_Mutex);
 	return HAL_OK;
 }
 
@@ -1353,9 +1359,13 @@ int32_t es_set_rtc_time(struct rtc_time_t *stime)
 	sTime.Seconds = stime->Seconds;
 	sTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
 	sTime.StoreOperation = RTC_STOREOPERATION_SET;
+	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
 	// printf("%s hh:mm:ss %02d:%02d:%02d\r\n", __func__, sTime.Hours, sTime.Minutes,sTime.Seconds);
-	if (HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BIN) != HAL_OK)
+	if (HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BIN) != HAL_OK) {
+		esEXIT_CRITICAL(gEEPROM_Mutex);
 		return HAL_ERROR;
+	}
+	esEXIT_CRITICAL(gEEPROM_Mutex);
 	return HAL_OK;
 }
 

@@ -31,6 +31,7 @@
 /* FreeRTOS includes. */
 #include "FreeRTOS.h"
 #include "task.h"
+#include "semphr.h"
 
 /* Utils includes. */
 #include "FreeRTOS_CLI.h"
@@ -92,12 +93,13 @@ attempted.
 configAPPLICATION_PROVIDES_cOutputBuffer is provided to allow the application
 writer to provide their own cOutputBuffer declaration in cases where the
 buffer needs to be placed at a fixed address (rather than by the linker). */
-#if( configAPPLICATION_PROVIDES_cOutputBuffer == 0 )
-	static char cOutputBuffer[ configCOMMAND_INT_MAX_OUTPUT_SIZE ];
-#else
-	extern char cOutputBuffer[ configCOMMAND_INT_MAX_OUTPUT_SIZE ];
-#endif
+// #if( configAPPLICATION_PROVIDES_cOutputBuffer == 0 )
+// 	static char cOutputBuffer[ configCOMMAND_INT_MAX_OUTPUT_SIZE ];
+// #else
+// 	extern char cOutputBuffer[ configCOMMAND_INT_MAX_OUTPUT_SIZE ];
+// #endif
 
+SemaphoreHandle_t gCLI_Mutex;
 
 /*-----------------------------------------------------------*/
 
@@ -134,6 +136,8 @@ BaseType_t xReturn = pdFAIL;
 			pxLastCommandInList = pxNewListItem;
 		}
 		taskEXIT_CRITICAL();
+
+		gCLI_Mutex = xSemaphoreCreateMutex();
 
 		xReturn = pdPASS;
 	}
@@ -217,10 +221,10 @@ size_t xCommandStringLength;
 }
 /*-----------------------------------------------------------*/
 
-char *FreeRTOS_CLIGetOutputBuffer( void )
-{
-	return cOutputBuffer;
-}
+// char *FreeRTOS_CLIGetOutputBuffer( void )
+// {
+// 	return cOutputBuffer;
+// }
 /*-----------------------------------------------------------*/
 
 const char *FreeRTOS_CLIGetParameter( const char *pcCommandString, UBaseType_t uxWantedParameter, BaseType_t *pxParameterStringLength )
@@ -348,3 +352,18 @@ BaseType_t xLastCharacterWasSpace = pdFALSE;
 	return cParameters;
 }
 
+/*
+ * Lock the critical resource for current process.
+ */
+void FreeRTOS_CLILock(void)
+{
+	xSemaphoreTake(gCLI_Mutex, portMAX_DELAY);
+}
+
+/*
+ * UnLock the critical resource for current process.
+ */
+void FreeRTOS_CLIUnLock(void)
+{
+	xSemaphoreGive(gCLI_Mutex);
+} 

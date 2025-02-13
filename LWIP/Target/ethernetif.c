@@ -41,7 +41,7 @@
 #define TIME_WAITING_FOR_INPUT ( portMAX_DELAY )
 /* USER CODE BEGIN OS_THREAD_STACK_SIZE_WITH_RTOS */
 /* Stack size of the interface thread */
-#define INTERFACE_THREAD_STACK_SIZE ( 1024 )
+#define INTERFACE_THREAD_STACK_SIZE ( 256 * 5 )
 /* USER CODE END OS_THREAD_STACK_SIZE_WITH_RTOS */
 /* Network interface name */
 #define IFNAME0 's'
@@ -317,8 +317,17 @@ static void low_level_init(struct netif *netif)
     HAL_ETH_SetMACConfig(&heth, &MACConf);
 
     HAL_ETH_Start_IT(&heth);
+    osDelay(1000);
     netif_set_up(netif);
     netif_set_link_up(netif);
+    #if LWIP_ARP
+    osDelay(5000);
+    if (netif->flags & (NETIF_FLAG_ETHARP)) {
+      etharp_gratuitous(netif);
+      osDelay(1000);
+      etharp_gratuitous(netif);
+    }
+    #endif
 
 /* USER CODE BEGIN PHY_POST_CONFIG */
 
@@ -390,9 +399,10 @@ static err_t low_level_output(struct netif *netif, struct pbuf *p)
   pbuf_ref(p);
 
   if (HAL_ETH_Transmit_IT(&heth, &TxConfig) == HAL_OK) {
-    while(osSemaphoreAcquire(TxPktSemaphore, TIME_WAITING_FOR_INPUT)!=osOK)
+    if(osSemaphoreAcquire(TxPktSemaphore, 3000)!=osOK)
 
     {
+      printf("GZL%s %d sned data failed  \n", __func__, __LINE__);
     }
 
     HAL_ETH_ReleaseTxPacket(&heth);
@@ -763,7 +773,7 @@ void ethernet_link_thread(void* argument)
 
   struct netif *netif = (struct netif *) argument;
 /* USER CODE BEGIN ETH link init */
-
+  
 /* USER CODE END ETH link init */
 
   for(;;)
@@ -811,14 +821,25 @@ void ethernet_link_thread(void* argument)
       MACConf.DuplexMode = duplex;
       MACConf.Speed = speed;
       HAL_ETH_SetMACConfig(&heth, &MACConf);
+      osDelay(1000);
       HAL_ETH_Start_IT(&heth);
-      netif_set_up(netif);
+      osDelay(2000);
+      netif_set_up(netif);      
       netif_set_link_up(netif);
+      /*Wait link stable, then send gratuitous ARP again.*/
+      #if LWIP_ARP
+      osDelay(5000);
+      if (netif->flags & (NETIF_FLAG_ETHARP)) {
+        etharp_gratuitous(netif);
+        osDelay(1000);
+        etharp_gratuitous(netif);
+      }
+      #endif
     }
   }
 
 /* USER CODE BEGIN ETH link Thread core code for User BSP */
-
+  
 /* USER CODE END ETH link Thread core code for User BSP */
 
     osDelay(100);
