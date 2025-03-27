@@ -305,7 +305,7 @@ A cbinfo	64		0
 #define ES_PRODUCTION_LINE_TEST 0
 
 /* functions prototypes ---------------------------------------------*/
-void hexstr2mac(uint8_t *mac, const char *hexstr);
+int hexstr2mac(uint8_t *mac, const char *hexstr);
 uint64_t atoh(const char *in, uint32_t len);
 
 void hf_http_task(void *argument);
@@ -394,6 +394,8 @@ int es_restore_userdata_to_factory(void);
 /* Dynamically change eth */
 int32_t es_set_eth(struct ip_t *ip, struct netmask_t *netmask, struct getway_t *gw, struct eth_mac_t *mac);
 void MX_I2C3_Init(void);
+
+int es_ipaddr_addr(const char *cp, uint32_t *p_naddr);
 
 #ifdef __cplusplus
 }

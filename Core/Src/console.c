@@ -197,7 +197,7 @@ static const CLI_Command_Definition_t xCommands[] =
     },
     {
         "setmac",
-        "\r\nsetmac <index,0-2> <mac,like a1:26:39:91:b0:22>: Set mac address.\r\n",
+        "\r\nsetmac <index,0-2> <mac,like 8c:26:39:91:b0:22>: Set mac address.\r\n",
         prvCommandMacSet,
         2
     },
@@ -643,7 +643,11 @@ static BaseType_t prvCommandAccountSet(char *pcWriteBuffer, size_t xWriteBufferL
     strncpy(admin_password, pcAdminPassword, xParamLen);
 
     /* update the accoutn info finally */
-    es_set_username_password(admin_name, pcAdminPassword);
+    if(es_set_username_password(admin_name, pcAdminPassword) == 0) {
+        snprintf(pcWriteBuffer, xWriteBufferLen, "Adminname and password set successfully!\r\n");
+    } else {
+        snprintf(pcWriteBuffer, xWriteBufferLen, "Failed to set the adminname and password!!!\r\n");
+    }
 
     return pdFALSE;
 }
@@ -706,11 +710,18 @@ static BaseType_t prvCommandIPSet(char *pcWriteBuffer, size_t xWriteBufferLen, c
     const char * pcIPaddr;
     BaseType_t xParamLen;
     struct ip_t ip;
+    ip4_addr_t ip4_addr;
+    uint8_t *buf = (uint8_t *)&naddr;
+    char *p_addr;
 
     pcIPaddr = FreeRTOS_CLIGetParameter(pcCommandString, 1, &xParamLen);
 
     /* store ipaddr to eeprom*/
-    naddr = ipaddr_addr(pcIPaddr);
+    if (es_ipaddr_addr(pcIPaddr, &naddr)) {
+        snprintf(pcWriteBuffer, xWriteBufferLen, "Failed to parse ip addr %s\r\n", pcIPaddr);
+        goto out;
+    }
+
     if(es_set_mcu_ipaddr((uint8_t *)&naddr)) {
         snprintf(pcWriteBuffer, xWriteBufferLen, "Invalid ip addr %s\r\n", pcIPaddr);
         goto out;
@@ -725,7 +736,9 @@ static BaseType_t prvCommandIPSet(char *pcWriteBuffer, size_t xWriteBufferLen, c
     es_set_eth(&ip, NULL, NULL, NULL);
     esEXIT_CRITICAL(gEEPROM_Mutex);
 
-    snprintf(pcWriteBuffer, xWriteBufferLen, "ip addr set to %s(0x%lx)\r\n", pcIPaddr, naddr);
+    IP4_ADDR(&ip4_addr, buf[0], buf[1], buf[2], buf[3]);
+    p_addr = ip4addr_ntoa(&ip4_addr);
+    snprintf(pcWriteBuffer, xWriteBufferLen, "ip input string %s set as %s\r\n", pcIPaddr, p_addr);
 out:
     return pdFALSE;
 }
@@ -744,11 +757,18 @@ static BaseType_t prvCommandNetMaskSet(char *pcWriteBuffer, size_t xWriteBufferL
     const char * pcIPaddr;
     BaseType_t xParamLen;
     struct netmask_t netmask;
+    ip4_addr_t ip4_addr;
+    uint8_t *buf = (uint8_t *)&naddr;
+    char *p_addr;
 
     pcIPaddr = FreeRTOS_CLIGetParameter(pcCommandString, 1, &xParamLen);
 
     /* store netmask to eeprom*/
-    naddr = ipaddr_addr(pcIPaddr);
+    if (es_ipaddr_addr(pcIPaddr, &naddr)) {
+        snprintf(pcWriteBuffer, xWriteBufferLen, "Failed to parse netmask addr %s\r\n", pcIPaddr);
+        goto out;
+    }
+
     if (es_set_mcu_netmask((uint8_t *)&naddr)) {
         snprintf(pcWriteBuffer, xWriteBufferLen, "Invalid netmask addr %s\r\n", pcIPaddr);
         goto out;
@@ -763,7 +783,9 @@ static BaseType_t prvCommandNetMaskSet(char *pcWriteBuffer, size_t xWriteBufferL
     es_set_eth(NULL, &netmask, NULL, NULL);
     esEXIT_CRITICAL(gEEPROM_Mutex);
 
-    snprintf(pcWriteBuffer, xWriteBufferLen, "netmask addr set to %s(0x%lx)\r\n", pcIPaddr, naddr);
+    IP4_ADDR(&ip4_addr, buf[0], buf[1], buf[2], buf[3]);
+    p_addr = ip4addr_ntoa(&ip4_addr);
+    snprintf(pcWriteBuffer, xWriteBufferLen, "netmask input string %s set as %s\r\n", pcIPaddr, p_addr);
 out:
     return pdFALSE;
 }
@@ -782,11 +804,18 @@ static BaseType_t prvCommandGateWaySet(char *pcWriteBuffer, size_t xWriteBufferL
     const char * pcIPaddr;
     BaseType_t xParamLen;
     struct getway_t gw;
+    ip4_addr_t ip4_addr;
+    uint8_t *buf = (uint8_t *)&naddr;
+    char *p_addr;
 
     pcIPaddr = FreeRTOS_CLIGetParameter(pcCommandString, 1, &xParamLen);
 
     /* store gateway to eeprom */
-    naddr = ipaddr_addr(pcIPaddr);
+    if (es_ipaddr_addr(pcIPaddr, &naddr)) {
+        snprintf(pcWriteBuffer, xWriteBufferLen, "Failed to parse gateway addr %s\r\n", pcIPaddr);
+        goto out;
+    }
+
     if (es_set_mcu_gateway((uint8_t *)&naddr)) {
         snprintf(pcWriteBuffer, xWriteBufferLen, "Invalid gateway addr %s\r\n", pcIPaddr);
         goto out;
@@ -801,7 +830,9 @@ static BaseType_t prvCommandGateWaySet(char *pcWriteBuffer, size_t xWriteBufferL
     es_set_eth(NULL, NULL, &gw, NULL);
     esEXIT_CRITICAL(gEEPROM_Mutex);
 
-    snprintf(pcWriteBuffer, xWriteBufferLen, "gateway addr set to %s(0x%lx)\r\n", pcIPaddr, naddr);
+    IP4_ADDR(&ip4_addr, buf[0], buf[1], buf[2], buf[3]);
+    p_addr = ip4addr_ntoa(&ip4_addr);
+    snprintf(pcWriteBuffer, xWriteBufferLen, "gateway input string %s set as %s\r\n", pcIPaddr, p_addr);
 out:
     return pdFALSE;
 }
@@ -828,14 +859,17 @@ static BaseType_t prvCommandMacSet(char *pcWriteBuffer, size_t xWriteBufferLen, 
     pcMACaddr = FreeRTOS_CLIGetParameter(pcCommandString, 2, &xParamLen);
 
     /* set mac */
-    hexstr2mac(mac, pcMACaddr);
+    if(hexstr2mac(mac, pcMACaddr)) {
+        snprintf(pcWriteBuffer, xWriteBufferLen, "Illegal MAC address format!\r\n");
+        goto out;
+    }
     if (es_set_mcu_mac(mac, mac_index))
         goto out;
 
     snprintf(pcWriteBuffer, xWriteBufferLen, "MAC[%d] addr set to %s(%x:%x:%x:%x:%x:%x)\r\n",
                 mac_index, pcMACaddr, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
-    printf("The MAC setting will be valid after rebooting the carrier board!!!\n");
+    printf("The MAC setting will be validated after rebooting the carrier board!!!\n");
 out:
     return pdFALSE;
 }

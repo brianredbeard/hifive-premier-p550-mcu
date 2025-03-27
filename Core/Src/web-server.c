@@ -10694,8 +10694,11 @@ int set_net_info(NETInfo netinfo) {
 	struct getway_t gw;
 
 	/* set ipaddr */
-	naddr = ipaddr_addr(netinfo.ipaddr);
-	es_set_mcu_ipaddr((uint8_t *)&naddr);
+	if (es_ipaddr_addr(netinfo.ipaddr, &naddr))
+		return -1;
+
+	if (es_set_mcu_ipaddr((uint8_t *)&naddr))
+		return -1;
 	/* Prepare ip struct for validating eth settings */
 	ip.ip_addr0 = 0xff & naddr;
 	ip.ip_addr1 = 0xff & (naddr >> 8);
@@ -10703,8 +10706,11 @@ int set_net_info(NETInfo netinfo) {
 	ip.ip_addr3 = 0xff & (naddr >> 24);
 
 	/* set netmask */
-	naddr = ipaddr_addr(netinfo.subnetwork);
-	es_set_mcu_netmask((uint8_t *)&naddr);
+	if (es_ipaddr_addr(netinfo.subnetwork, &naddr))
+		return -1;
+
+	if (es_set_mcu_netmask((uint8_t *)&naddr))
+		return -1;
 	/* Prepare netmask struct for validating eth settings */
 	netmask.netmask_addr0 = 0xff & naddr;
 	netmask.netmask_addr1 = 0xff & (naddr >> 8);
@@ -10712,8 +10718,11 @@ int set_net_info(NETInfo netinfo) {
 	netmask.netmask_addr3 = 0xff & (naddr >> 24);
 
 	/* set gateway */
-	naddr = ipaddr_addr(netinfo.gateway);
-	es_set_mcu_gateway((uint8_t *)&naddr);
+	if (es_ipaddr_addr(netinfo.gateway, &naddr))
+		return -1;
+
+	if (es_set_mcu_gateway((uint8_t *)&naddr))
+		return -1;
 	/* Prepare gateway struct for validating eth settings */
 	gw.getway_addr0 = 0xff & naddr;
 	gw.getway_addr1 = 0xff & (naddr >> 8);

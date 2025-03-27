@@ -141,19 +141,36 @@ static int hex2num(char c)
 	return -1;
 }
 
-void hexstr2mac(uint8_t *mac, const char *hexstr)
+int hexstr2mac(uint8_t *mac, const char *hexstr)
 {
 	int i = 0;
+	int hex_h,hex_l;
+
+	if((strlen(hexstr) != 17) || (hexstr == NULL))
+		return -1;
 
 	while (i < 6) {
-		if (' ' == *hexstr || ':' == *hexstr || '"' == *hexstr || '\'' == *hexstr) {
-			hexstr++;
-			continue;
-		}
-		*(mac + i) = (hex2num(*hexstr) <<4) | hex2num(*(hexstr + 1));
+		hex_h = hex2num(*hexstr);
+		if(hex_h == -1)
+			return -1;
+
+		hex_l = hex2num(*(hexstr + 1));
+		if(hex_l == -1)
+			return -1;
+
+		*(mac + i) = (hex_h << 4) | hex_l;
 		i++;
 		hexstr += 2;
+        /*detect "ABC:XX"*/
+		if(i != 6) {
+			if (' ' == *hexstr || ':' == *hexstr || '"' == *hexstr || '\'' == *hexstr) {
+				hexstr++;
+			} else {
+				return -1;
+			}
+		}
 	}
+    return 0;
 }
 
 uint64_t atoh(const char *in, uint32_t len)
@@ -799,11 +816,11 @@ int es_set_username_password(const char *p_admin_name, const char *p_admin_passw
 	if (NULL == p_admin_password)
 		return -1;
 
-	if (0 == strlen(p_admin_name)) {
+	if ((0 == strlen(p_admin_name)) || (20 < strlen(p_admin_name))) {
 		return -1;
 	}
 
-	if (0 == strlen(p_admin_password)) {
+	if ((0 == strlen(p_admin_password)) || (20 < strlen(p_admin_password))) {
 		return -1;
 	}
 
@@ -1651,4 +1668,24 @@ int es_check_carrier_board_info(void)
 out:
 	esEXIT_CRITICAL(gEEPROM_Mutex);
 	return ret;
+}
+
+/**
+ * Ascii internet address interpretation routine.
+ * The value returned is in network order.
+ *
+ * @param cp IP address in ascii representation (e.g. "127.0.0.1")
+ * @param p_naddr pointer to which to save the ip address in network order
+ * @return 0, success convert cp to  network addr; -1 on failure
+ */
+int es_ipaddr_addr(const char *cp, uint32_t *p_naddr)
+{
+	ip4_addr_t val;
+
+	if (ip4addr_aton(cp, &val)) {
+		*p_naddr = ip4_addr_get_u32(&val);
+		return 0;
+	}
+
+	return -1;
 }
