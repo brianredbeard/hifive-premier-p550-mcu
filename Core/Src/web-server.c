@@ -10821,6 +10821,33 @@ int set_rtcinfo(RTCInfo rtcInfo){
 	return 0;
 }
 
+char* url_decode(char* src)
+{
+	char* ori_str = src;
+    char* parse_str = strdup(src);
+    char* p = parse_str;
+    while (*src) {
+        if (*src == '%') {
+            if (src[1] && src[2]) {
+                /*Converts the two hexadecimal after the % to char.*/ 
+                sscanf(src + 1, "%2x", (unsigned int*)p++);
+                /*Skip %xx.*/
+                src += 3;
+                continue;
+            }
+        }
+        if (*src == '+') {
+            *p++ = ' ';
+            src++;
+        } else {
+            *p++ = *src++;
+        }
+    }
+    *p = '\0';
+	free(ori_str);
+    return parse_str;
+}
+
 //0,working,1,stopped
 int get_soc_status()
 {
@@ -11366,12 +11393,14 @@ http_server_netconn_serve(struct netconn *conn)
 					kv_pair *current = params.head;
 					while (current) {
 						if(strcmp(current->key,"username")==0){
+							current->value = url_decode(current->value);
 							username= current->value;
 							if(password!=NULL){//two param is found
 								break;
 							}
 						}
 						if(strcmp(current->key,"password")==0){
+							current->value = url_decode(current->value);
 							password= current->value;
 							if(username!=NULL){//two param is found
 								break;
@@ -11429,8 +11458,10 @@ http_server_netconn_serve(struct netconn *conn)
 					kv_pair *current = params.head;
 					while (current) {
 						if(strcmp(current->key,"password")==0){
+							current->value = url_decode(current->value);
 							password= current->value;
 						}else if(strcmp(current->key,"username")==0){
+							current->value = url_decode(current->value);
 							username= current->value;
 						}
 						current = current->next;
