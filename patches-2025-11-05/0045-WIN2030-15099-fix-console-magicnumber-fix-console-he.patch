@@ -1,0 +1,60 @@
+From 4c96b2c51361d023471a10d91672bb343bd9f2c2 Mon Sep 17 00:00:00 2001
+From: linmin <linmin@eswincomputing.com>
+Date: Tue, 21 May 2024 13:11:22 +0800
+Subject: [PATCH 045/109] WIN2030-15099:fix(console, magicnumber):fix console
+ help print
+
+Changelogs:
+1.Should be cbinfo-s <pcbr> <value>
+2.Change the value of Carrierboard magicnumber to 0xF15E5045
+  which is the finale mass production value.
+
+Change-Id: I6583584ed98c52aa34555fd06c63145b9dfed4ef
+---
+ Core/Inc/hf_common.h  | 2 +-
+ Core/Src/console.c    | 2 +-
+ Core/Src/web-server.h | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/Core/Inc/hf_common.h b/Core/Inc/hf_common.h
+index cc45dec..257c658 100644
+--- a/Core/Inc/hf_common.h
++++ b/Core/Inc/hf_common.h
+@@ -193,7 +193,7 @@ extern UART_HandleTypeDef huart3;
+ #define BMC_SOFTWARE_VERSION_MAJOR                   1
+ #define BMC_SOFTWARE_VERSION_MINOR                   0
+ 
+-#define MAGIC_NUMBER	0xdeadbeaf
++#define MAGIC_NUMBER	0xF15E5045
+ 
+ #define AT24C_ADDR (0x50<<1)
+ 
+diff --git a/Core/Src/console.c b/Core/Src/console.c
+index 02645a0..9230aaf 100644
+--- a/Core/Src/console.c
++++ b/Core/Src/console.c
+@@ -134,7 +134,7 @@ static const CLI_Command_Definition_t xCommands[] =
+     },
+     {
+         "cbinfo-s",
+-        "\r\ncbinfo-s <magic/format/productid/pcbv/bomr/bomv/boardsn/manu> <value in hex>: Set magicNumber...\r\n",
++        "\r\ncbinfo-s <magic/format/productid/pcbr/bomr/bomv/boardsn/manu> <value in hex>: Set magicNumber...\r\n",
+         prvCommandCarrierBoardInfoSet,
+         2
+     },
+diff --git a/Core/Src/web-server.h b/Core/Src/web-server.h
+index 4fb64e8..e0ebe50 100644
+--- a/Core/Src/web-server.h
++++ b/Core/Src/web-server.h
+@@ -15,7 +15,7 @@ typedef struct {
+ 	uint8_t pcb;
+ 	uint8_t bom_revision;
+ 	uint8_t bom_variant;
+-	uint8_t sn[18];
++	uint8_t sn[18];		// 18 bytes of serial number, excluding string terminator
+ 	uint8_t status;
+ 	uint32_t crc;
+ } __attribute__((packed)) som_info;
+-- 
+2.25.1
+

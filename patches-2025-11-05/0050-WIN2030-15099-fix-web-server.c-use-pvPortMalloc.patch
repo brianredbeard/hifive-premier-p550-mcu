@@ -1,0 +1,129 @@
+From d9095d4b845a3ae9d2050edf2231a57c45e2f0e1 Mon Sep 17 00:00:00 2001
+From: yuan junhui <yuanjunhui@eswincomputing.com>
+Date: Wed, 22 May 2024 17:46:17 +0800
+Subject: [PATCH 050/109] WIN2030-15099:fix(web-server.c):use pvPortMalloc()
+
+Changelogs:
+01,use pvPortMalloc()/vPortFree() instead of malloc()/free() in
+web-server.c
+
+Change-Id: Ibe62e8fb89bc7c16bd5f241d277698d5f17c4830
+---
+ Core/Src/web-server.c | 24 ++++++++++++------------
+ 1 file changed, 12 insertions(+), 12 deletions(-)
+
+diff --git a/Core/Src/web-server.c b/Core/Src/web-server.c
+index 3578319..7ce9612 100644
+--- a/Core/Src/web-server.c
++++ b/Core/Src/web-server.c
+@@ -9648,7 +9648,7 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
+ 													setInterval(function() {\n \
+ 														$('#power-consum-refresh-hid').click(); \n \
+ 														$('#rtc-refresh-hid').click(); \n \
+-													}, 30*1000); \n \
++													}, 1*60*1000); \n \
+ 													setInterval(function() {\n \
+ 														$('#pvt-info-refresh-hid').click(); \n \
+    														$('#net-work-refresh-hid').click(); \n \
+@@ -9656,7 +9656,7 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
+ 													setInterval(function() {\n \
+ 														$('#power-on-refresh-hid').click(); \n \
+ 														$('#soc-refresh-hid').click(); \n \
+-													}, 1000); \n \
++													}, 5*1000); \n \
+                                                 });\n\
+                                             </script>\n \
+                                             <style> \
+@@ -9996,7 +9996,7 @@ const char *json_header_withcookie = "HTTP/1.1 200 OK\r\n"
+ 
+ char* concatenate_strings(const char* str1, const char* str2) {
+     int length = strlen(str1) + strlen(str2) + 1; // +1 for the null terminator
+-    char* new_str = malloc(length);
++    char* new_str = pvPortMalloc(length);
+     if (new_str == NULL) {
+         web_debug("Memory allocation failed\n");
+         exit(1);
+@@ -10066,7 +10066,7 @@ void send_response_content(struct netconn *conn,const char* cookies,const char*
+     if(cookies!=NULL && strlen(cookies)>0){
+         header_tmp = concatenate_strings(http_html_hdr_patt,cookies);
+         header = concatenate_strings(header_tmp,"\r\n");
+-        free(header_tmp);
++        vPortFree(header_tmp);
+     }else{
+         header = concatenate_strings(http_html_hdr_patt,"\r\n");
+     }
+@@ -10079,7 +10079,7 @@ void send_response_content(struct netconn *conn,const char* cookies,const char*
+ 	send_large_data(conn, html_content,  strlen(html_content));
+ 	web_debug("send_response html_content end \n");
+ 
+-    free(header);
++    vPortFree(header);
+ }
+ void send_response_200(struct netconn *conn) {
+ 	const char http_html_200[] =  "HTTP/1.1 200 OK\r\n"\
+@@ -10104,7 +10104,7 @@ typedef struct {
+ } kv_map;
+ 
+ kv_pair* create_kv_pair(const char *key, const char *value) {
+-    kv_pair *new_pair = (kv_pair *)malloc(sizeof(kv_pair));
++    kv_pair *new_pair = (kv_pair *)pvPortMalloc(sizeof(kv_pair));
+     if (new_pair == NULL) {
+         return NULL;
+     }
+@@ -10121,7 +10121,7 @@ void free_kv_map(kv_map *map) {
+         kv_pair *next = current->next;
+         free(current->key);
+         free(current->value);
+-        free(current);
++        vPortFree(current);
+         current = next;
+     }
+     map->head = NULL;
+@@ -10200,7 +10200,7 @@ Session *session_list = NULL;
+ 
+ 
+ Session* create_session(const char *id, const char *data) {
+-    Session *new_session = (Session *)malloc(sizeof(Session));
++    Session *new_session = (Session *)pvPortMalloc(sizeof(Session));
+     if (new_session) {
+         strncpy(new_session->session_id, id, sizeof(new_session->session_id) - 1);
+         new_session->session_id[sizeof(new_session->session_id) - 1] = '\0';
+@@ -10243,7 +10243,7 @@ int delete_session(const char *id) {
+         if (strcmp((*current)->session_id, id) == 0) {
+             Session *to_delete = *current;
+             *current = (*current)->next;
+-            free(to_delete);
++            vPortFree(to_delete);
+             return 1;
+         }
+         current = &(*current)->next;
+@@ -10256,7 +10256,7 @@ void clear_sessions() {
+     while (current != NULL) {
+         Session *to_delete = current;
+         current = current->next;
+-        free(to_delete);
++        vPortFree(to_delete);
+     }
+     session_list = NULL;
+ }
+@@ -11101,7 +11101,7 @@ int get_soc_status()
+                 }
+                 assert(content_length==0||(content_length>0)&&body_start);
+ 
+-                char* query=malloc(sizeof(char)*(content_length+1));
++                char* query=pvPortMalloc(sizeof(char)*(content_length+1));
+ 
+                 strncpy(query, body_start , content_length);
+                 query[content_length] = '\0';
+@@ -11132,7 +11132,7 @@ int get_soc_status()
+                     }
+                 }
+                 // web_debug("end parse post query \n");
+-				free(query);
++				vPortFree(query);
+ 
+                 if(strcmp(path, "/testpost")==0 ){		//testpost
+                     // web_debug("POST location: testpost \n");
+-- 
+2.25.1
+

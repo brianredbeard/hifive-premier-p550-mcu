@@ -1,0 +1,338 @@
+From 6c31d25f99847822451f1d5634bc01e57536394e Mon Sep 17 00:00:00 2001
+From: linmin <linmin@eswincomputing.com>
+Date: Fri, 31 May 2024 11:27:46 +0800
+Subject: [PATCH 066/109] WIN2030-15279:fix:Clean the build warning
+
+Changelogs:
+1.Clean the warning while building project
+
+Change-Id: I496d206f9f29bdf899fa4f1201fea49251ca68fb
+---
+ Core/Inc/hf_common.h               |  2 +-
+ Core/Inc/hf_spi_slv.h              |  1 +
+ Core/Src/hf_board_init.c           |  2 +-
+ Core/Src/hf_it_callback.c          |  2 +-
+ Core/Src/hf_protocol_process.c     | 35 ++++++++++----------
+ Core/Src/main.c                    | 52 ------------------------------
+ Core/Src/protocol_lib/protocol.h   |  2 +-
+ Core/Src/protocol_lib/ringbuffer.c | 20 ++++++++----
+ Core/Src/protocol_lib/ringbuffer.h |  2 +-
+ 9 files changed, 37 insertions(+), 81 deletions(-)
+
+diff --git a/Core/Inc/hf_common.h b/Core/Inc/hf_common.h
+index 1c7bac7..35cce30 100644
+--- a/Core/Inc/hf_common.h
++++ b/Core/Inc/hf_common.h
+@@ -198,7 +198,7 @@ extern UART_HandleTypeDef huart3;
+ #define MIN(x , y)  (((x) < (y)) ? (x) : (y))
+ /* define ------------------------------------------------------------*/
+ #define BMC_SOFTWARE_VERSION_MAJOR                   1
+-#define BMC_SOFTWARE_VERSION_MINOR                   0
++#define BMC_SOFTWARE_VERSION_MINOR                   1
+ 
+ #define MAGIC_NUMBER	0xF15E5045
+ 
+diff --git a/Core/Inc/hf_spi_slv.h b/Core/Inc/hf_spi_slv.h
+index 95f021d..9f064df 100644
+--- a/Core/Inc/hf_spi_slv.h
++++ b/Core/Inc/hf_spi_slv.h
+@@ -17,6 +17,7 @@
+ 
+ int es_spi_write(uint8_t *buf, uint64_t addr, int len);
+ int es_spi_read(uint8_t *dst, uint64_t src, int len);
++int eswin_rx(uint8_t *rcvBuf, uint64_t addr, int len);
+ 
+ #ifdef __cplusplus
+ }
+diff --git a/Core/Src/hf_board_init.c b/Core/Src/hf_board_init.c
+index 6666072..b35ae14 100644
+--- a/Core/Src/hf_board_init.c
++++ b/Core/Src/hf_board_init.c
+@@ -105,7 +105,7 @@ void uart_init(USART_TypeDef *Instance)
+ 	if (Instance == UART4) {
+ 		MX_UART4_Init();
+ 		//trigger uart rx
+-		HAL_UARTEx_ReceiveToIdle_DMA(&huart4, (int8_t *)&UART4_RxMsg,
++		HAL_UARTEx_ReceiveToIdle_DMA(&huart4, (uint8_t *)&UART4_RxMsg,
+ 			sizeof(UART4_RxMsg));
+ 	}
+ 	else if (Instance == USART6)
+diff --git a/Core/Src/hf_it_callback.c b/Core/Src/hf_it_callback.c
+index 17bd58e..36c9f7e 100644
+--- a/Core/Src/hf_it_callback.c
++++ b/Core/Src/hf_it_callback.c
+@@ -101,7 +101,7 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
+ 				printf("[%s %d]: xUart4MsgQueue is full, drop the msg!\n", __func__, __LINE__);
+ 			}
+ 			memset(&UART4_RxMsg, 0, sizeof(UART4_RxMsg) / sizeof(uint8_t));
+-			HAL_UARTEx_ReceiveToIdle_DMA(&huart4, (int8_t *)&UART4_RxMsg, sizeof(UART4_RxMsg));
++			HAL_UARTEx_ReceiveToIdle_DMA(&huart4, (uint8_t *)&UART4_RxMsg, sizeof(UART4_RxMsg));
+ 			// If xHigherPriorityTaskWoken was set to true, there may be a higher priority task that can run now.
+ 			if (xHigherPriorityTaskWoken) {
+ 				// Force a context switch if xHigherPriorityTaskWoken is now set to pdTRUE.
+diff --git a/Core/Src/hf_protocol_process.c b/Core/Src/hf_protocol_process.c
+index 07653de..f5432b5 100644
+--- a/Core/Src/hf_protocol_process.c
++++ b/Core/Src/hf_protocol_process.c
+@@ -10,6 +10,7 @@
+ #include "queue.h"
+ #include "semphr.h"
+ #include "timers.h"
++#include "hf_spi_slv.h"
+ 
+ #define head_meg "\xA5\x5A\xAA\x55"
+ #define end_msg "\x0D\x0A\x0D\x0A"
+@@ -21,7 +22,7 @@ extern uint8_t netmask_address[4];
+ extern uint8_t getway_address[4];
+ extern uint8_t mac_address[6];
+ 
+-void es_send_req(b_frame_class_t *pframe,uint8_t req_cmd, int8_t *frame_data,uint8_t len)
++void es_send_req(b_frame_class_t *pframe,uint8_t req_cmd, char *frame_data,uint8_t len)
+ {
+ 	uint8_t buf[MAX_FRAME_LEN] = {0};
+ 	uint8_t b_len, xor = 0;
+@@ -91,7 +92,7 @@ int32_t es_set_eth(struct ip_t *ip, struct netmask_t *netmask, struct getway_t *
+ 		ip_address[1] = ip->ip_addr1;
+ 		ip_address[2] = ip->ip_addr2;
+ 		ip_address[3] = ip->ip_addr3;
+-		// printf("IP_ADDR0:%d IP_ADDR1: %d IP_ADDR2: %d IP_ADDR3 %d\n", \
++		// printf("IP_ADDR0:%d IP_ADDR1: %d IP_ADDR2: %d IP_ADDR3 %d\n",
+ 		// 	ip_address[0], ip_address[1], ip_address[2], ip_address[3]);
+ 	}
+ 	if (netmask != NULL) {
+@@ -217,19 +218,19 @@ int32_t es_spi_wl(struct spi_slv_w32_t *spi)
+ {
+ 	uint32_t addr = 0;
+ 	uint32_t value = 0;
+-	big2little(&addr, spi->addr, 4);
+-	big2little(&value, spi->value, 4);
++	big2little((uint8_t *)&addr, spi->addr, 4);
++	big2little((uint8_t *)&value, spi->value, 4);
+ 	// printf("%s %d addr %lx val %lx\n",__func__,__LINE__, addr, value);
+-	return es_spi_write(&value, addr, 4);
++	return es_spi_write((uint8_t *)&value, addr, 4);
+ }
+ 
+ int32_t es_spi_rl32(struct spi_slv_w32_t *spi)
+ {
+ 	uint32_t addr=0, value=0;
+ 	int32_t ret = 0;
+-	big2little(&addr, spi->addr, 4);
+-	ret = eswin_rx(&value, addr, 4);
+-	little2big(&spi->value, value,4);
++	big2little((uint8_t *)&addr, spi->addr, 4);
++	ret = eswin_rx((uint8_t *)&value, addr, 4);
++	little2big((uint8_t *)&spi->value, value,4);
+ 	return ret;
+ }
+ 
+@@ -280,7 +281,7 @@ void es_process_cmd(b_frame_class_t *pframe)
+ 		break;
+ 	case CMD_SET_TIME:
+ 		if (pframe->frame.len == sizeof(struct rtc_time_t)) {
+-			if (es_set_rtc_time(&pframe->frame.data.rtc_date) == HAL_OK)
++			if (es_set_rtc_time(&pframe->frame.data.rtc_time) == HAL_OK)
+ 				req_type = REQ_OK;
+ 		}
+ 		break;
+@@ -300,28 +301,28 @@ void es_process_cmd(b_frame_class_t *pframe)
+ 		if (pframe->frame.len == 0) {
+ 			if (es_get_rtc_date(&pframe->frame.data.rtc_date) == HAL_OK)
+ 			{
+-				es_send_req(pframe, CMD_GET_DATE, &pframe->frame.data.rtc_date, sizeof(struct rtc_date_t));
++				es_send_req(pframe, CMD_GET_DATE, (char *)&pframe->frame.data.rtc_date, sizeof(struct rtc_date_t));
+ 				req_type = REQ_OTHER;
+ 			}
+ 		}
+-		// printf("yy/mm/dd  %02d/%02d/%02d %02d\r\n", 2000 + pframe->frame.data.rtc_date.Year, pframe->frame.data.rtc_date.Month, \
+-				pframe->frame.data.rtc_date.Date, pframe->frame.data.rtc_date.WeekDay);
++		// printf("yy/mm/dd  %02d/%02d/%02d %02d\r\n", 2000 + pframe->frame.data.rtc_date.Year, pframe->frame.data.rtc_date.Month,
++				// pframe->frame.data.rtc_date.Date, pframe->frame.data.rtc_date.WeekDay);
+ 		break;
+ 	case CMD_GET_TIME:
+ 		if (pframe->frame.len == 0) {
+ 			if (es_get_rtc_time(&pframe->frame.data.rtc_time) == HAL_OK) {
+-				es_send_req(pframe, CMD_GET_TIME, &pframe->frame.data.rtc_time, sizeof(struct rtc_time_t));
++				es_send_req(pframe, CMD_GET_TIME, (char *)&pframe->frame.data.rtc_time, sizeof(struct rtc_time_t));
+ 				req_type = REQ_OTHER;
+ 			}
+ 		}
+-		// printf(" hh:mm:ss %02d:%02d:%02d\r\n", pframe->frame.data.rtc_time.Hours,\
+-						pframe->frame.data.rtc_time.Minutes, pframe->frame.data.rtc_time.Seconds);
++		// printf(" hh:mm:ss %02d:%02d:%02d\r\n", pframe->frame.data.rtc_time.Hours,
++						// pframe->frame.data.rtc_time.Minutes, pframe->frame.data.rtc_time.Seconds);
+ 		break;
+ 	case CMD_GET_FAN_DUTY:
+ 		printf("len %xuint8_t\n",pframe->frame.len);
+ 		if (pframe->frame.len == sizeof(uint8_t)) {
+ 			if (es_get_fan_duty(&pframe->frame.data.fan) == HAL_OK){
+-				es_send_req(pframe, CMD_GET_FAN_DUTY, &pframe->frame.data.fan, sizeof(struct fan_control_t));
++				es_send_req(pframe, CMD_GET_FAN_DUTY, (char *)&pframe->frame.data.fan, sizeof(struct fan_control_t));
+ 				req_type = REQ_OTHER;
+ 			}
+ 		}
+@@ -329,7 +330,7 @@ void es_process_cmd(b_frame_class_t *pframe)
+ 	case CMD_SPI_SLV_RL:
+ 		if (pframe->frame.len == sizeof(uint32_t)) {
+ 			if (es_spi_rl32(&pframe->frame.data.spislv32) == HAL_OK) {
+-				es_send_req(pframe, CMD_SPI_SLV_RL, &pframe->frame.data.spislv32.value, sizeof(uint32_t));
++				es_send_req(pframe, CMD_SPI_SLV_RL, (char *)&pframe->frame.data.spislv32.value, sizeof(uint32_t));
+ 				req_type = REQ_OTHER;
+ 			}
+ 		}
+diff --git a/Core/Src/main.c b/Core/Src/main.c
+index 7ecd8fb..9fdf383 100644
+--- a/Core/Src/main.c
++++ b/Core/Src/main.c
+@@ -74,16 +74,8 @@ const osThreadAttr_t http_task_attributes = {
+   .priority = (osPriority_t) osPriorityNormal,
+ };
+ 
+-osThreadId_t moniter_task_handle;
+-const osThreadAttr_t MoniterTask_attributes = {
+-  .name = "MoniterTask",
+-  .stack_size = 128 * 4,
+-  .priority = (osPriority_t) osPriorityNormal,
+-};
+-
+ /* Private function prototypes -----------------------------------------------*/
+ void hf_main_task(void *argument);
+-void MoniterTask(void *argument);
+ void protocol_task(void *argument);
+ void uart4_protocol_task(void *argument);
+ void deamon_keeplive_task(void *argument);
+@@ -167,7 +159,6 @@ void hf_main_task(void *argument)
+   power_task_handle = osThreadNew(hf_power_task, NULL, &power_task_attributes);
+   http_task_handle = osThreadNew(hf_http_task, NULL, &http_task_attributes);
+   key_task_handle = osThreadNew(hf_gpio_task, NULL, &gpio_task_attributes);
+-  // moniter_task_handle = osThreadNew(MoniterTask, NULL, &MoniterTask_attributes);
+   uart4_protocol_task_handle = osThreadNew(uart4_protocol_task, NULL, &protocol_task_attributes);
+   daemon_keelive_task_handle = osThreadNew(deamon_keeplive_task, NULL, &daemon_keeplive_task_attributes);
+   #if ES_PRODUCTION_LINE_TEST
+@@ -239,46 +230,3 @@ void get_rtc_info(void)
+ 
+ }
+ 
+-void MoniterTask(void *argument)
+-{
+-  TaskStatus_t *StatusArray;
+-  UBaseType_t task_num;
+-  uint32_t TotalRunTime;
+-  TaskHandle_t TaskHandle;
+-  TaskStatus_t TaskStatus;
+-
+-  osDelay(9000);
+-  for(;;)
+-  {
+-    task_num = uxTaskGetNumberOfTasks();
+-    printf("\nuxTaskGetNumberOfTasks %ld\r\n", task_num);
+-
+-    StatusArray = pvPortMalloc(task_num*sizeof(TaskStatus_t));
+-    if(StatusArray!=NULL)
+-    {
+-        uxTaskGetSystemState((TaskStatus_t*   )StatusArray,
+-                                      (UBaseType_t     )task_num,
+-                                      (uint32_t*       )&TotalRunTime);
+-        printf("\nTaskName\t\tPriority\t\tTaskNumber\t\t\r\n");
+-        for(uint32_t x=0;x < task_num;x++)
+-        {
+-              TaskHandle = xTaskGetHandle(StatusArray[x].pcTaskName);
+-
+-              vTaskGetInfo((TaskHandle_t  )TaskHandle,
+-                          (TaskStatus_t* )&TaskStatus,
+-                          (BaseType_t    )pdTRUE,
+-                          (eTaskState    )eInvalid);
+-
+-              printf("task name:                %s\r\n",TaskStatus.pcTaskName);
+-              printf("task number:              %d\r\n",(int)TaskStatus.xTaskNumber);
+-              printf("task state:              %d\r\n",TaskStatus.eCurrentState);
+-              printf("task run time:             %d\r\n",(int)TaskStatus.ulRunTimeCounter);
+-              printf("task stack base:        %#x\r\n",(int)TaskStatus.pxStackBase);
+-              printf("stack high water mark: %d\r\n",TaskStatus.usStackHighWaterMark);
+-        }
+-    }
+-    vPortFree(StatusArray);
+-    osDelay(5000);
+-
+-  }
+-}
+diff --git a/Core/Src/protocol_lib/protocol.h b/Core/Src/protocol_lib/protocol.h
+index 7dec12e..c5cd88c 100644
+--- a/Core/Src/protocol_lib/protocol.h
++++ b/Core/Src/protocol_lib/protocol.h
+@@ -12,7 +12,7 @@
+ #define MAX_FRAME_LEN 32
+ 
+ typedef struct {
+-	const uint8_t *pname;
++	const char *pname;
+ 	uint16_t head_len;
+ 	uint16_t end_len;
+ 	const char *head;
+diff --git a/Core/Src/protocol_lib/ringbuffer.c b/Core/Src/protocol_lib/ringbuffer.c
+index 1eda808..7876dbc 100644
+--- a/Core/Src/protocol_lib/ringbuffer.c
++++ b/Core/Src/protocol_lib/ringbuffer.c
+@@ -106,8 +106,10 @@ int32_t write_ring_buf(ring_buf_t *r, uint8_t *pBuff, uint32_t len)
+ 		memcpy(r->pWrite, pBuff, len);
+ 		r->pWrite += len;
+ 	}
+-    if (r->pWrite == r->pRead)
+-        r->is_full = 1; // Update is_full flag
++
++	if (r->pWrite == r->pRead)
++		r->is_full = 1; // Update is_full flag
++
+ 	return len;
+ }
+ 
+@@ -130,8 +132,9 @@ int32_t read_ring_buf(ring_buf_t *r, uint8_t *pBuff, uint32_t len)
+ 		printf("%s :Read buff size is larger than the valid area!\n", __func__);
+ 		return -1;
+ 	}
+-    if (r->is_full)
+-        r->is_full = 0; // Clear is_full flag when reading
++
++	if (r->is_full)
++		r->is_full = 0; // Clear is_full flag when reading
+ 
+ 	if (r->pRead + len > r->pTail) {
+ 		uint32_t pre_len = r->pTail - r->pRead;
+@@ -177,7 +180,7 @@ uint32_t ring_buf_check_get(ring_buf_t *r, uint8_t *pBuff, uint32_t len)
+ 	return len;
+ }
+ 
+-uint32_t ring_buf_clr_len(ring_buf_t *r, uint32_t len)
++int ring_buf_clr_len(ring_buf_t *r, uint32_t len)
+ {
+ 	if (0 == len)
+ 		return B_SUCCESS;
+@@ -196,6 +199,9 @@ uint32_t ring_buf_clr_len(ring_buf_t *r, uint32_t len)
+ 	} else {
+ 		r->pRead += len;
+ 	}
+-    if (r->pRead == r->pWrite)
+-        r->is_full = 0; // Update is_full flag after clearing
++
++	if (r->pRead == r->pWrite)
++		r->is_full = 0; // Update is_full flag after clearing
++
++	return 0;
+ }
+\ No newline at end of file
+diff --git a/Core/Src/protocol_lib/ringbuffer.h b/Core/Src/protocol_lib/ringbuffer.h
+index 5bff552..953e2a6 100644
+--- a/Core/Src/protocol_lib/ringbuffer.h
++++ b/Core/Src/protocol_lib/ringbuffer.h
+@@ -26,7 +26,7 @@ int32_t get_ring_buf_free_space(ring_buf_t *r);
+ int32_t write_ring_buf(ring_buf_t *r, uint8_t *pBuff, uint32_t len);
+ int32_t read_ring_buf(ring_buf_t *r, uint8_t *pBuff, uint32_t len);
+ uint32_t ring_buf_check_get(ring_buf_t *r, uint8_t *buf, uint32_t len);
+-uint32_t ring_buf_clr_len(ring_buf_t *r, uint32_t len);
++int ring_buf_clr_len(ring_buf_t *r, uint32_t len);
+ 
+ #ifdef __cplusplus
+ }
+-- 
+2.25.1
+

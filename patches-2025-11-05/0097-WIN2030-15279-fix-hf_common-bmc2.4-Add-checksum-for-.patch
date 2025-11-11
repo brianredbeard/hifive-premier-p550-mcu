@@ -1,0 +1,348 @@
+From 7b7123b1af499130994653a4732de70ce240d903 Mon Sep 17 00:00:00 2001
+From: linmin <linmin@eswincomputing.com>
+Date: Thu, 27 Jun 2024 11:10:57 +0800
+Subject: [PATCH 097/109] WIN2030-15279:fix(hf_common,bmc2.4):Add checksum for
+ SomPwrMgtDIPInfo
+
+Changelogs:
+1.Add checksum for SomPwrMgtDIPInfo to guarantee the value in valid.
+2.Fix bug of es_restore_userdata_to_factory(), gMCU_Server_Info.crc32Checksum
+  was missed, and the lost resume attr should be disable.
+3.Check the used user data size to make sure it doesn't exceed the
+  USER_MAX_SIZE in EEPROM.
+4.The factory setting of MCU IP address is set to 192.168.0.2, the gateway
+  is set to 192.168.0.1
+5.Validate the network setting and bootsel setting immediately in the
+  the es_restore_userdata_to_factory()
+
+Signed-off-by: linmin <linmin@eswincomputing.com>
+Change-Id: I99be7acdb62992ffc264d8957cc7123c5deb5093
+---
+ Core/Inc/hf_common.h          | 14 +++++++
+ Core/Inc/stm32f4xx_hal_conf.h | 14 +++----
+ Core/Src/hf_common.c          | 75 +++++++++++++++++++++++------------
+ Core/Src/hf_gpio_process.c    | 12 +++---
+ Core/Src/hf_i2c.c             |  2 +-
+ Core/Src/main.c               |  3 +-
+ 6 files changed, 79 insertions(+), 41 deletions(-)
+
+diff --git a/Core/Inc/hf_common.h b/Core/Inc/hf_common.h
+index 2bcb830..da48a85 100644
+--- a/Core/Inc/hf_common.h
++++ b/Core/Inc/hf_common.h
+@@ -157,6 +157,7 @@ typedef struct {
+ 										  // GPIO or by hardware switch(0xD)
+ 	uint8_t som_dip_switch_soft_state; // record the DIP Switch software state of the SOM, it is used for SOM bootsel,
+ 									   // bit0---bit3 stand for the DIP0---DIP3
++	uint32_t crc32Checksum;
+ } SomPwrMgtDIPInfo;
+ 
+ struct gpio_cmd {
+@@ -248,6 +249,18 @@ extern UART_HandleTypeDef huart3;
+ 
+ #define AT24C_ADDR (0x50<<1)
+ 
++#define BMC_DEBUG_EN	0
++#define bmc_fmt(fmt)	"[%s-BMC]: " fmt
++#define bmc_dbg_fmt(fmt)	bmc_fmt("%s[%d]: " fmt), "DEBUG",	\
++		        __func__, __LINE__
++#if BMC_DEBUG_EN
++#define bmc_debug(fmt, args...) \
++	do {							\
++		printf(bmc_dbg_fmt(fmt), ##args);	\
++	} while (0)
++#else
++#define bmc_debug(fmt, args...)
++#endif
+ /*
+ EEPROM Mapping
+ -----------------------
+@@ -270,6 +283,7 @@ A cbinfo	64		0
+ #define MCU_SERVER_INFO_EEPROM_OFFSET		(CARRIER_BOARD_INFO_EEPROM_BACKUP_OFFSET + CBINFO_MAX_SIZE + GAP_SIZE)
+ #define SOM_PWRMGT_DIP_INFO_EEPROM_OFFSET	(MCU_SERVER_INFO_EEPROM_OFFSET + sizeof(MCUServerInfo))
+ 
++#define USER_DATA_USED_SIZE			(sizeof(MCUServerInfo) + sizeof(SomPwrMgtDIPInfo))
+ 
+ #define DEFAULT_ADMIN_NAME	"admin"
+ #define DEFAULT_ADMIN_PASSWORD	"123456"
+diff --git a/Core/Inc/stm32f4xx_hal_conf.h b/Core/Inc/stm32f4xx_hal_conf.h
+index 509d524..bba2aaf 100644
+--- a/Core/Inc/stm32f4xx_hal_conf.h
++++ b/Core/Inc/stm32f4xx_hal_conf.h
+@@ -206,10 +206,10 @@
+ 
+ /* Section 1 : Ethernet peripheral configuration */
+ /* IP ADDRESS: IP_ADDR0:IP_ADDR1:IP_ADDR2:IP_ADDR3 */
+-#define IP_ADDR0 10U
+-#define IP_ADDR1 10U
+-#define IP_ADDR2 207U
+-#define IP_ADDR3 30U
++#define IP_ADDR0 192U
++#define IP_ADDR1 168U
++#define IP_ADDR2 0U
++#define IP_ADDR3 2U
+ 
+ /* NETMASK ADDRESS: NETMASK_ADDR0:NETMASK_ADDR1:NETMASK_ADDR2:NETMASK_ADDR3 */
+ #define NETMASK_ADDR0 255U
+@@ -218,9 +218,9 @@
+ #define NETMASK_ADDR3 0U
+ 
+ /* GATEWAY_ADDRESS: GATEWAY_ADDR0:GATEWAY_ADDR1:GATEWAY_ADDR2:GATEWAY_ADDR3*/
+-#define GATEWAY_ADDR0 10U
+-#define GATEWAY_ADDR1 10U
+-#define GATEWAY_ADDR2 192U
++#define GATEWAY_ADDR0 192U
++#define GATEWAY_ADDR1 168U
++#define GATEWAY_ADDR2 0U
+ #define GATEWAY_ADDR3 1U
+ 
+ /* MAC ADDRESS: MAC_ADDR0:MAC_ADDR1:MAC_ADDR2:MAC_ADDR3:MAC_ADDR4:MAC_ADDR5 */
+diff --git a/Core/Src/hf_common.c b/Core/Src/hf_common.c
+index 8b0383c..2ec651f 100644
+--- a/Core/Src/hf_common.c
++++ b/Core/Src/hf_common.c
+@@ -393,7 +393,7 @@ static int get_mcu_server_info(void)
+ 	ret = hf_i2c_mem_read(&hi2c1, AT24C_ADDR, MCU_SERVER_INFO_EEPROM_OFFSET,
+ 				(uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo));
+ 	if(ret) {
+-		eeprom_debug("Err to read mcu_server_info from EEPROM!!!\n");
++		printf("Err to read mcu_server_info from EEPROM!!!\n");
+ 		return -1;
+ 	}
+ 	eeprom_debug("print MCUServerInfo:\n");
+@@ -450,43 +450,26 @@ static int get_som_pwrmgt_dip_info(void)
+ {
+ 	int ret = 0;
+ 	int skip_update_eeprom = 1;
++	uint32_t crc32Checksum;
+ 
+ 	memset((uint8_t *)&gSOM_PwgMgtDIP_Info,  0, sizeof(SomPwrMgtDIPInfo));
+ 	ret = hf_i2c_mem_read(&hi2c1, AT24C_ADDR, SOM_PWRMGT_DIP_INFO_EEPROM_OFFSET,
+ 				(uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(SomPwrMgtDIPInfo));
+ 	if(ret) {
++		printf("Err to read SomPwrMgtDIPInfo from EEPROM!!!\n");
+ 		return -1;
+ 	}
+ 
+-	if ((gSOM_PwgMgtDIP_Info.som_pwr_lost_resume_attr != SOM_PWR_LOST_RESUME_ENABLE) &&
+-		(gSOM_PwgMgtDIP_Info.som_pwr_lost_resume_attr != SOM_PWR_LOST_RESUME_DISABLE)) {
+-		skip_update_eeprom = 0;
+-		eeprom_debug("Invalid pwr lost resume attr(0x%x) in EEPROM, set to SOM_PWR_LOST_RESUME_ENABLE!\n",
+-				gSOM_PwgMgtDIP_Info.som_pwr_lost_resume_attr);
+-		gSOM_PwgMgtDIP_Info.som_pwr_lost_resume_attr = SOM_PWR_LOST_RESUME_DISABLE;
+-	}
++	crc32Checksum = sifive_crc32((uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(gSOM_PwgMgtDIP_Info) - 4);
+ 
+-	if ((gSOM_PwgMgtDIP_Info.som_pwr_last_state != SOM_PWR_LAST_STATE_ON) &&
+-		(gSOM_PwgMgtDIP_Info.som_pwr_last_state != SOM_PWR_LAST_STATE_OFF)) {
++	if (crc32Checksum != gSOM_PwgMgtDIP_Info.crc32Checksum) {
++		printf("Invalid checksum of SomPwrMgtDIPInfo, init with default value!!!\n");
+ 		skip_update_eeprom = 0;
+-		eeprom_debug("Invalid pwr last state(0x%x) in EEPROM, set to SOM_PWR_LAST_STATE_OFF!\n",
+-				gSOM_PwgMgtDIP_Info.som_pwr_last_state);
++		gSOM_PwgMgtDIP_Info.som_pwr_lost_resume_attr = SOM_PWR_LOST_RESUME_DISABLE;
+ 		gSOM_PwgMgtDIP_Info.som_pwr_last_state = SOM_PWR_LAST_STATE_OFF;
+-	}
+-
+-	if ((gSOM_PwgMgtDIP_Info.som_dip_switch_soft_ctl_attr != SOM_DIP_SWITCH_SOFT_CTL_ENABLE) &&
+-		(gSOM_PwgMgtDIP_Info.som_dip_switch_soft_ctl_attr != SOM_DIP_SWITCH_SOFT_CTL_DISABLE)) {
+-		skip_update_eeprom = 0;
+-		eeprom_debug("Invalid dip swtich soft ctl attr(0x%x) in EEPROM, set to SOM_DIP_SWITCH_SOFT_CTL_DISABLE!\n",
+-				gSOM_PwgMgtDIP_Info.som_dip_switch_soft_ctl_attr);
+ 		gSOM_PwgMgtDIP_Info.som_dip_switch_soft_ctl_attr = SOM_DIP_SWITCH_SOFT_CTL_DISABLE;
+-	}
+-
+-	if (0xE0 != (0xE0 & gSOM_PwgMgtDIP_Info.som_dip_switch_soft_state)){
+-		skip_update_eeprom = 0;
+-		eeprom_debug("Invalid dip swtich soft state(0x%x) in EEPROM, set to SOM_DIP_SWITCH_STATE_EMMC!\n",
+-				gSOM_PwgMgtDIP_Info.som_dip_switch_soft_state);
+ 		gSOM_PwgMgtDIP_Info.som_dip_switch_soft_state = SOM_DIP_SWITCH_STATE_EMMC;
++		gSOM_PwgMgtDIP_Info.crc32Checksum = sifive_crc32((uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(gSOM_PwgMgtDIP_Info) - 4);
+ 	}
+ 
+ 	if (skip_update_eeprom == 0) {
+@@ -514,6 +497,12 @@ int es_init_info_in_eeprom(void)
+ 	#else
+ 	int ret = 0;
+ 
++	if (USER_DATA_USED_SIZE > USER_MAX_SIZE) {
++		printf("Error, the USER_DATA_USED_SIZE(%d) exceed the USER_MAX_SIZE(%d)!!!\n",
++			USER_DATA_USED_SIZE, USER_MAX_SIZE);
++		return -1;
++	}
++
+ 	gEEPROM_Mutex = xSemaphoreCreateMutex();
+ 	if (gEEPROM_Mutex == NULL) {
+ 		printf("Failed to xSemaphoreCreateMutex for gEEPROM_Mutex!!!\n");
+@@ -856,6 +845,7 @@ int es_set_som_pwr_lost_resume_attr(int isResumePwrLost)
+ 	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
+ 	if (som_pwr_lost_resume_attr != gSOM_PwgMgtDIP_Info.som_pwr_lost_resume_attr) {
+ 		gSOM_PwgMgtDIP_Info.som_pwr_lost_resume_attr = som_pwr_lost_resume_attr;
++		gSOM_PwgMgtDIP_Info.crc32Checksum = sifive_crc32((uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(gSOM_PwgMgtDIP_Info) - 4);
+ 		hf_i2c_mem_write(&hi2c1, AT24C_ADDR, SOM_PWRMGT_DIP_INFO_EEPROM_OFFSET,
+ 			(uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(SomPwrMgtDIPInfo));
+ 		eeprom_debug("Update SomPwrMgtDIPInfo in EEPROM for lost_resume_attr\n");
+@@ -897,6 +887,7 @@ int es_set_som_pwr_last_state(int som_pwr_last_state)
+ 	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
+ 	if (som_pwr_last_state_internal_fmt != gSOM_PwgMgtDIP_Info.som_pwr_last_state) {
+ 		gSOM_PwgMgtDIP_Info.som_pwr_last_state = som_pwr_last_state_internal_fmt;
++		gSOM_PwgMgtDIP_Info.crc32Checksum = sifive_crc32((uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(gSOM_PwgMgtDIP_Info) - 4);
+ 		hf_i2c_mem_write(&hi2c1, AT24C_ADDR, SOM_PWRMGT_DIP_INFO_EEPROM_OFFSET,
+ 			(uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(SomPwrMgtDIPInfo));
+ 	}
+@@ -937,6 +928,7 @@ int es_set_som_dip_switch_soft_ctl_attr(int som_dip_switch_soft_ctl_attr)
+ 	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
+ 	if (som_dip_swtich_soft_ctl_attr_internal_fmt != gSOM_PwgMgtDIP_Info.som_dip_switch_soft_ctl_attr) {
+ 		gSOM_PwgMgtDIP_Info.som_dip_switch_soft_ctl_attr = som_dip_swtich_soft_ctl_attr_internal_fmt;
++		gSOM_PwgMgtDIP_Info.crc32Checksum = sifive_crc32((uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(gSOM_PwgMgtDIP_Info) - 4);
+ 		hf_i2c_mem_write(&hi2c1, AT24C_ADDR, SOM_PWRMGT_DIP_INFO_EEPROM_OFFSET,
+ 			(uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(SomPwrMgtDIPInfo));
+ 	}
+@@ -969,6 +961,7 @@ int es_set_som_dip_switch_soft_state(uint8_t som_dip_switch_soft_state)
+ 	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
+ 	if (som_dip_switch_soft_state_internal_fmt != gSOM_PwgMgtDIP_Info.som_dip_switch_soft_state) {
+ 		gSOM_PwgMgtDIP_Info.som_dip_switch_soft_state = som_dip_switch_soft_state_internal_fmt;
++		gSOM_PwgMgtDIP_Info.crc32Checksum = sifive_crc32((uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(gSOM_PwgMgtDIP_Info) - 4);
+ 		hf_i2c_mem_write(&hi2c1, AT24C_ADDR, SOM_PWRMGT_DIP_INFO_EEPROM_OFFSET,
+ 			(uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(SomPwrMgtDIPInfo));
+ 	}
+@@ -1013,6 +1006,7 @@ int es_set_som_dip_switch_soft_state_all(int som_dip_switch_soft_ctl_attr, uint8
+ 	    (som_dip_switch_soft_state_internal_fmt != gSOM_PwgMgtDIP_Info.som_dip_switch_soft_state)) {
+ 		gSOM_PwgMgtDIP_Info.som_dip_switch_soft_ctl_attr = som_dip_swtich_soft_ctl_attr_internal_fmt;
+ 		gSOM_PwgMgtDIP_Info.som_dip_switch_soft_state = som_dip_switch_soft_state_internal_fmt;
++		gSOM_PwgMgtDIP_Info.crc32Checksum = sifive_crc32((uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(gSOM_PwgMgtDIP_Info) - 4);
+ 		hf_i2c_mem_write(&hi2c1, AT24C_ADDR, SOM_PWRMGT_DIP_INFO_EEPROM_OFFSET,
+ 			(uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(SomPwrMgtDIPInfo));
+ 	}
+@@ -1436,6 +1430,10 @@ void set_mcu_led_status(led_status_t type)
+ 
+ int es_restore_userdata_to_factory(void)
+ {
++	struct ip_t ip;
++	struct netmask_t netmask;
++	struct getway_t gw;
++
+ 	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
+ 
+ 	/* restore MCU server info */
+@@ -1458,18 +1456,43 @@ int es_restore_userdata_to_factory(void)
+ 	gMCU_Server_Info.gateway_address[2] = GATEWAY_ADDR2;
+ 	gMCU_Server_Info.gateway_address[3] = GATEWAY_ADDR3;
+ 
++	gMCU_Server_Info.crc32Checksum = sifive_crc32((uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo) - 4);
++
+ 	hf_i2c_mem_write(&hi2c1, AT24C_ADDR, MCU_SERVER_INFO_EEPROM_OFFSET,
+ 		(uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo));
+ 
+ 	/* restore power and dip info */
+-	gSOM_PwgMgtDIP_Info.som_pwr_lost_resume_attr = SOM_PWR_LOST_RESUME_ENABLE;
++	gSOM_PwgMgtDIP_Info.som_pwr_lost_resume_attr = SOM_PWR_LOST_RESUME_DISABLE;
+ 	gSOM_PwgMgtDIP_Info.som_pwr_last_state = SOM_PWR_LAST_STATE_OFF;
+ 	gSOM_PwgMgtDIP_Info.som_dip_switch_soft_ctl_attr = SOM_DIP_SWITCH_SOFT_CTL_DISABLE;
+ 	gSOM_PwgMgtDIP_Info.som_dip_switch_soft_state = SOM_DIP_SWITCH_STATE_EMMC;
++	gSOM_PwgMgtDIP_Info.crc32Checksum = sifive_crc32((uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(gSOM_PwgMgtDIP_Info) - 4);
+ 
+ 	hf_i2c_mem_write(&hi2c1, AT24C_ADDR, SOM_PWRMGT_DIP_INFO_EEPROM_OFFSET,
+ 		(uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(SomPwrMgtDIPInfo));
+ 
++
++	/* set bootsel to factor setting: controlled by hardware*/
++	set_bootsel(0, 0x1);
++
++	/* dynamically validate network settings */
++	ip.ip_addr0 = 0xff & IP_ADDR0;
++	ip.ip_addr1 = 0xff & (IP_ADDR1 >> 8);
++	ip.ip_addr2 = 0xff & (IP_ADDR2 >> 16);
++	ip.ip_addr3 = 0xff & (IP_ADDR3 >> 24);
++
++	netmask.netmask_addr0 = 0xff & NETMASK_ADDR0;
++	netmask.netmask_addr1 = 0xff & (NETMASK_ADDR1 >> 8);
++	netmask.netmask_addr2 = 0xff & (NETMASK_ADDR2 >> 16);
++	netmask.netmask_addr3 = 0xff & (NETMASK_ADDR3 >> 24);
++
++	gw.getway_addr0 = 0xff & GATEWAY_ADDR0;
++	gw.getway_addr1 = 0xff & (GATEWAY_ADDR1 >> 8);
++	gw.getway_addr2 = 0xff & (GATEWAY_ADDR2 >> 16);
++	gw.getway_addr3 = 0xff & (GATEWAY_ADDR3 >> 24);
++
++	es_set_eth(&ip, &netmask, &gw, NULL);
++
+ 	esEXIT_CRITICAL(gEEPROM_Mutex);
+ 
+ 	return 0;
+diff --git a/Core/Src/hf_gpio_process.c b/Core/Src/hf_gpio_process.c
+index 566bd15..6de6ae2 100644
+--- a/Core/Src/hf_gpio_process.c
++++ b/Core/Src/hf_gpio_process.c
+@@ -126,13 +126,13 @@ static void key_process(void)
+ 				// printf("short currentTime - pressStartTime %ld\n",currentTime - ReleaseTime);
+ 				button_state = KEY_SHORT_PRESS_STATE;
+ 			} else {
+-				printf("other ReleaseTime - pressStartTime %ld\n", ReleaseTime - pressStartTime);
+-				printf("other currentTime - ReleaseTime %ld\n", currentTime - ReleaseTime);
++				bmc_debug("other ReleaseTime - pressStartTime %ld\n", ReleaseTime - pressStartTime);
++				bmc_debug("other currentTime - ReleaseTime %ld\n", currentTime - ReleaseTime);
+ 				button_state = KEY_DOUBLE_PRESS_STATE;
+ 			}
+ 			break;
+ 		case KEY_SHORT_PRESS_STATE:
+-			printf("KEY_SHORT_PRESS_STATE time %ld\n", currentTime - pressStartTime);
++			bmc_debug("KEY_SHORT_PRESS_STATE time %ld\n", currentTime - pressStartTime);
+ 			button_state = KEY_PRESS_STATE_END;
+ 			if (get_som_power_state() != SOM_POWER_ON) {
+ 				vStopSomPowerOffTimer();
+@@ -140,7 +140,7 @@ static void key_process(void)
+ 			}
+ 			break;
+ 		case KEY_LONG_PRESS_STATE:
+-			printf("KEY_LONG_PRESS_STATE time %ld\n", currentTime - pressStartTime);
++			bmc_debug("KEY_LONG_PRESS_STATE time %ld\n", currentTime - pressStartTime);
+ 			button_state = KEY_PRESS_STATE_END;
+ 			if (get_som_power_state() == SOM_POWER_ON) {
+ 				ret = web_cmd_handle(CMD_POWER_OFF, NULL, 0, 2000);
+@@ -171,13 +171,13 @@ static void key_process(void)
+ 
+ static void mcu_reset_som_process(void)
+ {
+-	printf("%s %d mcu reset som\n", __func__, __LINE__);
++	bmc_debug("%s %d mcu reset som\n", __func__, __LINE__);
+ 	StopSomRebootTimer();
+ }
+ 
+ static void som_rst_feedback_process(void)
+ {
+-	printf("%s %d som reset\n", __func__, __LINE__);
++	bmc_debug("%s %d som reset\n", __func__, __LINE__);
+ 	if (get_som_power_state() == SOM_DAEMON_ON) {
+ 		som_reset_control(pdTRUE);
+ 		osDelay(2);
+diff --git a/Core/Src/hf_i2c.c b/Core/Src/hf_i2c.c
+index eecd64f..ebf7d2b 100644
+--- a/Core/Src/hf_i2c.c
++++ b/Core/Src/hf_i2c.c
+@@ -92,7 +92,7 @@ int hf_i2c_mem_write(I2C_HandleTypeDef *hi2c, uint8_t slave_addr,
+ 	int i, j = 0, offset;
+ 	int unaligned_bytes = 0, aligned_bytes; // the reg_addr offset that is not aligned with 8Bytes
+ 	HAL_StatusTypeDef status = HAL_OK;
+-	printf("slave_addr %x, reg_addr %x len %ld\n",slave_addr, reg_addr, len);
++	// printf("slave_addr %x, reg_addr %x len %ld\n",slave_addr, reg_addr, len);
+ 	if (hi2c->Instance == I2C1)
+ 		HAL_GPIO_WritePin(EEPROM_WP_GPIO_Port, EEPROM_WP_Pin, GPIO_PIN_RESET);
+ 
+diff --git a/Core/Src/main.c b/Core/Src/main.c
+index 72619d1..7494186 100644
+--- a/Core/Src/main.c
++++ b/Core/Src/main.c
+@@ -135,7 +135,8 @@ int retry_count = 10;
+ void hf_main_task(void *argument)
+ {
+   int ret = 0;
+-  printf("HiFive 106SC!\n");
++  printf("HiFive 106SC, BMC Version:%d.%d!\n",
++    (uint8_t)(BMC_SOFTWARE_VERSION_MAJOR), (uint8_t)(BMC_SOFTWARE_VERSION_MINOR));
+ 
+   /* get board info from eeprom where the MAC is stored */
+   do
+-- 
+2.25.1
+

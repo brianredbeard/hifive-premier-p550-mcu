@@ -1,0 +1,316 @@
+From cd9f56f02936b974fd932940d50cfbc8b9b2d6e8 Mon Sep 17 00:00:00 2001
+From: gengzonglin <gengzonglin@eswincomputing.com>
+Date: Thu, 27 Mar 2025 15:00:28 +0800
+Subject: [PATCH 109/109] WIN2030-17202:fix(bmc2.8):Fix some issues related to
+ invalid parameters
+
+Changelogs:
+1.Check the length of the username and password whether less than 20.
+2.Check the validation of the input MAC, IP and netmask parameters.
+
+Signed-off-by: gengzonglin <gengzonglin@eswincomputing.com>
+Change-Id: I88edec0d8abf607d7b8c87599a48c792654c9134
+---
+ Core/Inc/hf_common.h  |  4 +++-
+ Core/Src/console.c    | 54 +++++++++++++++++++++++++++++++++++--------
+ Core/Src/hf_common.c  | 53 +++++++++++++++++++++++++++++++++++-------
+ Core/Src/web-server.c | 21 ++++++++++++-----
+ 4 files changed, 107 insertions(+), 25 deletions(-)
+
+diff --git a/Core/Inc/hf_common.h b/Core/Inc/hf_common.h
+index afd47dc..ad6a34f 100644
+--- a/Core/Inc/hf_common.h
++++ b/Core/Inc/hf_common.h
+@@ -305,7 +305,7 @@ A cbinfo	64		0
+ #define ES_PRODUCTION_LINE_TEST 0
+ 
+ /* functions prototypes ---------------------------------------------*/
+-void hexstr2mac(uint8_t *mac, const char *hexstr);
++int hexstr2mac(uint8_t *mac, const char *hexstr);
+ uint64_t atoh(const char *in, uint32_t len);
+ 
+ void hf_http_task(void *argument);
+@@ -395,6 +395,8 @@ int es_restore_userdata_to_factory(void);
+ int32_t es_set_eth(struct ip_t *ip, struct netmask_t *netmask, struct getway_t *gw, struct eth_mac_t *mac);
+ void MX_I2C3_Init(void);
+ 
++int es_ipaddr_addr(const char *cp, uint32_t *p_naddr);
++
+ #ifdef __cplusplus
+ }
+ #endif
+diff --git a/Core/Src/console.c b/Core/Src/console.c
+index 6e15754..3a44aae 100644
+--- a/Core/Src/console.c
++++ b/Core/Src/console.c
+@@ -197,7 +197,7 @@ static const CLI_Command_Definition_t xCommands[] =
+     },
+     {
+         "setmac",
+-        "\r\nsetmac <index,0-2> <mac,like a1:26:39:91:b0:22>: Set mac address.\r\n",
++        "\r\nsetmac <index,0-2> <mac,like 8c:26:39:91:b0:22>: Set mac address.\r\n",
+         prvCommandMacSet,
+         2
+     },
+@@ -643,7 +643,11 @@ static BaseType_t prvCommandAccountSet(char *pcWriteBuffer, size_t xWriteBufferL
+     strncpy(admin_password, pcAdminPassword, xParamLen);
+ 
+     /* update the accoutn info finally */
+-    es_set_username_password(admin_name, pcAdminPassword);
++    if(es_set_username_password(admin_name, pcAdminPassword) == 0) {
++        snprintf(pcWriteBuffer, xWriteBufferLen, "Adminname and password set successfully!\r\n");
++    } else {
++        snprintf(pcWriteBuffer, xWriteBufferLen, "Failed to set the adminname and password!!!\r\n");
++    }
+ 
+     return pdFALSE;
+ }
+@@ -706,11 +710,18 @@ static BaseType_t prvCommandIPSet(char *pcWriteBuffer, size_t xWriteBufferLen, c
+     const char * pcIPaddr;
+     BaseType_t xParamLen;
+     struct ip_t ip;
++    ip4_addr_t ip4_addr;
++    uint8_t *buf = (uint8_t *)&naddr;
++    char *p_addr;
+ 
+     pcIPaddr = FreeRTOS_CLIGetParameter(pcCommandString, 1, &xParamLen);
+ 
+     /* store ipaddr to eeprom*/
+-    naddr = ipaddr_addr(pcIPaddr);
++    if (es_ipaddr_addr(pcIPaddr, &naddr)) {
++        snprintf(pcWriteBuffer, xWriteBufferLen, "Failed to parse ip addr %s\r\n", pcIPaddr);
++        goto out;
++    }
++
+     if(es_set_mcu_ipaddr((uint8_t *)&naddr)) {
+         snprintf(pcWriteBuffer, xWriteBufferLen, "Invalid ip addr %s\r\n", pcIPaddr);
+         goto out;
+@@ -725,7 +736,9 @@ static BaseType_t prvCommandIPSet(char *pcWriteBuffer, size_t xWriteBufferLen, c
+     es_set_eth(&ip, NULL, NULL, NULL);
+     esEXIT_CRITICAL(gEEPROM_Mutex);
+ 
+-    snprintf(pcWriteBuffer, xWriteBufferLen, "ip addr set to %s(0x%lx)\r\n", pcIPaddr, naddr);
++    IP4_ADDR(&ip4_addr, buf[0], buf[1], buf[2], buf[3]);
++    p_addr = ip4addr_ntoa(&ip4_addr);
++    snprintf(pcWriteBuffer, xWriteBufferLen, "ip input string %s set as %s\r\n", pcIPaddr, p_addr);
+ out:
+     return pdFALSE;
+ }
+@@ -744,11 +757,18 @@ static BaseType_t prvCommandNetMaskSet(char *pcWriteBuffer, size_t xWriteBufferL
+     const char * pcIPaddr;
+     BaseType_t xParamLen;
+     struct netmask_t netmask;
++    ip4_addr_t ip4_addr;
++    uint8_t *buf = (uint8_t *)&naddr;
++    char *p_addr;
+ 
+     pcIPaddr = FreeRTOS_CLIGetParameter(pcCommandString, 1, &xParamLen);
+ 
+     /* store netmask to eeprom*/
+-    naddr = ipaddr_addr(pcIPaddr);
++    if (es_ipaddr_addr(pcIPaddr, &naddr)) {
++        snprintf(pcWriteBuffer, xWriteBufferLen, "Failed to parse netmask addr %s\r\n", pcIPaddr);
++        goto out;
++    }
++
+     if (es_set_mcu_netmask((uint8_t *)&naddr)) {
+         snprintf(pcWriteBuffer, xWriteBufferLen, "Invalid netmask addr %s\r\n", pcIPaddr);
+         goto out;
+@@ -763,7 +783,9 @@ static BaseType_t prvCommandNetMaskSet(char *pcWriteBuffer, size_t xWriteBufferL
+     es_set_eth(NULL, &netmask, NULL, NULL);
+     esEXIT_CRITICAL(gEEPROM_Mutex);
+ 
+-    snprintf(pcWriteBuffer, xWriteBufferLen, "netmask addr set to %s(0x%lx)\r\n", pcIPaddr, naddr);
++    IP4_ADDR(&ip4_addr, buf[0], buf[1], buf[2], buf[3]);
++    p_addr = ip4addr_ntoa(&ip4_addr);
++    snprintf(pcWriteBuffer, xWriteBufferLen, "netmask input string %s set as %s\r\n", pcIPaddr, p_addr);
+ out:
+     return pdFALSE;
+ }
+@@ -782,11 +804,18 @@ static BaseType_t prvCommandGateWaySet(char *pcWriteBuffer, size_t xWriteBufferL
+     const char * pcIPaddr;
+     BaseType_t xParamLen;
+     struct getway_t gw;
++    ip4_addr_t ip4_addr;
++    uint8_t *buf = (uint8_t *)&naddr;
++    char *p_addr;
+ 
+     pcIPaddr = FreeRTOS_CLIGetParameter(pcCommandString, 1, &xParamLen);
+ 
+     /* store gateway to eeprom */
+-    naddr = ipaddr_addr(pcIPaddr);
++    if (es_ipaddr_addr(pcIPaddr, &naddr)) {
++        snprintf(pcWriteBuffer, xWriteBufferLen, "Failed to parse gateway addr %s\r\n", pcIPaddr);
++        goto out;
++    }
++
+     if (es_set_mcu_gateway((uint8_t *)&naddr)) {
+         snprintf(pcWriteBuffer, xWriteBufferLen, "Invalid gateway addr %s\r\n", pcIPaddr);
+         goto out;
+@@ -801,7 +830,9 @@ static BaseType_t prvCommandGateWaySet(char *pcWriteBuffer, size_t xWriteBufferL
+     es_set_eth(NULL, NULL, &gw, NULL);
+     esEXIT_CRITICAL(gEEPROM_Mutex);
+ 
+-    snprintf(pcWriteBuffer, xWriteBufferLen, "gateway addr set to %s(0x%lx)\r\n", pcIPaddr, naddr);
++    IP4_ADDR(&ip4_addr, buf[0], buf[1], buf[2], buf[3]);
++    p_addr = ip4addr_ntoa(&ip4_addr);
++    snprintf(pcWriteBuffer, xWriteBufferLen, "gateway input string %s set as %s\r\n", pcIPaddr, p_addr);
+ out:
+     return pdFALSE;
+ }
+@@ -828,14 +859,17 @@ static BaseType_t prvCommandMacSet(char *pcWriteBuffer, size_t xWriteBufferLen,
+     pcMACaddr = FreeRTOS_CLIGetParameter(pcCommandString, 2, &xParamLen);
+ 
+     /* set mac */
+-    hexstr2mac(mac, pcMACaddr);
++    if(hexstr2mac(mac, pcMACaddr)) {
++        snprintf(pcWriteBuffer, xWriteBufferLen, "Illegal MAC address format!\r\n");
++        goto out;
++    }
+     if (es_set_mcu_mac(mac, mac_index))
+         goto out;
+ 
+     snprintf(pcWriteBuffer, xWriteBufferLen, "MAC[%d] addr set to %s(%x:%x:%x:%x:%x:%x)\r\n",
+                 mac_index, pcMACaddr, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+ 
+-    printf("The MAC setting will be valid after rebooting the carrier board!!!\n");
++    printf("The MAC setting will be validated after rebooting the carrier board!!!\n");
+ out:
+     return pdFALSE;
+ }
+diff --git a/Core/Src/hf_common.c b/Core/Src/hf_common.c
+index 37571aa..dc1ba21 100644
+--- a/Core/Src/hf_common.c
++++ b/Core/Src/hf_common.c
+@@ -141,19 +141,36 @@ static int hex2num(char c)
+ 	return -1;
+ }
+ 
+-void hexstr2mac(uint8_t *mac, const char *hexstr)
++int hexstr2mac(uint8_t *mac, const char *hexstr)
+ {
+ 	int i = 0;
++	int hex_h,hex_l;
++
++	if((strlen(hexstr) != 17) || (hexstr == NULL))
++		return -1;
+ 
+ 	while (i < 6) {
+-		if (' ' == *hexstr || ':' == *hexstr || '"' == *hexstr || '\'' == *hexstr) {
+-			hexstr++;
+-			continue;
+-		}
+-		*(mac + i) = (hex2num(*hexstr) <<4) | hex2num(*(hexstr + 1));
++		hex_h = hex2num(*hexstr);
++		if(hex_h == -1)
++			return -1;
++
++		hex_l = hex2num(*(hexstr + 1));
++		if(hex_l == -1)
++			return -1;
++
++		*(mac + i) = (hex_h << 4) | hex_l;
+ 		i++;
+ 		hexstr += 2;
++        /*detect "ABC:XX"*/
++		if(i != 6) {
++			if (' ' == *hexstr || ':' == *hexstr || '"' == *hexstr || '\'' == *hexstr) {
++				hexstr++;
++			} else {
++				return -1;
++			}
++		}
+ 	}
++    return 0;
+ }
+ 
+ uint64_t atoh(const char *in, uint32_t len)
+@@ -799,11 +816,11 @@ int es_set_username_password(const char *p_admin_name, const char *p_admin_passw
+ 	if (NULL == p_admin_password)
+ 		return -1;
+ 
+-	if (0 == strlen(p_admin_name)) {
++	if ((0 == strlen(p_admin_name)) || (20 < strlen(p_admin_name))) {
+ 		return -1;
+ 	}
+ 
+-	if (0 == strlen(p_admin_password)) {
++	if ((0 == strlen(p_admin_password)) || (20 < strlen(p_admin_password))) {
+ 		return -1;
+ 	}
+ 
+@@ -1651,4 +1668,24 @@ int es_check_carrier_board_info(void)
+ out:
+ 	esEXIT_CRITICAL(gEEPROM_Mutex);
+ 	return ret;
++}
++
++/**
++ * Ascii internet address interpretation routine.
++ * The value returned is in network order.
++ *
++ * @param cp IP address in ascii representation (e.g. "127.0.0.1")
++ * @param p_naddr pointer to which to save the ip address in network order
++ * @return 0, success convert cp to  network addr; -1 on failure
++ */
++int es_ipaddr_addr(const char *cp, uint32_t *p_naddr)
++{
++	ip4_addr_t val;
++
++	if (ip4addr_aton(cp, &val)) {
++		*p_naddr = ip4_addr_get_u32(&val);
++		return 0;
++	}
++
++	return -1;
+ }
+\ No newline at end of file
+diff --git a/Core/Src/web-server.c b/Core/Src/web-server.c
+index 0a111f5..c421b37 100644
+--- a/Core/Src/web-server.c
++++ b/Core/Src/web-server.c
+@@ -10694,8 +10694,11 @@ int set_net_info(NETInfo netinfo) {
+ 	struct getway_t gw;
+ 
+ 	/* set ipaddr */
+-	naddr = ipaddr_addr(netinfo.ipaddr);
+-	es_set_mcu_ipaddr((uint8_t *)&naddr);
++	if (es_ipaddr_addr(netinfo.ipaddr, &naddr))
++		return -1;
++
++	if (es_set_mcu_ipaddr((uint8_t *)&naddr))
++		return -1;
+ 	/* Prepare ip struct for validating eth settings */
+ 	ip.ip_addr0 = 0xff & naddr;
+ 	ip.ip_addr1 = 0xff & (naddr >> 8);
+@@ -10703,8 +10706,11 @@ int set_net_info(NETInfo netinfo) {
+ 	ip.ip_addr3 = 0xff & (naddr >> 24);
+ 
+ 	/* set netmask */
+-	naddr = ipaddr_addr(netinfo.subnetwork);
+-	es_set_mcu_netmask((uint8_t *)&naddr);
++	if (es_ipaddr_addr(netinfo.subnetwork, &naddr))
++		return -1;
++
++	if (es_set_mcu_netmask((uint8_t *)&naddr))
++		return -1;
+ 	/* Prepare netmask struct for validating eth settings */
+ 	netmask.netmask_addr0 = 0xff & naddr;
+ 	netmask.netmask_addr1 = 0xff & (naddr >> 8);
+@@ -10712,8 +10718,11 @@ int set_net_info(NETInfo netinfo) {
+ 	netmask.netmask_addr3 = 0xff & (naddr >> 24);
+ 
+ 	/* set gateway */
+-	naddr = ipaddr_addr(netinfo.gateway);
+-	es_set_mcu_gateway((uint8_t *)&naddr);
++	if (es_ipaddr_addr(netinfo.gateway, &naddr))
++		return -1;
++
++	if (es_set_mcu_gateway((uint8_t *)&naddr))
++		return -1;
+ 	/* Prepare gateway struct for validating eth settings */
+ 	gw.getway_addr0 = 0xff & naddr;
+ 	gw.getway_addr1 = 0xff & (naddr >> 8);
+-- 
+2.25.1
+

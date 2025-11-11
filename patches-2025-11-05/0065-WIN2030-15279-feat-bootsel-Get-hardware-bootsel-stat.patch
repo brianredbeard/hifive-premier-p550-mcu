@@ -1,0 +1,378 @@
+From fd8ef395a64733280010ae28603c654753196b97 Mon Sep 17 00:00:00 2001
+From: linmin <linmin@eswincomputing.com>
+Date: Thu, 30 May 2024 15:45:40 +0800
+Subject: [PATCH 065/109] WIN2030-15279:feat(bootsel):Get hardware bootsel
+ status
+
+Changelogs:
+1.Init bootsel pin as input/output according to the configuration
+  stored in eeprom at startup.
+2.Support read the hardware bootsel pin status.
+
+Change-Id: I99d4bd26c5f7c1516f8496a467101ced90e07dc8
+---
+ Core/Inc/hf_common.h        |  15 +++++
+ Core/Src/console.c          |  23 +++----
+ Core/Src/hf_common.c        | 124 ++++++++++++++++++++++++++++++++++++
+ Core/Src/hf_power_process.c |  14 ++--
+ Core/Src/main.c             |  13 ----
+ Core/Src/web-server.c       |  29 ---------
+ 6 files changed, 161 insertions(+), 57 deletions(-)
+
+diff --git a/Core/Inc/hf_common.h b/Core/Inc/hf_common.h
+index 257c658..1c7bac7 100644
+--- a/Core/Inc/hf_common.h
++++ b/Core/Inc/hf_common.h
+@@ -179,6 +179,13 @@ struct rtc_time_t {
+ 	uint8_t Seconds;
+ };
+ 
++typedef struct {
++    int dip01;//0 on,1 off
++    int dip02;
++    int dip03;
++	int dip04;
++	int swctrl;//0 hw,1,sw
++} DIPSwitchInfo;
+ /* constants --------------------------------------------------------*/
+ extern UART_HandleTypeDef huart3;
+ 
+@@ -266,6 +273,9 @@ int es_set_som_dip_switch_soft_ctl_attr(int som_dip_switch_soft_ctl_attr);
+ int es_get_som_dip_switch_soft_state(uint8_t *p_som_dip_switch_soft_state);
+ int es_set_som_dip_switch_soft_state(uint8_t som_dip_switch_soft_state);
+ 
++int es_get_som_dip_switch_soft_state_all(int *p_som_dip_switch_soft_ctl_attr, uint8_t *p_som_dip_switch_soft_state);
++int es_set_som_dip_switch_soft_state_all(int som_dip_switch_soft_ctl_attr, uint8_t som_dip_switch_soft_state);
++
+ int es_eeprom_info_test(void);
+ power_switch_t get_som_power_state(void);
+ void change_som_power_state(power_switch_t newState);
+@@ -277,6 +287,11 @@ void TriggerSomRebootTimer(void);
+ void StopSomRebootTimer(void);
+ 
+ void set_bootsel(uint8_t is_soft_crtl, uint8_t sel);
++int get_bootsel(int *pCtl_attr, uint8_t *pSel);
++int init_bootsel(void);
++
++int get_dip_switch(DIPSwitchInfo *dipSwitchInfo);
++int set_dip_switch(DIPSwitchInfo dipSwitchInfo);
+ 
+ uint32_t es_autoboot(void);
+ 
+diff --git a/Core/Src/console.c b/Core/Src/console.c
+index 0d8ef3d..485d63e 100644
+--- a/Core/Src/console.c
++++ b/Core/Src/console.c
+@@ -743,11 +743,7 @@ static BaseType_t prvCommandDipSwitchSoftGet(char *pcWriteBuffer, size_t xWriteB
+     uint8_t state;
+     int ctl_attr;
+ 
+-    /* Read dip switch ctl attribute */
+-    es_get_som_dip_switch_soft_ctl_attr(&ctl_attr);
+-
+-    /* Read dip switch state and fill FreeRTOS write buffer */
+-    es_get_som_dip_switch_soft_state(&state);
++    get_bootsel(&ctl_attr, &state);
+ 
+     snprintf(pcWriteBuffer, xWriteBufferLen, "Get: Bootsel Controlled by: %s, bootsel[3 2 1 0]:%d %d %d %d\r\n",
+             ctl_attr == 1?"SW":"HW", (0x8&state)>>3, (0x4&state)>>2, (0x2&state)>>1, (0x1&state));
+@@ -772,6 +768,7 @@ static BaseType_t prvCommandDipSwitchSoftSet(char *pcWriteBuffer, size_t xWriteB
+     const char * pcCtlAttr;
+     const char * pcState;
+     int setAttrFlag = 0;
++    DIPSwitchInfo dipSwitchInfo;
+ 
+     pcCtlAttr = FreeRTOS_CLIGetParameter(pcCommandString, 1, &xParamLen);
+     if ((0 == strncmp("sw", pcCtlAttr, xParamLen)) || (0 == strncmp("SW", pcCtlAttr, xParamLen))) {
+@@ -787,17 +784,21 @@ static BaseType_t prvCommandDipSwitchSoftSet(char *pcWriteBuffer, size_t xWriteB
+     }
+ 
+     if (setAttrFlag) {
+-        /* set new dip switch ctl attr */
+-        es_set_som_dip_switch_soft_ctl_attr(ctl_attr);
+-
+         /* get dip switch state parameter */
+         pcState = FreeRTOS_CLIGetParameter(pcCommandString, 2, &xParamLen);
+         state = atoh(pcState, xParamLen) & 0xF;
+-        /* set new dip switch state */
+-        es_set_som_dip_switch_soft_state(state);
++
++        dipSwitchInfo.swctrl = ctl_attr;
++        dipSwitchInfo.dip01 = 0x1 & state;
++        dipSwitchInfo.dip02 = (0x2 & state) >> 1;
++        dipSwitchInfo.dip03 = (0x4 & state) >> 2;
++        dipSwitchInfo.dip04 = (0x8 & state) >> 3;
++
++        set_dip_switch(dipSwitchInfo);
++        get_dip_switch(&dipSwitchInfo);
+ 
+         snprintf(pcWriteBuffer, xWriteBufferLen, "Set: Bootsel Controlled by: %s, bootsel[3 2 1 0]:%d %d %d %d\r\n",
+-                ctl_attr == 1?"SW":"HW", (0x8&state)>>3, (0x4&state)>>2, (0x2&state)>>1, (0x1&state));
++                dipSwitchInfo.swctrl == 1?"SW":"HW", dipSwitchInfo.dip04, dipSwitchInfo.dip03, dipSwitchInfo.dip02, dipSwitchInfo.dip01);
+     }
+ 
+     return pdFALSE;
+diff --git a/Core/Src/hf_common.c b/Core/Src/hf_common.c
+index 64222ba..d2610ed 100644
+--- a/Core/Src/hf_common.c
++++ b/Core/Src/hf_common.c
+@@ -778,6 +778,50 @@ int es_set_som_dip_switch_soft_state(uint8_t som_dip_switch_soft_state)
+ 	return 0;
+ }
+ 
++
++int es_get_som_dip_switch_soft_state_all(int *p_som_dip_switch_soft_ctl_attr, uint8_t *p_som_dip_switch_soft_state)
++{
++	if (NULL == p_som_dip_switch_soft_state)
++		return -1;
++
++	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
++	*p_som_dip_switch_soft_ctl_attr = (gSOM_PwgMgtDIP_Info.som_dip_switch_soft_ctl_attr == SOM_DIP_SWITCH_SOFT_CTL_ENABLE) ? 1 : 0;
++	*p_som_dip_switch_soft_state = 0xF & gSOM_PwgMgtDIP_Info.som_dip_switch_soft_state;
++	esEXIT_CRITICAL(gEEPROM_Mutex);
++
++	return 0;
++}
++
++int es_set_som_dip_switch_soft_state_all(int som_dip_switch_soft_ctl_attr, uint8_t som_dip_switch_soft_state)
++{
++	int som_dip_swtich_soft_ctl_attr_internal_fmt;
++	uint8_t som_dip_switch_soft_state_internal_fmt;
++
++	/* convert to internal ctl attr */
++	if (som_dip_switch_soft_ctl_attr) {
++		som_dip_swtich_soft_ctl_attr_internal_fmt = SOM_DIP_SWITCH_SOFT_CTL_ENABLE;
++	}
++	else {
++		som_dip_swtich_soft_ctl_attr_internal_fmt = SOM_DIP_SWITCH_SOFT_CTL_DISABLE;
++	}
++
++	/* convert to internal soft sate */
++
++	som_dip_switch_soft_state_internal_fmt = 0xE0 | (0xF & som_dip_switch_soft_state);
++
++	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
++	if ((som_dip_swtich_soft_ctl_attr_internal_fmt != gSOM_PwgMgtDIP_Info.som_dip_switch_soft_ctl_attr) ||
++	    (som_dip_switch_soft_state_internal_fmt != gSOM_PwgMgtDIP_Info.som_dip_switch_soft_state)) {
++		gSOM_PwgMgtDIP_Info.som_dip_switch_soft_ctl_attr = som_dip_swtich_soft_ctl_attr_internal_fmt;
++		gSOM_PwgMgtDIP_Info.som_dip_switch_soft_state = som_dip_switch_soft_state_internal_fmt;
++		hf_i2c_mem_write(&hi2c1, AT24C_ADDR, SOM_PWRMGT_DIP_INFO_EEPROM_OFFSET,
++			(uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(SomPwrMgtDIPInfo));
++	}
++	esEXIT_CRITICAL(gEEPROM_Mutex);
++
++	return 0;
++}
++
+ #if EEPROM_TEST_DEBUG
+ static int es_eeprom_test(void)
+ {
+@@ -965,6 +1009,7 @@ int es_eeprom_info_test(void)
+ 	return 0;
+ }
+ 
++
+ /**
+  * @brief  eic7700 boot sel.
+  * @param  sel 4'b, bit3:bootsel3 ,bit2:bootsel2; bit1:bootsel2; bit0:bootsel0
+@@ -998,7 +1043,86 @@ void set_bootsel(uint8_t is_soft_crtl, uint8_t sel)
+ 		GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+ 		HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+ 	}
++}
++
++int get_bootsel(int *pCtl_attr, uint8_t *pSel)
++{
++	uint8_t bootsel = 0;
++
++	es_get_som_dip_switch_soft_state_all(pCtl_attr, pSel);
++
++	/* if it's controlled by hardware, then read the gpio pin */
++	if (*pCtl_attr == 0) {
++		*pSel = 0;
++		uint16_t pin_n = BOOT_SEL0_Pin;
++		for (int i = 0; i < 4; i++) {
++			bootsel = HAL_GPIO_ReadPin(BOOT_SEL0_GPIO_Port, pin_n);
++			*pSel |= (bootsel << i);
++			pin_n = pin_n << 1;
++		}
++	}
++
++	return 0;
++}
++
++/* This API must be called after es_init_info_in_eeprom() */
++int init_bootsel(void)
++{
++	int dip_switch_soft_ctl_attr;
++	uint8_t dip_switch_soft_state;
++
++	es_get_som_dip_switch_soft_state_all(&dip_switch_soft_ctl_attr, &dip_switch_soft_state);
++
++	set_bootsel(dip_switch_soft_ctl_attr, dip_switch_soft_state);
++
++	return 0;
++}
++
++int get_dip_switch(DIPSwitchInfo *dipSwitchInfo)
++{
++	uint8_t som_dip_switch_state;
++
++	get_bootsel(&dipSwitchInfo->swctrl, &som_dip_switch_state);
++
++	dipSwitchInfo->dip01 = 0x1 & som_dip_switch_state;
++	dipSwitchInfo->dip02 = (0x2 & som_dip_switch_state) >> 1;
++	dipSwitchInfo->dip03 = (0x4 & som_dip_switch_state) >> 2;
++	dipSwitchInfo->dip04 = (0x8 & som_dip_switch_state) >> 3;
++
++	return 0;
++}
++
++int set_dip_switch(DIPSwitchInfo dipSwitchInfo)
++{
++	uint8_t som_dip_switch_state;
++	int dip_switch_soft_ctl_attr = 0;
++
++	som_dip_switch_state =  ((0x1 & dipSwitchInfo.dip04) << 3) | ((0x1 & dipSwitchInfo.dip03) << 2)
++				| ((0x1 & dipSwitchInfo.dip02) << 1)| (0x1 & dipSwitchInfo.dip01);
++
++	es_get_som_dip_switch_soft_ctl_attr(&dip_switch_soft_ctl_attr);
++
++	if (dipSwitchInfo.swctrl != dip_switch_soft_ctl_attr) {
++		/* if it's controlled by hardware */
++		if (dipSwitchInfo.swctrl == 0) {
++			set_bootsel(0, 0);
++			es_set_som_dip_switch_soft_ctl_attr(0);
++		}
++		else {
++			set_bootsel(1, som_dip_switch_state);
++			es_set_som_dip_switch_soft_state_all(dipSwitchInfo.swctrl, som_dip_switch_state);
++		}
++	}
++	else {
++		/* if it's controlled by software */
++		if (dipSwitchInfo.swctrl == 1) {
++			set_bootsel(1, som_dip_switch_state);
++			/* since ctl attr is not changed, only needs to update software state */
++			es_set_som_dip_switch_soft_state(som_dip_switch_state);
++		}
++	}
+ 
++	return 0;
+ }
+ 
+ int32_t es_set_rtc_date(struct rtc_date_t *sdate)
+diff --git a/Core/Src/hf_power_process.c b/Core/Src/hf_power_process.c
+index b0e21a4..87e9323 100644
+--- a/Core/Src/hf_power_process.c
++++ b/Core/Src/hf_power_process.c
+@@ -164,9 +164,13 @@ void hf_power_task(void *parameter)
+ void hf_power_task(void *parameter)
+ {
+ 	power_state_t power_state = IDLE_STATE;
+-	GPIO_PinState pin_state = GPIO_PIN_RESET;
++
+ 	printf("hf_power_task started!!!\r\n");
+ 	osDelay(1000);
++
++	/* init bootsel according to the switch attr in eepprom */
++	init_bootsel();
++
+ 	if(es_autoboot())
+ 		change_som_power_state(SOM_POWER_ON);
+ 	else
+@@ -337,8 +341,8 @@ static void pmic_status_led_on(uint8_t turnon)
+ void som_reset_control(uint8_t reset)
+ {
+ 	GPIO_InitTypeDef GPIO_InitStruct = {0};
+-	int dip_switch_soft_ctl_attr = 0;
+-	uint8_t dip_switch_soft_state = 0;
++	// int dip_switch_soft_ctl_attr = 0;
++	// uint8_t dip_switch_soft_state = 0;
+ 	if (reset) {
+ 		HAL_GPIO_WritePin(MCU_RESET_SOM_N_GPIO_Port, MCU_RESET_SOM_N_Pin, GPIO_PIN_RESET);
+ 		GPIO_InitStruct.Pin = MCU_RESET_SOM_N_Pin;
+@@ -350,13 +354,15 @@ void som_reset_control(uint8_t reset)
+ 		uart_deinit(UART4);
+ 		uart_deinit(USART6);
+ 		SPI2_FLASH_CS_LOW();
+-		set_bootsel(0, 0);
++		// set_bootsel(0, 0);
+ 	} else {
++		/*
+ 		if(!es_get_som_dip_switch_soft_ctl_attr(&dip_switch_soft_ctl_attr) && !es_get_som_dip_switch_soft_state(&dip_switch_soft_state))
+ 			if(dip_switch_soft_ctl_attr == 1)
+ 				set_bootsel(1, dip_switch_soft_state);
+ 			else
+ 				set_bootsel(0, 0);
++		*/
+ 		HAL_GPIO_WritePin(MCU_RESET_SOM_N_GPIO_Port, MCU_RESET_SOM_N_Pin, GPIO_PIN_SET);
+ 		GPIO_InitStruct.Pin = MCU_RESET_SOM_N_Pin;
+ 		GPIO_InitStruct.Pull = GPIO_NOPULL;
+diff --git a/Core/Src/main.c b/Core/Src/main.c
+index fd6b0de..7ecd8fb 100644
+--- a/Core/Src/main.c
++++ b/Core/Src/main.c
+@@ -148,19 +148,6 @@ extern void get_rtc_info(void);
+ extern void hf_power_task (void* parameter);
+ extern void hf_gpio_task (void* parameter);
+ 
+-
+-typedef struct {
+-  int dip01;
+-  int dip02;
+-  int dip03;
+-	int dip04;
+-	int swctrl;//0 hw,1,sw
+-} DIPSwitchInfo;
+-
+-extern int get_dip_switch(DIPSwitchInfo *dipSwitchInfo);
+-extern int set_dip_switch(DIPSwitchInfo dipSwitchInfo);
+-
+-
+ void hf_main_task(void *argument)
+ {
+   printf("HiFive 106SC!\n");
+diff --git a/Core/Src/web-server.c b/Core/Src/web-server.c
+index 4b05303..f006323 100644
+--- a/Core/Src/web-server.c
++++ b/Core/Src/web-server.c
+@@ -10522,35 +10522,6 @@ int get_pvt_info(PVTInfo *ppvtInfo)
+ 	return ret;
+ }
+ 
+-typedef struct {
+-    int dip01;//0 on,1 off
+-    int dip02;
+-    int dip03;
+-	int dip04;
+-	int swctrl;//0 hw,1,sw
+-} DIPSwitchInfo;
+-
+-int get_dip_switch(DIPSwitchInfo *dipSwitchInfo)
+-{
+-	uint8_t som_dip_switch_state;
+-	es_get_som_dip_switch_soft_state(&som_dip_switch_state);
+-	dipSwitchInfo->dip01 = 0x1 & som_dip_switch_state;
+-	dipSwitchInfo->dip02 = (0x2 & som_dip_switch_state) >> 1;
+-	dipSwitchInfo->dip03 = (0x4 & som_dip_switch_state) >> 2;
+-	dipSwitchInfo->dip04 = (0x8 & som_dip_switch_state) >> 3;
+-	return 0;
+-}
+-
+-int set_dip_switch(DIPSwitchInfo dipSwitchInfo)
+-{
+-	uint8_t som_dip_switch_state;
+-
+-	som_dip_switch_state =  ((0x1 & dipSwitchInfo.dip04) << 3) | ((0x1 & dipSwitchInfo.dip03) << 2)
+-				| ((0x1 & dipSwitchInfo.dip02) << 1)| (0x1 & dipSwitchInfo.dip01);
+-	es_set_som_dip_switch_soft_ctl_attr(dipSwitchInfo.swctrl);
+-	return es_set_som_dip_switch_soft_state(som_dip_switch_state);
+-}
+-
+ int get_som_info(som_info *psomInfo)
+ {
+ 	int ret = HAL_OK;
+-- 
+2.25.1
+

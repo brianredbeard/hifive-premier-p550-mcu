@@ -1,0 +1,33 @@
+From fa9f9990e1558d3fcb28e49cb4ea37efe7f0e3ba Mon Sep 17 00:00:00 2001
+From: xuxiang <xuxiang@eswincomputing.com>
+Date: Wed, 12 Jun 2024 09:47:39 +0800
+Subject: [PATCH 086/109] WIN2030-15279:fix: power led turnoff when poweroff
+
+Changelogs:
+1. when som is powered on, the power led  on the chassis is turn on and the sleep led is turn off
+2. when som is powered off, the power led on the chassis is turn off and the sleep led is turn on
+
+Change-Id: I7055849fc73f9da0df5e1091ee878f9beb9fbe64
+---
+ Core/Src/hf_power_process.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/Core/Src/hf_power_process.c b/Core/Src/hf_power_process.c
+index 2c559fe..a9469fa 100644
+--- a/Core/Src/hf_power_process.c
++++ b/Core/Src/hf_power_process.c
+@@ -219,9 +219,9 @@ static void chass_led_ctl(uint8_t turnon)
+ 		osDelay(10);
+ 		power_led_on(turnon);
+ 	} else {
+-		power_led_on(!turnon);
++		power_led_on(turnon);
+ 		osDelay(10);
+-		sleep_led_on(turnon);
++		sleep_led_on(!turnon);
+ 	}
+ }
+ 
+-- 
+2.25.1
+

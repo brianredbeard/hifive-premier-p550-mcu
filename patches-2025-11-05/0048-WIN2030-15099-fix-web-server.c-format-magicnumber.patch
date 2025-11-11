@@ -1,0 +1,284 @@
+From 01b50f3466ac808ee155f22959020d7c78eecfcc Mon Sep 17 00:00:00 2001
+From: yuan junhui <yuanjunhui@eswincomputing.com>
+Date: Wed, 22 May 2024 16:57:42 +0800
+Subject: [PATCH 048/109] WIN2030-15099:fix(web-server.c):format magicnumber
+
+Changelogs:
+01,format magicnumber,hex number
+02,add ajax param verify,empty,mac,ipaddr
+03,reset when poweron
+
+Change-Id: Ib3021331563a9b0ab622f5806a926397bffd31bd
+---
+ Core/Src/web-server.c | 122 +++++++++++++++++++++++++++++++++++-------
+ 1 file changed, 103 insertions(+), 19 deletions(-)
+
+diff --git a/Core/Src/web-server.c b/Core/Src/web-server.c
+index dafd6ce..2f4a8b7 100644
+--- a/Core/Src/web-server.c
++++ b/Core/Src/web-server.c
+@@ -9026,6 +9026,16 @@ const unsigned char login_html[] ="<html lang=\"zh\"> \
+ 															username: username, \n \
+ 															password: password \n \
+ 														}, \n \
++														beforeSend: function() { \n \
++															if(!(username.length>0 && username.length<=20)){\n \
++																alert('username illegal! 0<length<=20' );\n \
++																return false;\n \
++															}\n \
++															if(!(password.length>0 && password.length<=20)){\n \
++																alert('password illegal! 0<length<=20' );\n \
++																return false;\n \
++															}\n \
++														},\n \
+ 														success: function(response) {\n \
+ 															if(response.status===0){\n \
+ 																window.location.href = '/info.html';  \n \
+@@ -9081,6 +9091,14 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
+                                          <script src=\"/jquery.min.js\"></script> \
+ 										 <script> \n \
+                                                 $(document).ready(function() { \n \
++													function isValidMacAddress(mac) {\n \
++														const macAddressRegex = /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/;\n \
++														return macAddressRegex.test(mac);\n \
++													}\n \
++													function validateIPAddress(ip) {\n \
++														var ipRegex = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;\n \
++														return ipRegex.test(ip);\n \
++													}\n \
+                                                     $('#net-work-update').click(function() { \n \
+                                                         var ipaddr = $('#ipaddr').val();\n \
+                                                         var gateway = $('#gateway').val();\n \
+@@ -9095,7 +9113,25 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
+                                                                 gateway: gateway,\n \
+                                                                 subnetwork: subnetwork, \n \
+ 																macaddr: macaddr \n \
+-                                                            },\
++                                                            },\n \
++															beforeSend: function() { \n \
++																if(!(macaddr.length>0 && isValidMacAddress(macaddr))){\n \
++																	alert('macaddr illegal!' );\n \
++																	return false;\n \
++																}\n \
++																if(!(ipaddr.length>0 && validateIPAddress(ipaddr))){\n \
++																	alert('ipaddr illegal!' );\n \
++																	return false;\n \
++																}\n \
++																if(!(gateway.length>0 && validateIPAddress(gateway))){\n \
++																	alert('gateway illegal!' );\n \
++																	return false;\n \
++																}\n \
++																if(!(subnetwork.length>0 && validateIPAddress(subnetwork))){\n \
++																	alert('subnetwork illegal!' );\n \
++																	return false;\n \
++																}\n \
++															},\n \
+                                                             success: function(response) {\n \
+                                                                 if(response.status===0){\n \
+                                                                     alert(\"update success!\");\n \
+@@ -9139,6 +9175,8 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
+                                                     }); \n \
+ 													$('#power-on-change').click(function() {\n \
+ 													 	var power_status = $('#power-on-change').val();\n \
++														$('#power-consum-refresh').prop(\"disabled\", true); \n \
++														$('#reset').prop(\"disabled\", true); \n \
+                                                         $.ajax({\n \
+                                                             url: '/power_status',\n \
+                                                             type: 'POST',\n \
+@@ -9147,12 +9185,12 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
+                                                                 power_status: power_status,\n \
+                                                             },\
+                                                             success: function(response) {\n \
++																$('#power-on-refresh-hid').click(); \n \
+                                                                 if(response.status===0){\n \
+                                                                     alert(\"update success!\");\n \
+                                                                 }else{\n \
+                                                                     alert(response.message);\n \
+                                                                 }\n \
+-                                                                $('#power-on-refresh-hid').click(); \n \
+                                                                 console.log('power-on-change updated successfully.');\n \
+                                                             },\n \
+                                                             error: function(xhr, status, error) {\n \
+@@ -9171,12 +9209,12 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
+                                                                 power_lostresume_status: power_lostresume_status,\n \
+                                                             },\
+                                                             success: function(response) {\n \
++																$('#power-lostresume-refresh-hid').click(); \n \
+                                                                 if(response.status===0){\n \
+                                                                     alert(\"update success!\");\n \
+                                                                 }else{\n \
+                                                                     alert(response.message);\n \
+                                                                 }\n \
+-                                                                $('#power-lostresume-refresh-hid').click(); \n \
+                                                                 console.log('power-on-change updated successfully.');\n \
+                                                             },\n \
+                                                             error: function(xhr, status, error) {\n \
+@@ -9186,6 +9224,9 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
+                                                         });\n \
+                                                     });\n\
+ 													$('#reset').click(function() { \n \
++														if($('#power-on-change').val()===1){ //off status \n \
++															return; \n \
++														}\n \
+                                                         $.ajax({ \n\
+                                                             url: '/reset',\n \
+                                                             type: 'POST',\n \
+@@ -9334,6 +9375,7 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
+ 													$('#power-on-refresh-hid').click(function() {\n \
+ 														$('#power-on-change').prop(\"disabled\", true); \n \
+ 														$('#power-consum-refresh').prop(\"disabled\", true); \n \
++														$('#reset').prop(\"disabled\", true); \n \
+ 														$('#power-on-change').text('loading,,,');\n \
+                                                         $.ajax({\n \
+ 															async: false,\n \
+@@ -9351,11 +9393,13 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
+ 																		$('#power-on-change').text('powerON');\n \
+ 																		$('#power-on-change').val('1');\n \
+ 																		$('#power-consum-refresh').prop(\"disabled\", true); \n \
++																		$('#reset').prop(\"disabled\", true); \n \
+ 																	}else{\n \
+ 																		$('#power-status-label').text('Power Status (ON):');\n \
+ 																		$('#power-on-change').text('powerOFF');\n \
+ 																		$('#power-on-change').val('0');\n \
+ 																		$('#power-consum-refresh').prop(\"disabled\", false); \n \
++																		$('#reset').prop(\"disabled\", false); \n \
+ 																	}\n \
+ 																}\n \
+ 															},\n \
+@@ -9494,7 +9538,37 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
+ 																hours: rtc_hours, \n \
+ 																minutes: rtc_minutes, \n \
+ 																seconds: rtc_seconds \n \
+-                                                            },\
++                                                            },\n \
++															beforeSend: function() { \n \
++																if (parseInt(rtc_year) > 3000 || parseInt(rtc_year) < 1900) {\n \
++																	alert('Invalid year!');\n \
++																	return false;\n \
++																}\n \
++																if (parseInt(rtc_month) >12 || parseInt(rtc_month) <1) {\n \
++																	alert('Invalid month!');\n \
++																	return false;\n \
++																}\n \
++																if (parseInt(rtc_date) < 1 || parseInt(rtc_date) > 31) {\n \
++																	alert('Invalid date!');\n \
++																	return false;\n \
++																}\n \
++																if (parseInt(rtc_weekday) < 1 || parseInt(rtc_weekday) > 7) {\n \
++																	alert('Invalid weekday!');\n \
++																	return false;\n \
++																}\n \
++																if (parseInt(rtc_hours) < 0 || parseInt(rtc_hours) > 23) {\n \
++																	alert('Invalid hours!');\n \
++																	return false;\n \
++																}\n \
++																if (parseInt(rtc_minutes) < 0 || parseInt(rtc_minutes) > 59) {\n \
++																	alert('Invalid minutes!');\n \
++																	return false;\n \
++																}\n \
++																if (parseInt(rtc_seconds) < 0 || parseInt(rtc_seconds) > 59) {\n \
++																	alert('Invalid seconds!');\n \
++																	return false;\n \
++																}\n \
++															},\n \
+                                                             success: function(response) {\n \
+                                                                 if(response.status===0){\n \
+                                                                     alert(\"update success!\");\n \
+@@ -9601,7 +9675,7 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
+ 												align-items: center; \
+ 											} \
+ 											label { \
+-												width: 200px; \
++												width: 220px; \
+ 											} \
+ 											.network-roww {\
+ 												display: flex;\
+@@ -9630,36 +9704,36 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
+ 											<h3>Board Information</h3> \
+ 											<h4>SOM Info</h4> \
+ 											<div class=\"network-row\"> \
+-											<label>magicNumber:</label> <input type=\"text\" id=\"som_magicNumber\" value=\"0\" style=\"width: 100px;\" disabled>  <br> \
++											<label>magicNumber(hex):</label> <input type=\"text\" id=\"som_magicNumber\" value=\"0\" style=\"width: 100px;\" disabled>  <br> \
+ 											</div> \
+ 											<div class=\"network-row\"> \
+-											<label>formatVersionNumber:</label> <input type=\"text\" id=\"som_formatVersionNumber\" value=\"0\" style=\"width: 100px;\" disabled>  <br> \
++											<label>formatVersionNumber(hex):</label> <input type=\"text\" id=\"som_formatVersionNumber\" value=\"0\" style=\"width: 100px;\" disabled>  <br> \
+ 											</div> \
+ 											<div class=\"network-row\"> \
+-											<label>productIdentifier:</label> <input type=\"text\" id=\"som_productIdentifier\" value=\"0\" style=\"width: 100px;\" disabled>  <br> \
++											<label>productIdentifier(hex):</label> <input type=\"text\" id=\"som_productIdentifier\" value=\"0\" style=\"width: 100px;\" disabled>  <br> \
+ 											</div> \
+ 											<div class=\"network-row\"> \
+-											<label>pcbRevision:</label> <input type=\"text\" id=\"som_pcbRevision\" value=\"0\" style=\"width: 100px;\" disabled>  <br> \
++											<label>pcbRevision(hex):</label> <input type=\"text\" id=\"som_pcbRevision\" value=\"0\" style=\"width: 100px;\" disabled>  <br> \
+ 											</div> \
+ 											<div class=\"network-row\"> \
+-											<label>boardSerialNumber:</label> <input type=\"text\" id=\"som_boardSerialNumber\" value=\"0\" style=\"width: 180px;\" disabled>  <br> \
++											<label>boardSerialNumber(str):</label> <input type=\"text\" id=\"som_boardSerialNumber\" value=\"0\" style=\"width: 180px;\" disabled>  <br> \
+ 											</div> \
+ 											<button id=\"board-info-som-refresh\" >refresh</button> \
+ 											<h4>CarrierBoard Info</h4> \
+ 											<div class=\"network-row\"> \
+-											<label>magicNumber:</label> <input type=\"text\" id=\"cb_magicNumber\" value=\"0\" style=\"width: 100px;\" disabled>  <br> \
++											<label>magicNumber(hex):</label> <input type=\"text\" id=\"cb_magicNumber\" value=\"0\" style=\"width: 100px;\" disabled>  <br> \
+ 											</div> \
+ 											<div class=\"network-row\"> \
+-											<label>formatVersionNumber:</label> <input type=\"text\" id=\"cb_formatVersionNumber\" value=\"0\" style=\"width: 100px;\" disabled>  <br> \
++											<label>formatVersionNumber(hex):</label> <input type=\"text\" id=\"cb_formatVersionNumber\" value=\"0\" style=\"width: 100px;\" disabled>  <br> \
+ 											</div> \
+ 											<div class=\"network-row\"> \
+-											<label>productIdentifier:</label> <input type=\"text\" id=\"cb_productIdentifier\" value=\"0\" style=\"width: 100px;\" disabled>  <br> \
++											<label>productIdentifier(hex):</label> <input type=\"text\" id=\"cb_productIdentifier\" value=\"0\" style=\"width: 100px;\" disabled>  <br> \
+ 											</div> \
+ 											<div class=\"network-row\"> \
+-											<label>pcbRevision:</label> <input type=\"text\" id=\"cb_pcbRevision\" value=\"0\" style=\"width: 100px;\" disabled>  <br> \
++											<label>pcbRevision(hex):</label> <input type=\"text\" id=\"cb_pcbRevision\" value=\"0\" style=\"width: 100px;\" disabled>  <br> \
+ 											</div> \
+ 											<div class=\"network-row\"> \
+-											<label>boardSerialNumber:</label> <input type=\"text\" id=\"cb_boardSerialNumber\" value=\"0\" style=\"width: 180px;\" disabled>  <br> \
++											<label>boardSerialNumber(str):</label> <input type=\"text\" id=\"cb_boardSerialNumber\" value=\"0\" style=\"width: 180px;\" disabled>  <br> \
+ 											</div> \
+ 											<button id=\"board-info-cb-refresh\" >refresh</button> \
+ 										</div> \
+@@ -9817,6 +9891,16 @@ const unsigned char modify_account_html[] ="<html lang=\"zh\"> \
+ 															username: username, \n \
+ 															password: password \n \
+ 														}, \n \
++														beforeSend: function() { \n \
++															if(!(username.length>0 && username.length<=20)){\n \
++																alert('username illegal! 0<length<=20' );\n \
++																return false;\n \
++															}\n \
++															if(!(password.length>0 && password.length<=20)){\n \
++																alert('password illegal! 0<length<=20' );\n \
++																return false;\n \
++															}\n \
++														},\n \
+ 														success: function(response) {\n \
+ 															if(response.status===0){\n \
+ 																alert(' modify success! login in please!'); \n \
+@@ -10871,8 +10955,8 @@ int get_soc_status()
+ 				int rett = get_som_info(pSimpleInfo);
+ 
+ 				char json_response[BUF_SIZE_256]={0};
+-                char *json_response_patt = "{\"status\":%d,\"message\":\"success\",\"data\":{\"magicNumber\":\"0x%x\",\"formatVersionNumber\":\"%c\",\"productIdentifier\":\"%c%c\",\"pcbRevision\":\"%c\",\"boardSerialNumber\":\"%.18s\"}}";
+-                sprintf(json_response, json_response_patt,rett,pSimpleInfo->magic,pSimpleInfo->version,(char)(pSimpleInfo->id >> 8), (char)(pSimpleInfo->id & 0xFF),pSimpleInfo->pcb,pSimpleInfo->sn);
++                char *json_response_patt = "{\"status\":%d,\"message\":\"success\",\"data\":{\"magicNumber\":\"%x\",\"formatVersionNumber\":\"%x\",\"productIdentifier\":\"%x\",\"pcbRevision\":\"%x\",\"boardSerialNumber\":\"%.18s\"}}";
++                sprintf(json_response, json_response_patt,rett,pSimpleInfo->magic,pSimpleInfo->version,pSimpleInfo->id ,pSimpleInfo->pcb,pSimpleInfo->sn);
+ 
+                 char response_header[BUF_SIZE_256];
+                 if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 && byhand ){
+@@ -10892,8 +10976,8 @@ int get_soc_status()
+ 				CBSimpleInfo simpleInfo=get_cb_info();
+ 
+                	char json_response[BUF_SIZE_256]={0};
+-                char *json_response_patt = "{\"status\":0,\"message\":\"success\",\"data\":{\"magicNumber\":\"0x%x\",\"formatVersionNumber\":\"%c\",\"productIdentifier\":\"%c%c\",\"pcbRevision\":\"%c\",\"boardSerialNumber\":\"%.18s\"}}";
+-                sprintf(json_response, json_response_patt,simpleInfo.magicNumber,simpleInfo.formatVersionNumber, (char)(simpleInfo.productIdentifier >> 8), (char)(simpleInfo.productIdentifier & 0xFF),simpleInfo.pcbRevision,simpleInfo.boardSerialNumber);
++                char *json_response_patt = "{\"status\":0,\"message\":\"success\",\"data\":{\"magicNumber\":\"%x\",\"formatVersionNumber\":\"%x\",\"productIdentifier\":\"%x\",\"pcbRevision\":\"%x\",\"boardSerialNumber\":\"%.18s\"}}";
++                sprintf(json_response, json_response_patt,simpleInfo.magicNumber,simpleInfo.formatVersionNumber, simpleInfo.productIdentifier,simpleInfo.pcbRevision,simpleInfo.boardSerialNumber);
+ 
+                 char response_header[BUF_SIZE_256];
+                 if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 && byhand ){
+-- 
+2.25.1
+

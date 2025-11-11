@@ -1,0 +1,42 @@
+From 0a16df596a36b63fccf17a8b903837f57fccec1e Mon Sep 17 00:00:00 2001
+From: xuxiang <xuxiang@eswincomputing.com>
+Date: Wed, 12 Jun 2024 11:15:54 +0800
+Subject: [PATCH 087/109] WIN2030-15279:fix: Power on and off logic exception
+ repair
+
+Changelogs:
+1. The power off timer is not turned off in time, it will change the power state to poeroff when it is powered on
+
+Change-Id: I5181d37302e41940d12633c615e24b857287411b
+---
+ Core/Src/hf_gpio_process.c | 1 +
+ Core/Src/web-server.c      | 1 +
+ 2 files changed, 2 insertions(+)
+
+diff --git a/Core/Src/hf_gpio_process.c b/Core/Src/hf_gpio_process.c
+index 36ca9ff..270fd0f 100644
+--- a/Core/Src/hf_gpio_process.c
++++ b/Core/Src/hf_gpio_process.c
+@@ -111,6 +111,7 @@ static void key_process(void)
+ 			printf("KEY_SHORT_PRESS_STATE time %ld\n", currentTime - pressStartTime);
+ 			button_state = KEY_PRESS_STATE_END;
+ 			if (get_som_power_state() != SOM_POWER_ON) {
++				vStopSomPowerOffTimer();
+ 				change_som_power_state(SOM_POWER_ON);
+ 			}
+ 			break;
+diff --git a/Core/Src/web-server.c b/Core/Src/web-server.c
+index fd0495c..d262df7 100644
+--- a/Core/Src/web-server.c
++++ b/Core/Src/web-server.c
+@@ -10474,6 +10474,7 @@ int change_power_status(int status)
+ 		}
+ 	} else {
+ 		if (SOM_POWER_OFF == get_som_power_state()) {
++			vStopSomPowerOffTimer();
+ 			change_som_power_state(SOM_POWER_ON);
+ 		} else {
+ 			web_debug("SOM already power on!\n");
+-- 
+2.25.1
+

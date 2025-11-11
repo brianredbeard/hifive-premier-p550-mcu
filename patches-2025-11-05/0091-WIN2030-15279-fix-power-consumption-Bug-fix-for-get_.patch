@@ -1,0 +1,114 @@
+From 19dd576d3d89cc9cb2a5029532a42d72c5799908 Mon Sep 17 00:00:00 2001
+From: linmin <linmin@eswincomputing.com>
+Date: Fri, 14 Jun 2024 15:11:10 +0800
+Subject: [PATCH 091/109] WIN2030-15279:fix(power consumption):Bug fix for
+ get_som_power()
+
+Changelogs:
+1.Delete the taskENTER_CRITICAL()/taskEXIT_CRITICAL() in get_som_power().
+  Because this will disable interrupt, then the tick will not be
+  increased, so that the i2c api will never timeout and will wait forever.
+2.osDelay(pdMS_TO_TICKS(10)) after PAC193X_CMD_REFRESH_V I2C write cmd.
+  If not delay with sufficient time, the I2C will be always in address busy
+  state.
+
+Change-Id: I154f771c378e7dc733222ef5d378e69304024180
+---
+ Core/Inc/hf_common.h           | 1 +
+ Core/Src/hf_i2c.c              | 4 +---
+ Core/Src/hf_power_process.c    | 5 +----
+ Core/Src/hf_protocol_process.c | 1 +
+ 4 files changed, 4 insertions(+), 7 deletions(-)
+
+diff --git a/Core/Inc/hf_common.h b/Core/Inc/hf_common.h
+index 9f63af3..0f43eed 100644
+--- a/Core/Inc/hf_common.h
++++ b/Core/Inc/hf_common.h
+@@ -350,6 +350,7 @@ int es_restore_userdata_to_factory(void);
+ 
+ /* Dynamically change eth */
+ int32_t es_set_eth(struct ip_t *ip, struct netmask_t *netmask, struct getway_t *gw, struct eth_mac_t *mac);
++void MX_I2C3_Init(void);
+ 
+ #ifdef __cplusplus
+ }
+diff --git a/Core/Src/hf_i2c.c b/Core/Src/hf_i2c.c
+index 8efc972..a4e3348 100644
+--- a/Core/Src/hf_i2c.c
++++ b/Core/Src/hf_i2c.c
+@@ -151,7 +151,6 @@ int hf_i2c_reg_write_block(I2C_HandleTypeDef *hi2c, uint8_t slave_addr,
+ 	}
+ 	while (HAL_I2C_GetState(hi2c) != HAL_I2C_STATE_READY);
+ 	while (HAL_I2C_IsDeviceReady(hi2c, slave_addr, 0xff, 0xff) == HAL_TIMEOUT);
+-	while (HAL_I2C_GetState(hi2c) != HAL_I2C_STATE_READY);
+ 	return status;
+ }
+ 
+@@ -161,7 +160,7 @@ int hf_i2c_reg_read_block(I2C_HandleTypeDef *hi2c, uint8_t slave_addr,
+ 	HAL_StatusTypeDef status = HAL_OK;
+ 	while (HAL_I2C_GetState(hi2c) != HAL_I2C_STATE_READY);
+ 	status = HAL_I2C_Mem_Read(hi2c, slave_addr, reg_addr, I2C_MEMADD_SIZE_8BIT,
+-							  data_ptr, len, 0xff);
++							  data_ptr, len, pdMS_TO_TICKS(100));
+ 	if (status != HAL_OK){
+ 		printf("I2Cx_read_Error(%x) reg %x; status %x\r\n", slave_addr, reg_addr, status);
+ 		hf_i2c_reinit(hi2c);
+@@ -169,6 +168,5 @@ int hf_i2c_reg_read_block(I2C_HandleTypeDef *hi2c, uint8_t slave_addr,
+ 	}
+ 	while (HAL_I2C_GetState(hi2c) != HAL_I2C_STATE_READY);
+ 	while (HAL_I2C_IsDeviceReady(hi2c, slave_addr, 0xff, 0xff) == HAL_TIMEOUT);
+-	while (HAL_I2C_GetState(hi2c) != HAL_I2C_STATE_READY);
+ 	return status;
+ }
+diff --git a/Core/Src/hf_power_process.c b/Core/Src/hf_power_process.c
+index 7376074..a6b4dac 100644
+--- a/Core/Src/hf_power_process.c
++++ b/Core/Src/hf_power_process.c
+@@ -192,7 +192,6 @@ static uint8_t get_dc_power_status(void)
+  * @param  reset pdTRUE : reset; pdFALSE : release
+  * @retval None
+  */
+-extern void MX_I2C3_Init(void);
+ void som_reset_control(uint8_t reset)
+ {
+ 	GPIO_InitTypeDef GPIO_InitStruct = {0};
+@@ -393,7 +392,6 @@ int get_som_power(uint32_t *volt, uint32_t *curr, uint32_t *power)
+ 	uint8_t is_neg = 0;
+ 	uint8_t ctrl_value = 0x8;
+ 
+-	taskENTER_CRITICAL();
+ 	if (1 == is_first)
+ 	{
+ 		/*Write failure, not find wrong reason*/
+@@ -408,7 +406,7 @@ int get_som_power(uint32_t *volt, uint32_t *curr, uint32_t *power)
+ 	}
+ 
+ 	hf_i2c_reg_write_block(&hi2c3, PAC1934_ADDR, PAC193X_CMD_REFRESH_V, (uint8_t *)&ctrl_value, 0);
+-	osDelay(1);
++	osDelay(pdMS_TO_TICKS(10));
+ 	ret = hf_i2c_reg_read(&hi2c3, PAC1934_ADDR, PAC193X_CMD_NEG_PWR_ACT, &act_val);
+ 	if (ret)
+ 	{
+@@ -471,6 +469,5 @@ int get_som_power(uint32_t *volt, uint32_t *curr, uint32_t *power)
+ 	}
+ 
+ out:
+-	taskEXIT_CRITICAL();
+ 	return ret;
+ }
+\ No newline at end of file
+diff --git a/Core/Src/hf_protocol_process.c b/Core/Src/hf_protocol_process.c
+index 0d23383..b955738 100644
+--- a/Core/Src/hf_protocol_process.c
++++ b/Core/Src/hf_protocol_process.c
+@@ -11,6 +11,7 @@
+ #include "semphr.h"
+ #include "timers.h"
+ #include "hf_spi_slv.h"
++#include "web-server.h"
+ 
+ #define head_meg "\xA5\x5A\xAA\x55"
+ #define end_msg "\x0D\x0A\x0D\x0A"
+-- 
+2.25.1
+

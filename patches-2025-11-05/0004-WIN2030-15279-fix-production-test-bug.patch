@@ -1,0 +1,603 @@
+From c61953ff1c632b633dbd80aecc8f0055ba15e07f Mon Sep 17 00:00:00 2001
+From: xuxiang <xuxiang@eswincomputing.com>
+Date: Wed, 24 Apr 2024 10:23:30 +0800
+Subject: [PATCH 004/109] WIN2030-15279 : fix : production test bug
+
+Changelogs:
+1. Dynamic change of ip address, netmask, and gatway
+2. rtc data, times format
+3. sys timebase change to time2
+
+Change-Id: I54b261c4e50f349b9d33f40566f3eaa4afac0049
+---
+ Core/Inc/stm32f4xx_it.h               |  1 +
+ Core/Src/hf_board_init.c              |  3 +-
+ Core/Src/hf_gpio_process.c            |  2 +-
+ Core/Src/hf_http_process.c            | 28 +++++++++-
+ Core/Src/hf_it_callback.c             |  2 +-
+ Core/Src/hf_protocol_process.c        | 55 ++++++++++---------
+ Core/Src/main.c                       | 11 ++--
+ Core/Src/stm32f4xx_hal_msp.c          | 79 ++++++++++++++++++++++++++-
+ Core/Src/stm32f4xx_hal_timebase_tim.c | 63 ++++++++++++---------
+ Core/Src/stm32f4xx_it.c               | 20 ++++++-
+ 10 files changed, 196 insertions(+), 68 deletions(-)
+
+diff --git a/Core/Inc/stm32f4xx_it.h b/Core/Inc/stm32f4xx_it.h
+index 4143322..5af1298 100644
+--- a/Core/Inc/stm32f4xx_it.h
++++ b/Core/Inc/stm32f4xx_it.h
+@@ -60,6 +60,7 @@ void DMA1_Stream3_IRQHandler(void);
+ void DMA1_Stream4_IRQHandler(void);
+ void EXTI9_5_IRQHandler(void);
+ void TIM1_UP_TIM10_IRQHandler(void);
++void TIM2_IRQHandler(void);
+ void TIM4_IRQHandler(void);
+ void TIM5_IRQHandler(void);
+ void EXTI15_10_IRQHandler(void);
+diff --git a/Core/Src/hf_board_init.c b/Core/Src/hf_board_init.c
+index 8ad36f2..3ed61ae 100644
+--- a/Core/Src/hf_board_init.c
++++ b/Core/Src/hf_board_init.c
+@@ -41,6 +41,7 @@ DMA_HandleTypeDef hdma_spi1_rx;
+ DMA_HandleTypeDef hdma_spi1_tx;
+ DMA_HandleTypeDef hdma_spi2_rx;
+ DMA_HandleTypeDef hdma_spi2_tx;
++TIM_HandleTypeDef htim1;
+ TIM_HandleTypeDef htim4;
+ TIM_HandleTypeDef htim5;
+ UART_HandleTypeDef huart4;
+@@ -150,8 +151,6 @@ int board_init(void)
+ 	/* watch dog */
+ 	// MX_WWDG_Init();
+ 	// MX_IWDG_Init();
+-
+-	printf("\r\n%s %d %s %s\r\n", __func__, __LINE__, __DATE__, __TIME__);
+ 	return 0;
+ }
+ 
+diff --git a/Core/Src/hf_gpio_process.c b/Core/Src/hf_gpio_process.c
+index ad47308..545c8d1 100644
+--- a/Core/Src/hf_gpio_process.c
++++ b/Core/Src/hf_gpio_process.c
+@@ -11,7 +11,7 @@
+ /* Private define ------------------------------------------------------------*/
+ #define SHORT_CLICK_THRESHOLD 50
+ #define LONG_PRESS_THRESHOLD 3000
+-#define PRESS_Time 100
++#define PRESS_Time 50
+ #define BUTTON_ERROR_Time 10000
+ 
+ #define FLAGS_KEY 0x00000001U
+diff --git a/Core/Src/hf_http_process.c b/Core/Src/hf_http_process.c
+index b5c3289..042adb2 100644
+--- a/Core/Src/hf_http_process.c
++++ b/Core/Src/hf_http_process.c
+@@ -42,6 +42,29 @@ void eth_get_address(void)
+     mac_address[5] = MAC_ADDR5;
+   }
+ }
++
++extern struct netif gnetif;
++extern ip4_addr_t ipaddr;
++extern ip4_addr_t netmask;
++extern ip4_addr_t gw;
++
++void dynamic_change_eth(void)
++{
++
++  IP4_ADDR(&ipaddr, ip_address[0], ip_address[1], ip_address[2],
++            ip_address[3]);
++  IP4_ADDR(&netmask, netmask_address[0], netmask_address[1],
++            netmask_address[2], netmask_address[3]);
++  IP4_ADDR(&gw, getway_address[0], getway_address[1], getway_address[2],
++            getway_address[3]);
++
++  netif_set_addr(&gnetif, &ipaddr, &netmask, &gw);
++
++  netif_set_default(&gnetif);
++
++  netif_set_up(&gnetif);
++}
++
+ void hf_http_task(void *argument)
+ {
+   /* init code for LWIP */
+@@ -49,11 +72,14 @@ void hf_http_task(void *argument)
+   MX_LWIP_Init();
+   httpd_init();
+   // /* Infinite loop */
+-  osDelay(5000); 
++  osDelay(5000);
+   dhcp = netif_dhcp_data(&gnetif);
+   printf("Static IP address: %s\n", ip4addr_ntoa(&gnetif.ip_addr));
+   printf("Subnet mask: %s\n", ip4addr_ntoa(&gnetif.netmask));
+   printf("Default gateway: %s\n", ip4addr_ntoa(&gnetif.gw));
++  memcpy((uint8_t *)ip_address, &gnetif.ip_addr, 4);
++  memcpy((uint8_t *)netmask_address, &gnetif.netmask, 4);
++  memcpy((uint8_t *)getway_address, &gnetif.gw, 4);
+   for(;;)
+   {
+     osDelay(1000);
+diff --git a/Core/Src/hf_it_callback.c b/Core/Src/hf_it_callback.c
+index ee205ce..77cbd7e 100644
+--- a/Core/Src/hf_it_callback.c
++++ b/Core/Src/hf_it_callback.c
+@@ -64,7 +64,7 @@ void Error_Handler(void)
+  */
+ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+ {
+-	if (htim->Instance == TIM1) {
++	if (htim->Instance == TIM2) {
+ 		HAL_IncTick();
+ 	}
+ }
+diff --git a/Core/Src/hf_protocol_process.c b/Core/Src/hf_protocol_process.c
+index cbe832c..e729849 100644
+--- a/Core/Src/hf_protocol_process.c
++++ b/Core/Src/hf_protocol_process.c
+@@ -18,8 +18,6 @@ extern uint8_t ip_address[4];
+ extern uint8_t netmask_address[4];
+ extern uint8_t getway_address[4];
+ extern uint8_t mac_address[6];
+-extern osThreadId_t http_task_handle;
+-extern osThreadAttr_t http_task_attributes;
+ 
+ void es_send_req(b_frame_class_t *pframe, uint8_t req_cmd, int8_t *frame_data, uint8_t len)
+ {
+@@ -86,31 +84,29 @@ int32_t es_set_gpio(struct gpio_cmd *gpio)
+ 
+ int32_t es_set_eth(struct ip_t *ip, struct netmask_t *netmask, struct getway_t *gw, struct eth_mac_t *mac)
+ {
+-	if (http_task_handle)
+-		osThreadTerminate(http_task_handle);
+ 	if (ip != NULL) {
+ 		ip_address[0] = ip->ip_addr0;
+ 		ip_address[1] = ip->ip_addr1;
+ 		ip_address[2] = ip->ip_addr2;
+ 		ip_address[3] = ip->ip_addr3;
+ 		// printf("IP_ADDR0:%d IP_ADDR1: %d IP_ADDR2: %d IP_ADDR3 %d\n", \
+-			ip_address[0], ip_address[1], ip_address[2], ip_address[3]);
++			// ip_address[0], ip_address[1], ip_address[2], ip_address[3]);
+ 	}
+ 	if (netmask != NULL) {
+ 		netmask_address[0] = netmask->netmask_addr0;
+ 		netmask_address[1] = netmask->netmask_addr1;
+ 		netmask_address[2] = netmask->netmask_addr2;
+ 		netmask_address[3] = netmask->netmask_addr3;
+-		// printf("NETMASK_ADDR0:%d NETMASK_ADDR1: %d NETMASK_ADDR2: %d NETMASK_ADDR3 %d\n", \
+-		netmask_address[0], netmask_address[1], netmask_address[2], netmask_address[3]);
++		// printf("NETMASK_ADDR0:%d NETMASK_ADDR1: %d NETMASK_ADDR2: %d NETMASK_ADDR3 %d\n",
++		// netmask_address[0], netmask_address[1], netmask_address[2], netmask_address[3]);
+ 	}
+ 	if (gw != NULL) {
+ 		getway_address[0] = gw->getway_addr0;
+ 		getway_address[1] = gw->getway_addr1;
+ 		getway_address[2] = gw->getway_addr2;
+ 		getway_address[3] = gw->getway_addr3;
+-		// printf("GETWAY_ADDR0:%d GETWAY_ADDR1: %dGETWAY_ADDR2: %d GETWAY_ADDR3 %d\n", \
+-			getway_address[0], getway_address[1], getway_address[2], getway_address[3]);
++		// printf("GETWAY_ADDR0:%d GETWAY_ADDR1: %dGETWAY_ADDR2: %d GETWAY_ADDR3 %d\n",
++			// getway_address[0], getway_address[1], getway_address[2], getway_address[3]);
+ 	}
+ 	if (mac != NULL) {
+ 		mac_address[0] = mac->eth_mac_addr0;
+@@ -119,10 +115,11 @@ int32_t es_set_eth(struct ip_t *ip, struct netmask_t *netmask, struct getway_t *
+ 		mac_address[3] = mac->eth_mac_addr3;
+ 		mac_address[4] = mac->eth_mac_addr4;
+ 		mac_address[5] = mac->eth_mac_addr5;
+-		// printf("GETWAY_ADDR0:%d GETWAY_ADDR1: %dGETWAY_ADDR2: %d GETWAY_ADDR3 %d\n", \
+-			getway_address[0], getway_address[1], getway_address[2], getway_address[3]);
++		// printf("GETWAY_ADDR0:%d GETWAY_ADDR1: %dGETWAY_ADDR2: %d GETWAY_ADDR3 %d\n",
++			// getway_address[0], getway_address[1], getway_address[2], getway_address[3]);
+ 	}
+-	http_task_handle = osThreadNew(hf_http_task, NULL, &http_task_attributes);
++	extern void dynamic_change_eth(void);
++	dynamic_change_eth();
+ 	return HAL_OK;
+ }
+ 
+@@ -156,7 +153,7 @@ int32_t es_set_rtc_time(struct rtc_time_t *stime)
+ int32_t es_get_rtc_date(struct rtc_date_t *sdate)
+ {
+ 	RTC_DateTypeDef GetData;
+-	if (HAL_RTC_GetDate(&hrtc, &GetData, RTC_FORMAT_BIN) != HAL_OK)
++	if (HAL_RTC_GetDate(&hrtc, &GetData, RTC_FORMAT_BCD) != HAL_OK)
+ 		return HAL_ERROR;
+ 	// printf("yy/mm/dd  %02d/%02d/%02d\r\n", 2000 + GetData.Year, GetData.Month, GetData.Date);
+ 	sdate->Year = 2000 + GetData.Year;
+@@ -166,7 +163,22 @@ int32_t es_get_rtc_date(struct rtc_date_t *sdate)
+ 	return HAL_OK;
+ }
+ 
++int32_t es_get_rtc_time(struct rtc_time_t *stime)
++{
++	RTC_TimeTypeDef GetTime;
++	if (HAL_RTC_GetTime(&hrtc, &GetTime, RTC_FORMAT_BCD) != HAL_OK)
++		return HAL_ERROR;
++	// printf(" hh:mm:ss %02d:%02d:%02d\r\n", GetTime.Hours, GetTime.Minutes, GetTime.Seconds);
++	stime->Hours = GetTime.Hours;
++	stime->Minutes = GetTime.Minutes;
++	stime->Seconds = GetTime.Seconds;
++	return HAL_OK;
++}
++
+ extern uint32_t pwm_period;
++uint32_t fan0_duty = 0;
++uint32_t fan1_duty = 0;
++
+ int32_t es_set_fan_duty(struct fan_control_t *fan)
+ {
+ 	TIM_OC_InitTypeDef sConfigOC = {0};
+@@ -177,6 +189,7 @@ int32_t es_set_fan_duty(struct fan_control_t *fan)
+ 		if (HAL_TIM_PWM_Stop(&htim4, TIM_CHANNEL_1) != HAL_OK)
+ 			return HAL_ERROR;
+ 
++		fan0_duty = fan->duty;
+ 		sConfigOC.OCMode = TIM_OCMODE_PWM1;
+ 		sConfigOC.Pulse = fan->duty*pwm_period/100;
+ 		sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+@@ -190,6 +203,7 @@ int32_t es_set_fan_duty(struct fan_control_t *fan)
+ 		if (HAL_TIM_PWM_Stop(&htim4, TIM_CHANNEL_2) != HAL_OK)
+ 			return HAL_ERROR;
+ 
++		fan1_duty = fan->duty;
+ 		sConfigOC.OCMode = TIM_OCMODE_PWM1;
+ 		sConfigOC.Pulse = fan->duty*pwm_period/100;
+ 		sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+@@ -208,26 +222,15 @@ int32_t es_set_fan_duty(struct fan_control_t *fan)
+ int32_t es_get_fan_duty(struct fan_control_t *fan)
+ {
+ 	if (fan->fan_num == 0) {
+-		fan->duty = 50;
++		fan->duty = fan0_duty;
+ 	} else if (fan->fan_num == 1) {
+-		fan->duty = 60;
++		fan->duty = fan1_duty;
+ 	} else {
+ 		return HAL_ERROR;
+ 	}
+ 	return HAL_OK;
+ }
+ 
+-int32_t es_get_rtc_time(struct rtc_time_t *stime)
+-{
+-	RTC_TimeTypeDef GetTime;
+-	if (HAL_RTC_GetTime(&hrtc, &GetTime, RTC_FORMAT_BIN) != HAL_OK)
+-		return HAL_ERROR;
+-	// printf(" hh:mm:ss %02d:%02d:%02d\r\n", GetTime.Hours, GetTime.Minutes, GetTime.Seconds);
+-	stime->Hours = GetTime.Hours;
+-	stime->Minutes = GetTime.Minutes;
+-	stime->Seconds = GetTime.Seconds;
+-	return HAL_OK;
+-}
+ 
+ void es_process_cmd(b_frame_class_t *pframe)
+ {
+diff --git a/Core/Src/main.c b/Core/Src/main.c
+index a63e651..6321375 100644
+--- a/Core/Src/main.c
++++ b/Core/Src/main.c
+@@ -149,14 +149,13 @@ void hf_main_task(void *argument)
+ 
+ 	// MX_IWDG_Init();
+ 
+-	
+   mcu_status_led_on(pdTRUE);
+   // extern uint32_t PWM2_T_Count;
+   // extern uint32_t PWM2_D_Count;
+   // uint32_t uiFrequency;
++
+   for(;;)
+   {
+-	  HAL_Delay(500);
+ 		// uiFrequency = 1000000 / PWM2_D_Count;
+ 		// printf("占空:%dus    周期:%dus    频率:%dHz    \r\n", PWM2_T_Count, PWM2_D_Count, uiFrequency);
+     // PWM2_T_Count = 0;
+@@ -198,9 +197,9 @@ void get_rtc_info(void)
+ {
+   RTC_DateTypeDef GetData;
+   RTC_TimeTypeDef GetTime;
+-  HAL_RTC_GetTime(&hrtc, &GetTime, RTC_FORMAT_BIN);
++  HAL_RTC_GetTime(&hrtc, &GetTime, RTC_FORMAT_BCD);
+   /* Get the RTC current Date */
+-  HAL_RTC_GetDate(&hrtc, &GetData, RTC_FORMAT_BIN);
++  HAL_RTC_GetDate(&hrtc, &GetData, RTC_FORMAT_BCD);
+ 
+   /* Display date Format : yy/mm/dd */
+   printf("yy/mm/dd  %02d/%02d/%02d\r\n",2000 + GetData.Year, GetData.Month, GetData.Date);
+@@ -209,8 +208,8 @@ void get_rtc_info(void)
+ 
+   // RTC_AlarmTypeDef alarm1;
+   // RTC_AlarmTypeDef alarm2;
+-  // HAL_RTC_GetAlarm(&hrtc, &alarm1, RTC_ALARM_A, RTC_FORMAT_BIN);
+-  // HAL_RTC_GetAlarm(&hrtc, &alarm2, RTC_ALARM_B, RTC_FORMAT_BIN);
++  // HAL_RTC_GetAlarm(&hrtc, &alarm1, RTC_ALARM_A, RTC_FORMAT_BCD);
++  // HAL_RTC_GetAlarm(&hrtc, &alarm2, RTC_ALARM_B, RTC_FORMAT_BCD);
+   // printf("alarm1 info :\n");
+   // printf("AlarmMask %x, AlarmSubSecondMask %x, \n AlarmDateWeekDaySel %x, AlarmDateWeekDay %x, Alarm %x:\n", 
+   //       alarm1.AlarmMask, alarm1.AlarmSubSecondMask, alarm1.AlarmDateWeekDaySel, alarm1.AlarmDateWeekDay, alarm1.Alarm );
+diff --git a/Core/Src/stm32f4xx_hal_msp.c b/Core/Src/stm32f4xx_hal_msp.c
+index 58525ae..0201441 100644
+--- a/Core/Src/stm32f4xx_hal_msp.c
++++ b/Core/Src/stm32f4xx_hal_msp.c
+@@ -655,6 +655,35 @@ void HAL_SPI_MspDeInit(SPI_HandleTypeDef* hspi)
+ 
+ }
+ 
++/**
++* @brief TIM_PWM MSP Initialization
++* This function configures the hardware resources used in this example
++* @param htim_pwm: TIM_PWM handle pointer
++* @retval None
++*/
++void HAL_TIM_PWM_MspInit(TIM_HandleTypeDef* htim_pwm)
++{
++  if(htim_pwm->Instance==TIM1)
++  {
++  /* USER CODE BEGIN TIM1_MspInit 0 */
++
++  /* USER CODE END TIM1_MspInit 0 */
++    /* Peripheral clock enable */
++    __HAL_RCC_TIM1_CLK_ENABLE();
++    /* TIM1 interrupt Init */
++    HAL_NVIC_SetPriority(TIM1_BRK_TIM9_IRQn, 5, 0);
++    HAL_NVIC_EnableIRQ(TIM1_BRK_TIM9_IRQn);
++    HAL_NVIC_SetPriority(TIM1_TRG_COM_TIM11_IRQn, 5, 0);
++    HAL_NVIC_EnableIRQ(TIM1_TRG_COM_TIM11_IRQn);
++    HAL_NVIC_SetPriority(TIM1_CC_IRQn, 5, 0);
++    HAL_NVIC_EnableIRQ(TIM1_CC_IRQn);
++  /* USER CODE BEGIN TIM1_MspInit 1 */
++
++  /* USER CODE END TIM1_MspInit 1 */
++  }
++
++}
++
+ /**
+ * @brief TIM_Base MSP Initialization
+ * This function configures the hardware resources used in this example
+@@ -710,7 +739,28 @@ void HAL_TIM_Base_MspInit(TIM_HandleTypeDef* htim_base)
+ void HAL_TIM_MspPostInit(TIM_HandleTypeDef* htim)
+ {
+   GPIO_InitTypeDef GPIO_InitStruct = {0};
+-  if(htim->Instance==TIM4)
++  if(htim->Instance==TIM1)
++  {
++  /* USER CODE BEGIN TIM1_MspPostInit 0 */
++
++  /* USER CODE END TIM1_MspPostInit 0 */
++    __HAL_RCC_GPIOE_CLK_ENABLE();
++    /**TIM1 GPIO Configuration
++    PE9     ------> TIM1_CH1
++    PE11     ------> TIM1_CH2
++    */
++    GPIO_InitStruct.Pin = GPIO_PIN_9|GPIO_PIN_11;
++    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
++    GPIO_InitStruct.Pull = GPIO_NOPULL;
++    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
++    GPIO_InitStruct.Alternate = GPIO_AF1_TIM1;
++    HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
++
++  /* USER CODE BEGIN TIM1_MspPostInit 1 */
++
++  /* USER CODE END TIM1_MspPostInit 1 */
++  }
++  else if(htim->Instance==TIM4)
+   {
+   /* USER CODE BEGIN TIM4_MspPostInit 0 */
+ 
+@@ -737,6 +787,33 @@ void HAL_TIM_MspPostInit(TIM_HandleTypeDef* htim)
+ 
+ }
+ 
++/**
++* @brief TIM_PWM MSP De-Initialization
++* This function freeze the hardware resources used in this example
++* @param htim_pwm: TIM_PWM handle pointer
++* @retval None
++*/
++void HAL_TIM_PWM_MspDeInit(TIM_HandleTypeDef* htim_pwm)
++{
++  if(htim_pwm->Instance==TIM1)
++  {
++  /* USER CODE BEGIN TIM1_MspDeInit 0 */
++
++  /* USER CODE END TIM1_MspDeInit 0 */
++    /* Peripheral clock disable */
++    __HAL_RCC_TIM1_CLK_DISABLE();
++
++    /* TIM1 interrupt DeInit */
++    HAL_NVIC_DisableIRQ(TIM1_BRK_TIM9_IRQn);
++    HAL_NVIC_DisableIRQ(TIM1_TRG_COM_TIM11_IRQn);
++    HAL_NVIC_DisableIRQ(TIM1_CC_IRQn);
++  /* USER CODE BEGIN TIM1_MspDeInit 1 */
++
++  /* USER CODE END TIM1_MspDeInit 1 */
++  }
++
++}
++
+ /**
+ * @brief TIM_Base MSP De-Initialization
+ * This function freeze the hardware resources used in this example
+diff --git a/Core/Src/stm32f4xx_hal_timebase_tim.c b/Core/Src/stm32f4xx_hal_timebase_tim.c
+index f2304fb..44dc907 100644
+--- a/Core/Src/stm32f4xx_hal_timebase_tim.c
++++ b/Core/Src/stm32f4xx_hal_timebase_tim.c
+@@ -25,12 +25,12 @@
+ /* Private define ------------------------------------------------------------*/
+ /* Private macro -------------------------------------------------------------*/
+ /* Private variables ---------------------------------------------------------*/
+-TIM_HandleTypeDef        htim1;
++TIM_HandleTypeDef        htim2;
+ /* Private function prototypes -----------------------------------------------*/
+ /* Private functions ---------------------------------------------------------*/
+ 
+ /**
+-  * @brief  This function configures the TIM1 as a time base source.
++  * @brief  This function configures the TIM2 as a time base source.
+   *         The time source is configured  to have 1ms time base with a dedicated
+   *         Tick interrupt priority.
+   * @note   This function is called  automatically at the beginning of program after
+@@ -41,54 +41,63 @@ TIM_HandleTypeDef        htim1;
+ HAL_StatusTypeDef HAL_InitTick(uint32_t TickPriority)
+ {
+   RCC_ClkInitTypeDef    clkconfig;
+-  uint32_t              uwTimclock = 0U;
++  uint32_t              uwTimclock, uwAPB1Prescaler = 0U;
+ 
+   uint32_t              uwPrescalerValue = 0U;
+   uint32_t              pFLatency;
+   HAL_StatusTypeDef     status;
+ 
+-  /* Enable TIM1 clock */
+-  __HAL_RCC_TIM1_CLK_ENABLE();
++  /* Enable TIM2 clock */
++  __HAL_RCC_TIM2_CLK_ENABLE();
+ 
+   /* Get clock configuration */
+   HAL_RCC_GetClockConfig(&clkconfig, &pFLatency);
+ 
+-  /* Compute TIM1 clock */
+-      uwTimclock = 2*HAL_RCC_GetPCLK2Freq();
++  /* Get APB1 prescaler */
++  uwAPB1Prescaler = clkconfig.APB1CLKDivider;
++  /* Compute TIM2 clock */
++  if (uwAPB1Prescaler == RCC_HCLK_DIV1)
++  {
++    uwTimclock = HAL_RCC_GetPCLK1Freq();
++  }
++  else
++  {
++    uwTimclock = 2UL * HAL_RCC_GetPCLK1Freq();
++  }
+ 
+-  /* Compute the prescaler value to have TIM1 counter clock equal to 1MHz */
++  /* Compute the prescaler value to have TIM2 counter clock equal to 1MHz */
+   uwPrescalerValue = (uint32_t) ((uwTimclock / 1000000U) - 1U);
+ 
+-  /* Initialize TIM1 */
+-  htim1.Instance = TIM1;
++  /* Initialize TIM2 */
++  htim2.Instance = TIM2;
+ 
+   /* Initialize TIMx peripheral as follow:
+ 
+-  + Period = [(TIM1CLK/1000) - 1]. to have a (1/1000) s time base.
++  + Period = [(TIM2CLK/1000) - 1]. to have a (1/1000) s time base.
+   + Prescaler = (uwTimclock/1000000 - 1) to have a 1MHz counter clock.
+   + ClockDivision = 0
+   + Counter direction = Up
+   */
+-  htim1.Init.Period = (1000000U / 1000U) - 1U;
+-  htim1.Init.Prescaler = uwPrescalerValue;
+-  htim1.Init.ClockDivision = 0;
+-  htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
+-  htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
++  htim2.Init.Period = (1000000U / 1000U) - 1U;
++  htim2.Init.Prescaler = uwPrescalerValue;
++  htim2.Init.ClockDivision = 0;
++  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
++  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+ 
+-  status = HAL_TIM_Base_Init(&htim1);
++  status = HAL_TIM_Base_Init(&htim2);
+   if (status == HAL_OK)
+   {
+     /* Start the TIM time Base generation in interrupt mode */
+-    status = HAL_TIM_Base_Start_IT(&htim1);
++    status = HAL_TIM_Base_Start_IT(&htim2);
+     if (status == HAL_OK)
+     {
+-    /* Enable the TIM1 global Interrupt */
+-        HAL_NVIC_EnableIRQ(TIM1_UP_TIM10_IRQn);
++    /* Enable the TIM2 global Interrupt */
++        HAL_NVIC_EnableIRQ(TIM2_IRQn);
+       /* Configure the SysTick IRQ priority */
+       if (TickPriority < (1UL << __NVIC_PRIO_BITS))
+       {
+         /* Configure the TIM IRQ priority */
+-        HAL_NVIC_SetPriority(TIM1_UP_TIM10_IRQn, TickPriority, 0U);
++        HAL_NVIC_SetPriority(TIM2_IRQn, TickPriority, 0U);
+         uwTickPrio = TickPriority;
+       }
+       else
+@@ -104,25 +113,25 @@ HAL_StatusTypeDef HAL_InitTick(uint32_t TickPriority)
+ 
+ /**
+   * @brief  Suspend Tick increment.
+-  * @note   Disable the tick increment by disabling TIM1 update interrupt.
++  * @note   Disable the tick increment by disabling TIM2 update interrupt.
+   * @param  None
+   * @retval None
+   */
+ void HAL_SuspendTick(void)
+ {
+-  /* Disable TIM1 update Interrupt */
+-  __HAL_TIM_DISABLE_IT(&htim1, TIM_IT_UPDATE);
++  /* Disable TIM2 update Interrupt */
++  __HAL_TIM_DISABLE_IT(&htim2, TIM_IT_UPDATE);
+ }
+ 
+ /**
+   * @brief  Resume Tick increment.
+-  * @note   Enable the tick increment by Enabling TIM1 update interrupt.
++  * @note   Enable the tick increment by Enabling TIM2 update interrupt.
+   * @param  None
+   * @retval None
+   */
+ void HAL_ResumeTick(void)
+ {
+-  /* Enable TIM1 Update interrupt */
+-  __HAL_TIM_ENABLE_IT(&htim1, TIM_IT_UPDATE);
++  /* Enable TIM2 Update interrupt */
++  __HAL_TIM_ENABLE_IT(&htim2, TIM_IT_UPDATE);
+ }
+ 
+diff --git a/Core/Src/stm32f4xx_it.c b/Core/Src/stm32f4xx_it.c
+index daca7ca..f422ed0 100644
+--- a/Core/Src/stm32f4xx_it.c
++++ b/Core/Src/stm32f4xx_it.c
+@@ -64,15 +64,15 @@ extern DMA_HandleTypeDef hdma_spi1_rx;
+ extern DMA_HandleTypeDef hdma_spi1_tx;
+ extern DMA_HandleTypeDef hdma_spi2_rx;
+ extern DMA_HandleTypeDef hdma_spi2_tx;
+-extern TIM_HandleTypeDef htim4;
+-extern TIM_HandleTypeDef htim5;
+ extern DMA_HandleTypeDef hdma_usart3_rx;
+ extern DMA_HandleTypeDef hdma_uart4_rx;
+ extern DMA_HandleTypeDef hdma_usart6_rx;
+ extern DMA_HandleTypeDef hdma_usart6_tx;
+ extern WWDG_HandleTypeDef hwwdg;
+ extern TIM_HandleTypeDef htim1;
+-
++extern TIM_HandleTypeDef htim2;
++extern TIM_HandleTypeDef htim4;
++extern TIM_HandleTypeDef htim5;
+ /* USER CODE BEGIN EV */
+ 
+ /* USER CODE END EV */
+@@ -306,6 +306,20 @@ void EXTI9_5_IRQHandler(void)
+   /* USER CODE END EXTI9_5_IRQn 1 */
+ }
+ 
++/**
++  * @brief This function handles TIM2 global interrupt.
++  */
++void TIM2_IRQHandler(void)
++{
++  /* USER CODE BEGIN TIM2_IRQn 0 */
++
++  /* USER CODE END TIM2_IRQn 0 */
++  HAL_TIM_IRQHandler(&htim2);
++  /* USER CODE BEGIN TIM2_IRQn 1 */
++
++  /* USER CODE END TIM2_IRQn 1 */
++}
++
+ /**
+   * @brief This function handles TIM4 global interrupt.
+   */
+-- 
+2.25.1
+

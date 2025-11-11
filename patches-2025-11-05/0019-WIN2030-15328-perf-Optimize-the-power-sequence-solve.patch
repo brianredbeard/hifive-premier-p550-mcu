@@ -1,0 +1,296 @@
+From ac695f48444093390ff4c34bb364cbba91c722df Mon Sep 17 00:00:00 2001
+From: xuxiang <xuxiang@eswincomputing.com>
+Date: Fri, 10 May 2024 20:12:59 +0800
+Subject: [PATCH 019/109] WIN2030-15328:perf:Optimize the power sequence,solve
+ the leakage
+
+Changelogs:
+1. Optimize the power-on and power-on sequence
+2. add feature, try to get the power state 10 times if it fails
+3. solve the problem of leakage
+
+Change-Id: I240d75fa117c8e34ab74d0588c82f3b29596e956
+---
+ Core/Src/hf_board_init.c     | 29 ++++++++++++++
+ Core/Src/hf_common.c         |  2 -
+ Core/Src/hf_i2c.c            | 18 ---------
+ Core/Src/hf_power_process.c  | 75 ++++++++++++++++++------------------
+ Core/Src/stm32f4xx_hal_msp.c | 20 +++++++++-
+ 5 files changed, 86 insertions(+), 58 deletions(-)
+
+diff --git a/Core/Src/hf_board_init.c b/Core/Src/hf_board_init.c
+index c144f67..6666072 100644
+--- a/Core/Src/hf_board_init.c
++++ b/Core/Src/hf_board_init.c
+@@ -747,6 +747,35 @@ static void MX_GPIO_Init(void)
+ 	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+ 	HAL_GPIO_Init(SPI2_NSS_GPIO_Port, &GPIO_InitStruct);
+ 
++	/*
++    PB6     ------> I2C1_SCL
++    PB7     ------> I2C1_SDA
++    */
++	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6|GPIO_PIN_7, GPIO_PIN_RESET);
++    GPIO_InitStruct.Pin = GPIO_PIN_6|GPIO_PIN_7;
++    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
++    GPIO_InitStruct.Pull = GPIO_NOPULL;
++    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
++    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
++
++    /**I2C3 GPIO Configuration
++    PC9     ------> I2C3_SDA
++    PA8     ------> I2C3_SCL
++    */
++	HAL_GPIO_WritePin(GPIOC,GPIO_PIN_9, GPIO_PIN_RESET);
++    GPIO_InitStruct.Pin = GPIO_PIN_9;
++    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
++    GPIO_InitStruct.Pull = GPIO_NOPULL;
++    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
++    HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
++
++	HAL_GPIO_WritePin(GPIOA,GPIO_PIN_8, GPIO_PIN_RESET);
++    GPIO_InitStruct.Pin = GPIO_PIN_8;
++    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
++    GPIO_InitStruct.Pull = GPIO_NOPULL;
++    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
++    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
++
+ 	/* EXTI interrupt init*/
+ 	HAL_NVIC_SetPriority(EXTI9_5_IRQn, 5, 0);
+ 	HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+diff --git a/Core/Src/hf_common.c b/Core/Src/hf_common.c
+index 5037241..0bcbc87 100644
+--- a/Core/Src/hf_common.c
++++ b/Core/Src/hf_common.c
+@@ -130,11 +130,9 @@ int _write(int fd, char *ch, int len)
+ void es_eeprom_wp(uint8_t flag)
+ {
+ 	if(flag) {
+-		// printf("eeprom wp enable \n");
+ 		HAL_GPIO_WritePin(EEPROM_WP_GPIO_Port, EEPROM_WP_Pin, GPIO_PIN_SET);
+ 	}
+ 	else {
+-		// printf("eeprom wp disgenable \n");
+ 		HAL_GPIO_WritePin(EEPROM_WP_GPIO_Port, EEPROM_WP_Pin, GPIO_PIN_RESET);
+ 	}
+ }
+diff --git a/Core/Src/hf_i2c.c b/Core/Src/hf_i2c.c
+index 88a5f66..1df2544 100644
+--- a/Core/Src/hf_i2c.c
++++ b/Core/Src/hf_i2c.c
+@@ -99,22 +99,4 @@ int hf_i2c_mem_write(I2C_HandleTypeDef *hi2c, uint8_t slave_addr,
+ 	if (hi2c->Instance == I2C1)
+ 		HAL_GPIO_WritePin(EEPROM_WP_GPIO_Port, EEPROM_WP_Pin, GPIO_PIN_SET);
+ 	return status;
+-}
+-
+-void AT24C_eeprom_rw(void)
+-{
+-	#define AT24C_ADDR (0x50<<1)
+-
+-    #define BufferSize 256
+-    uint8_t WriteBuffer[BufferSize],ReadBuffer[BufferSize];
+-    uint16_t i;
+-    for(i=0; i<BufferSize; i++)
+-      WriteBuffer[i]=i+0xf0;    /* WriteBuffer init */
+-    hf_i2c_mem_write(&hi2c1, AT24C_ADDR,
+-					  0, WriteBuffer, BufferSize);
+-    hf_i2c_mem_read(&hi2c1, AT24C_ADDR,
+-					0, ReadBuffer, BufferSize);
+-    for(i=0; i<BufferSize; i++)
+-      printf("0x%02X  ",ReadBuffer[i]);
+-	printf("read_finash\n");
+ }
+\ No newline at end of file
+diff --git a/Core/Src/hf_power_process.c b/Core/Src/hf_power_process.c
+index 993717b..8070ec1 100644
+--- a/Core/Src/hf_power_process.c
++++ b/Core/Src/hf_power_process.c
+@@ -9,7 +9,7 @@
+ #include "hf_i2c.h"
+ #include "hf_spi_slv.h"
+ /* Private typedef -----------------------------------------------------------*/
+-// #define AUTO_BOOT
++#define AUTO_BOOT
+ /* Private define ------------------------------------------------------------*/
+ #define ATX_POWER_GOOD GPIO_PIN_RESET
+ #define ATX_POWER_FAIL GPIO_PIN_SET
+@@ -30,6 +30,8 @@ static void atx_power_on(uint8_t turnon);
+ static void power_led_on(uint8_t turnon);
+ static int pmic_b6out_105v(void);
+ 
++#define MAXTRYCOUNT		10
++int try_count = 0;
+ void hf_power_task(void *parameter)
+ {
+ 	HAL_StatusTypeDef status = HAL_OK;
+@@ -47,45 +49,44 @@ void hf_power_task(void *parameter)
+ 		case ATX_PS_ON_STATE:
+ 			printf("ATX_PS_ON_STATE\r\n");
+ 			atx_power_on(pdTRUE);
+-			power_state = ATX_PWR_GOOD_STATE;
+-			break;
+-		case ATX_PWR_GOOD_STATE:
+-			printf("ATX_PWR_GOOD_STATE\r\n");
+-			// pin_state = get_atx_power_status();
+-			// if (pin_state == pdTRUE)
+-				power_state = DC_PWR_GOOD_STATE;
++			power_state = DC_PWR_GOOD_STATE;
+ 			break;
+ 		case DC_PWR_GOOD_STATE:
+ 			printf("DC_PWR_GOOD_STATE\r\n");
+-			pin_state = get_dc_power_status();
+-			osDelay(500);
++			try_count = MAXTRYCOUNT;
++			do
++			{
++				pin_state = get_dc_power_status();
++				osDelay(100);
++			} while (pin_state != pdTRUE && try_count--);
++			
++			if(try_count <= 0)
++			{
++				printf("DC_PWR_STATE fail\r\n");
++				power_state = STOP_POWER;
++			}
+ 			if (pin_state == pdTRUE) {
+ 				i2c_init(I2C3);
+-				i2c_init(I2C1);
++				i2c_init(I2C1); // dvb v2 move to board init
+ 				power_state = SOM_STATUS_CHECK_STATE;
+ 			}
+ 			break;
+ 		case SOM_STATUS_CHECK_STATE:
+ 			printf("SOM_STATUS_CHECK_STATE\r\n");
+ 			pmic_power_on(pdTRUE);
+-			osDelay(1000);
+-			// while (1)
++			try_count = MAXTRYCOUNT;
++			do
+ 			{
++				osDelay(200);
+ 				status = pmic_b6out_105v();
+-				// reg_dat = 0x0;
+-				// hf_i2c_reg_read(&hi2c3, PCA9450_ADDR, reg_add, &reg_dat);
+-				// printf("reg_add %x reg_dat %x\n", reg_add, reg_dat);
+-				// reg_add = 0x4;
+-				// reg_dat = 0x0;
+-				// hf_i2c_reg_read(&hi2c3, PCA9450_ADDR, reg_add, &reg_dat);
+-				// printf("reg_add %x reg_dat %x\n", reg_add, reg_dat);
+-				// osDelay(1000);
+-				// printf("status %d\n", status);
++				osDelay(50);
++			}while(pin_state != pdTRUE && try_count--);
++			if(try_count <= 0)
++			{
++				printf("SOM_STATUS_CHECK_STATE fail\r\n");
++				power_state = STOP_POWER;
++				break;
+ 			}
+-			// if (status != HAL_OK) {
+-			// 	power_state = STOP_POWER;
+-			// 	break;
+-			// }
+ 			som_reset_control(pdFALSE);
+ 			SPI2_FLASH_CS_HIGH();
+ 			pmic_status_led_on(pdTRUE);
+@@ -103,9 +104,11 @@ void hf_power_task(void *parameter)
+ 		case STOP_POWER:
+ 			printf("STOP_POWER\r\n");
+ 			i2c_deinit(I2C3);
+-
++			i2c_deinit(I2C1); // dvb v2 move to board init
+ 			pmic_power_on(pdFALSE);
++			osDelay(10);
+ 			atx_power_on(pdFALSE);
++			osDelay(10);
+ 			pmic_status_led_on(pdFALSE);
+ 			power_led_on(pdFALSE);
+ 			som_power_state = SOM_POWER_OFF;
+@@ -239,13 +242,15 @@ static void power_led_on(uint8_t turnon)
+  */
+ static int pmic_b6out_105v(void)
+ {
+-	uint8_t reg_add = 0x1e, reg_dat = 0x12;
+-	return hf_i2c_reg_write(&hi2c3, PCA9450_ADDR, reg_add, &reg_dat);
++	uint8_t reg_add = 0x1e, reg_dat = 0x12, read_dat;
++	hf_i2c_reg_write(&hi2c3, PCA9450_ADDR, reg_add, &reg_dat);
++	hf_i2c_reg_read(&hi2c3, PCA9450_ADDR, reg_add, &read_dat);
++	return (reg_dat == read_dat);
+ }
+ 
+ /**
+- * @brief  power led control.
+- * @param  sel pdTRUE : power led on; pdFALSE : power led off
++ * @brief  eic7700 boot sel.
++ * @param  sel 4'b, bit3:bootsel3 ,bit2:bootsel2; bit1:bootsel2; bit0:bootsel0
+  * @retval None
+  */
+ void bootsel(uint8_t sel)
+@@ -260,14 +265,10 @@ void bootsel(uint8_t sel)
+ 	uint16_t pin_n = BOOT_SEL0_Pin;
+ 	for (int i = 0; i < 4; i++) {
+ 		if (sel & 0x1)
+-			HAL_GPIO_WritePin(BOOT_SEL0_GPIO_Port, BOOT_SEL0_Pin, GPIO_PIN_SET);
++			HAL_GPIO_WritePin(BOOT_SEL0_GPIO_Port, pin_n, GPIO_PIN_SET);
+ 		else
+-			HAL_GPIO_WritePin(BOOT_SEL0_GPIO_Port, BOOT_SEL0_Pin, GPIO_PIN_RESET);
++			HAL_GPIO_WritePin(BOOT_SEL0_GPIO_Port, pin_n, GPIO_PIN_RESET);
+ 		sel = sel >> 1;
+ 		pin_n = pin_n << 1;
+ 	}
+-	// HAL_GPIO_WritePin(BOOT_SEL0_GPIO_Port,BOOT_SEL0_Pin,GPIO_PIN_SET);
+-	// HAL_GPIO_WritePin(BOOT_SEL1_GPIO_Port,BOOT_SEL1_Pin,GPIO_PIN_RESET);
+-	// HAL_GPIO_WritePin(BOOT_SEL2_GPIO_Port,BOOT_SEL2_Pin,GPIO_PIN_RESET);
+-	// HAL_GPIO_WritePin(BOOT_SEL3_GPIO_Port,BOOT_SEL3_Pin,GPIO_PIN_RESET);
+ }
+\ No newline at end of file
+diff --git a/Core/Src/stm32f4xx_hal_msp.c b/Core/Src/stm32f4xx_hal_msp.c
+index 530e2ed..d15b58c 100644
+--- a/Core/Src/stm32f4xx_hal_msp.c
++++ b/Core/Src/stm32f4xx_hal_msp.c
+@@ -260,6 +260,7 @@ void HAL_SMBUS_MspInit(SMBUS_HandleTypeDef* hsmbus)
+ */
+ void HAL_I2C_MspDeInit(I2C_HandleTypeDef* hi2c)
+ {
++	GPIO_InitTypeDef GPIO_InitStruct = {0};
+   if(hi2c->Instance==I2C1)
+   {
+   /* USER CODE BEGIN I2C1_MspDeInit 0 */
+@@ -275,7 +276,12 @@ void HAL_I2C_MspDeInit(I2C_HandleTypeDef* hi2c)
+     HAL_GPIO_DeInit(GPIOB, GPIO_PIN_6);
+ 
+     HAL_GPIO_DeInit(GPIOB, GPIO_PIN_7);
+-
++	  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6|GPIO_PIN_7, GPIO_PIN_RESET);
++    GPIO_InitStruct.Pin = GPIO_PIN_6|GPIO_PIN_7;
++    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
++    GPIO_InitStruct.Pull = GPIO_NOPULL;
++    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
++    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+   /* USER CODE BEGIN I2C1_MspDeInit 1 */
+ 
+   /* USER CODE END I2C1_MspDeInit 1 */
+@@ -295,7 +301,19 @@ void HAL_I2C_MspDeInit(I2C_HandleTypeDef* hi2c)
+     HAL_GPIO_DeInit(GPIOC, GPIO_PIN_9);
+ 
+     HAL_GPIO_DeInit(GPIOA, GPIO_PIN_8);
++	  HAL_GPIO_WritePin(GPIOC,GPIO_PIN_9, GPIO_PIN_RESET);
++    GPIO_InitStruct.Pin = GPIO_PIN_9;
++    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
++    GPIO_InitStruct.Pull = GPIO_NOPULL;
++    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
++    HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+ 
++	  HAL_GPIO_WritePin(GPIOA,GPIO_PIN_8, GPIO_PIN_RESET);
++    GPIO_InitStruct.Pin = GPIO_PIN_8;
++    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
++    GPIO_InitStruct.Pull = GPIO_NOPULL;
++    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
++    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+   /* USER CODE BEGIN I2C3_MspDeInit 1 */
+ 
+   /* USER CODE END I2C3_MspDeInit 1 */
+-- 
+2.25.1
+

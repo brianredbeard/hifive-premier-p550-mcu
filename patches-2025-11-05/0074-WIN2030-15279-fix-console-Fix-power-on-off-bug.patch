@@ -1,0 +1,231 @@
+From 860a1bf89c1a9dd790f9d386a8fb6854b8b43b26 Mon Sep 17 00:00:00 2001
+From: linmin <linmin@eswincomputing.com>
+Date: Fri, 7 Jun 2024 09:41:05 +0800
+Subject: [PATCH 074/109] WIN2030-15279:fix(console):Fix power on/off bug
+
+Changelogs:
+1.Use change_power_status() to power on/off with the command line
+2.Dynamically validate the IP, netmask and gateway settings
+3.Use xSOMRebootHandle() to reboot warm with command line
+
+Change-Id: I9e361923ca367def527968bc3601a82972041e2b
+---
+ Core/Inc/hf_common.h  |  5 +++
+ Core/Src/console.c    | 85 +++++++++++++++++++++++--------------------
+ Core/Src/web-server.c |  4 +-
+ 3 files changed, 53 insertions(+), 41 deletions(-)
+
+diff --git a/Core/Inc/hf_common.h b/Core/Inc/hf_common.h
+index 73bfcfe..0317615 100644
+--- a/Core/Inc/hf_common.h
++++ b/Core/Inc/hf_common.h
+@@ -305,6 +305,7 @@ int es_set_som_dip_switch_soft_state_all(int som_dip_switch_soft_ctl_attr, uint8
+ int es_eeprom_info_test(void);
+ power_switch_t get_som_power_state(void);
+ void change_som_power_state(power_switch_t newState);
++int change_power_status(int status);
+ void vRestartSOM(void);
+ deamon_stats_t get_som_daemon_state(void);
+ void change_som_daemon_state(deamon_stats_t newState);
+@@ -329,9 +330,13 @@ int32_t es_get_rtc_date(struct rtc_date_t *sdate);
+ int32_t es_get_rtc_time(struct rtc_time_t *stime);
+ power_info get_power_info(void);
+ int xSOMRestartHandle(void);
++int xSOMRebootHandle(void);
+ 
+ int es_restore_userdata_to_factory(void);
+ 
++/* Dynamically change eth */
++int32_t es_set_eth(struct ip_t *ip, struct netmask_t *netmask, struct getway_t *gw, struct eth_mac_t *mac);
++
+ #ifdef __cplusplus
+ }
+ #endif
+diff --git a/Core/Src/console.c b/Core/Src/console.c
+index 9d91971..1cbd2e7 100644
+--- a/Core/Src/console.c
++++ b/Core/Src/console.c
+@@ -658,15 +658,26 @@ static BaseType_t prvCommandIPSet(char *pcWriteBuffer, size_t xWriteBufferLen, c
+     uint32_t naddr;
+     const char * pcIPaddr;
+     BaseType_t xParamLen;
++    struct ip_t ip;
+ 
+     pcIPaddr = FreeRTOS_CLIGetParameter(pcCommandString, 1, &xParamLen);
+ 
+-    /* set ipaddr */
++    /* store ipaddr to eeprom*/
+     naddr = ipaddr_addr(pcIPaddr);
+-    es_set_mcu_ipaddr((uint8_t *)&naddr);
++    if(es_set_mcu_ipaddr((uint8_t *)&naddr)) {
++        snprintf(pcWriteBuffer, xWriteBufferLen, "Invalid ip addr %s\r\n", pcIPaddr);
++        goto out;
++    }
+ 
+-    snprintf(pcWriteBuffer, xWriteBufferLen, "ip addr set to %s(0x%lx)\r\n", pcIPaddr, naddr);
++    /* dynamically change ip addr */
++    ip.ip_addr0 = 0xff & naddr;
++    ip.ip_addr1 = 0xff & (naddr >> 8);
++    ip.ip_addr2 = 0xff & (naddr >> 16);
++    ip.ip_addr3 = 0xff & (naddr >> 24);
++    es_set_eth(&ip, NULL, NULL, NULL);
+ 
++    snprintf(pcWriteBuffer, xWriteBufferLen, "ip addr set to %s(0x%lx)\r\n", pcIPaddr, naddr);
++out:
+     return pdFALSE;
+ }
+ 
+@@ -683,15 +694,26 @@ static BaseType_t prvCommandNetMaskSet(char *pcWriteBuffer, size_t xWriteBufferL
+     uint32_t naddr;
+     const char * pcIPaddr;
+     BaseType_t xParamLen;
++    struct netmask_t netmask;
+ 
+     pcIPaddr = FreeRTOS_CLIGetParameter(pcCommandString, 1, &xParamLen);
+ 
+-    /* set ipaddr */
++    /* store netmask to eeprom*/
+     naddr = ipaddr_addr(pcIPaddr);
+-    es_set_mcu_netmask((uint8_t *)&naddr);
++    if (es_set_mcu_netmask((uint8_t *)&naddr)) {
++        snprintf(pcWriteBuffer, xWriteBufferLen, "Invalid netmask addr %s\r\n", pcIPaddr);
++        goto out;
++    }
+ 
+-    snprintf(pcWriteBuffer, xWriteBufferLen, "netmask addr set to %s(0x%lx)\r\n", pcIPaddr, naddr);
++    /* dynamically change netmask */
++    netmask.netmask_addr0 = 0xff & naddr;
++    netmask.netmask_addr0 = 0xff & (naddr >> 8);
++    netmask.netmask_addr0 = 0xff & (naddr >> 16);
++    netmask.netmask_addr0 = 0xff & (naddr >> 24);
++    es_set_eth(NULL, &netmask, NULL, NULL);
+ 
++    snprintf(pcWriteBuffer, xWriteBufferLen, "netmask addr set to %s(0x%lx)\r\n", pcIPaddr, naddr);
++out:
+     return pdFALSE;
+ }
+ 
+@@ -708,15 +730,26 @@ static BaseType_t prvCommandGateWaySet(char *pcWriteBuffer, size_t xWriteBufferL
+     uint32_t naddr;
+     const char * pcIPaddr;
+     BaseType_t xParamLen;
++    struct getway_t gw;
+ 
+     pcIPaddr = FreeRTOS_CLIGetParameter(pcCommandString, 1, &xParamLen);
+ 
+-    /* set ipaddr */
++    /* store gateway to eeprom */
+     naddr = ipaddr_addr(pcIPaddr);
+-    es_set_mcu_gateway((uint8_t *)&naddr);
++    if (es_set_mcu_gateway((uint8_t *)&naddr)) {
++        snprintf(pcWriteBuffer, xWriteBufferLen, "Invalid gateway addr %s\r\n", pcIPaddr);
++        goto out;
++    }
+ 
+-    snprintf(pcWriteBuffer, xWriteBufferLen, "gateway addr set to %s(0x%lx)\r\n", pcIPaddr, naddr);
++    /* dynamically change gateway */
++    gw.getway_addr0 = 0xff & naddr;
++    gw.getway_addr1 = 0xff & (naddr >> 8);
++    gw.getway_addr2 = 0xff & (naddr >> 16);
++    gw.getway_addr3 = 0xff & (naddr >> 24);
++    es_set_eth(NULL, NULL, &gw, NULL);
+ 
++    snprintf(pcWriteBuffer, xWriteBufferLen, "gateway addr set to %s(0x%lx)\r\n", pcIPaddr, naddr);
++out:
+     return pdFALSE;
+ }
+ 
+@@ -743,6 +776,8 @@ static BaseType_t prvCommandMacSet(char *pcWriteBuffer, size_t xWriteBufferLen,
+     snprintf(pcWriteBuffer, xWriteBufferLen, "MAC addr set to %s(%x:%x:%x:%x:%x:%x)\r\n",
+                 pcMACaddr, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+ 
++    printf("The MAC setting will be valid after rebooting the carrier board!!!\n");
++
+     return pdFALSE;
+ }
+ 
+@@ -1055,7 +1090,6 @@ static BaseType_t prvCommandSomPwrStatusGet(char *pcWriteBuffer, size_t xWriteBu
+ */
+ static BaseType_t prvCommandSomPwrStatusSet(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString)
+ {
+-    int ret = 0;
+     const char *cPwrOnOff;
+     BaseType_t xParamLen;
+     uint8_t powerOnOff;
+@@ -1064,25 +1098,7 @@ static BaseType_t prvCommandSomPwrStatusSet(char *pcWriteBuffer, size_t xWriteBu
+     powerOnOff = atoi(cPwrOnOff);
+ 
+     /* change som power */
+-    if (0 == powerOnOff) {
+-        if (SOM_POWER_ON == get_som_power_state()) {
+-            ret = web_cmd_handle(CMD_POWER_OFF, NULL, 0, 2000);
+-            if (HAL_OK != ret) {
+-                change_som_power_state(SOM_POWER_OFF);
+-                printf("Poweroff SOM error(ret %d), force shutdown it!\n", ret);
+-            }
+-            // Trigger the Som timer to enusre SOM could poweroff in 5 senconds
+-            TriggerSomPowerOffTimer();
+-        } else {
+-            printf("SOM already power off!\n");
+-        }
+-    } else {
+-        if (SOM_POWER_OFF == get_som_power_state()) {
+-            change_som_power_state(SOM_POWER_ON);
+-        } else {
+-            printf("SOM already power on!\n");
+-        }
+-    }
++    change_power_status(powerOnOff);
+ 
+     return pdFALSE;
+ }
+@@ -1114,7 +1130,6 @@ static BaseType_t prvCommandSomSwWorkStatusGet(char *pcWriteBuffer, size_t xWrit
+ */
+ static BaseType_t prvCommandReboot(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString)
+ {
+-    int ret = HAL_OK;
+     const char * pcCtlAttr;
+     BaseType_t xParamLen;
+     int ctl_attr;
+@@ -1134,15 +1149,7 @@ static BaseType_t prvCommandReboot(char *pcWriteBuffer, size_t xWriteBufferLen,
+ 
+     if (SOM_POWER_ON == get_som_power_state()) {
+         if (0 == ctl_attr) { // warm reboot
+-        ret = web_cmd_handle(CMD_REBOOT, NULL, 0, 2000);
+-            if (HAL_OK != ret) {
+-                som_reset_control(pdTRUE);
+-                osDelay(10);
+-                som_reset_control(pdFALSE);
+-                printf("Faild to reboot SOM(ret %d), force reset SOM!\n", ret);
+-            }
+-            // Trigger the Som timer to enusre SOM could reboot in 5 senconds
+-            TriggerSomRebootTimer();
++            xSOMRebootHandle();
+         }
+         else { // cold reboot
+             xSOMRestartHandle();
+diff --git a/Core/Src/web-server.c b/Core/Src/web-server.c
+index a75cf2f..37d1b96 100644
+--- a/Core/Src/web-server.c
++++ b/Core/Src/web-server.c
+@@ -10459,7 +10459,7 @@ static int get_power_status()
+ }
+ 
+ //status 0:power off,1:power on
+-static int change_power_status(int status)
++int change_power_status(int status)
+ {
+ 	int ret = 0;
+ 
+@@ -10495,7 +10495,7 @@ int change_power_lost_resume_attr(int status){//status 0:power off,1:power on
+ 	return es_set_som_pwr_lost_resume_attr(status);
+ }
+ 
+-int xSOMRebootHandle()
++int xSOMRebootHandle(void)
+ {
+ 	int ret = HAL_OK;
+ 
+-- 
+2.25.1
+

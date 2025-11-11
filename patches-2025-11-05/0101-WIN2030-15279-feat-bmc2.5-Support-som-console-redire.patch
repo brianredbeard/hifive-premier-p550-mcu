@@ -1,0 +1,2370 @@
+From 4c353ac55c6cae8f986e9b2eeb40430f18da1e59 Mon Sep 17 00:00:00 2001
+From: linmin <linmin@eswincomputing.com>
+Date: Mon, 22 Jul 2024 20:06:24 +0800
+Subject: [PATCH 101/109] WIN2030-15279:feat(bmc2.5):Support som console
+ redirection
+
+Changelogs:
+1.Add telnet_server.c and telnet_som_console.c to support som console output
+  redirection, through UART(default) or Telnet.
+  Usage steps:
+  a: telnet <MCU ipaddr> 23
+  b: Select som console redirection to UART/TELNET via MCU CLI or WEB
+2.Set MEMP_NUM_NETBUF to 4, and MEMP_NUM_NETCONN to 8, so that multi connections
+  (http, and telnet connections) can be handled.
+3.Add "somconsole-s" and "somconsole-g" commands to select/check the som console
+  output redirection.
+4.Increase the configTOTAL_HEAP_SIZE to 36KB, so that there is sufficient memory
+  for all the tasks.
+5.Fix a bug for web-server.c: Do not perform netconn_close(newconn) and
+  netconn_close(newconn) when it was failed with netconn_accept(conn, &newconn);
+6.Change LICENSE statements for the files which is created or modified by ESWIN
+7.Add som console redirection function in web-server.c
+
+Signed-off-by: linmin <linmin@eswincomputing.com>
+Change-Id: I0e1e4d409c7be81f7986fd50cc916a65317ef4f1
+---
+ Core/Inc/FreeRTOSConfig.h                     |   2 +-
+ Core/Inc/hf_common.h                          |  46 +--
+ Core/Inc/hf_crc32.h                           |  29 ++
+ Core/Inc/hf_i2c.h                             |  33 +-
+ Core/Inc/hf_power_process.h                   |  33 +-
+ Core/Inc/hf_spi_slv.h                         |  33 +-
+ Core/Inc/main.h                               |   4 +-
+ Core/Inc/sifive_crc32.h                       |  44 --
+ Core/Inc/stm32f4xx_it.h                       |   1 +
+ Core/Inc/telnet_server.h                      | 107 +++++
+ Core/Inc/telnet_som_console.h                 |  22 +
+ Core/Src/console.c                            |  98 ++++-
+ Core/Src/hf_board_init.c                      |  33 +-
+ Core/Src/hf_common.c                          | 123 +++---
+ Core/Src/{sifive_crc32.c => hf_crc32.c}       |   2 +-
+ Core/Src/hf_gpio_process.c                    |  33 +-
+ Core/Src/hf_http_process.c                    |  44 +-
+ Core/Src/hf_i2c.c                             |  34 +-
+ Core/Src/hf_it_callback.c                     |  33 +-
+ Core/Src/hf_power_process.c                   |  37 +-
+ Core/Src/hf_protocol_process.c                |  37 +-
+ Core/Src/hf_spi_slv.c                         |  33 +-
+ Core/Src/main.c                               |  17 +-
+ Core/Src/telnet_server.c                      | 388 ++++++++++++++++++
+ Core/Src/telnet_som_console.c                 | 131 ++++++
+ Core/Src/web-server.c                         | 211 ++++++++--
+ Core/Src/web-server.h                         |  33 +-
+ Makefile                                      |   4 +-
+ .../Third_Party/LwIP/src/include/lwip/opt.h   |   4 +-
+ 29 files changed, 1183 insertions(+), 466 deletions(-)
+ create mode 100644 Core/Inc/hf_crc32.h
+ delete mode 100644 Core/Inc/sifive_crc32.h
+ create mode 100644 Core/Inc/telnet_server.h
+ create mode 100644 Core/Inc/telnet_som_console.h
+ rename Core/Src/{sifive_crc32.c => hf_crc32.c} (99%)
+ create mode 100644 Core/Src/telnet_server.c
+ create mode 100644 Core/Src/telnet_som_console.c
+
+diff --git a/Core/Inc/FreeRTOSConfig.h b/Core/Inc/FreeRTOSConfig.h
+index a1dee2d..83df28a 100644
+--- a/Core/Inc/FreeRTOSConfig.h
++++ b/Core/Inc/FreeRTOSConfig.h
+@@ -68,7 +68,7 @@
+ #define configTICK_RATE_HZ                       ((TickType_t)1000)
+ #define configMAX_PRIORITIES                     ( 56 )
+ #define configMINIMAL_STACK_SIZE                 ((uint16_t)128)
+-#define configTOTAL_HEAP_SIZE                    ((size_t)(32 * 1024))
++#define configTOTAL_HEAP_SIZE                    ((size_t)(36 * 1024))
+ #define configMAX_TASK_NAME_LEN                  ( 16 )
+ #define configUSE_TRACE_FACILITY                 1
+ #define configUSE_STATS_FORMATTING_FUNCTIONS     1
+diff --git a/Core/Inc/hf_common.h b/Core/Inc/hf_common.h
+index 692bfc0..b016de2 100644
+--- a/Core/Inc/hf_common.h
++++ b/Core/Inc/hf_common.h
+@@ -1,28 +1,13 @@
+-/************************************************************************************
+-* Copyright 2024, Beijing ESWIN Computing Technology Co., Ltd.. All rights reserved.
+-* 
+-* Licensed under the Apache License, Version 2.0 (the "License");
+-* you may not use this file except in compliance with the License.
+-* You may obtain a copy of the License at
+-* 
+-* http://www.apache.org/licenses/LICENSE-2.0
+-* 
+-* Unless required by applicable law or agreed to in writing, software
+-* distributed under the License is distributed on an "AS IS" BASIS,
+-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-* See the License for the specific language governing permissions and
+-* limitations under the License.
+-*************************************************************************************/
+-
+-/************************************************************************************
+-* SPDX-License-Identifier: MIT, Apache
+-* 
+-* Author: linmin@eswincomputing.com
+-* 
+-* File Description: hf_common.h
+-*  Declaration of the cbinfo structure and common api, such as power and
+-   rtc operations.
+-************************************************************************************/
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * Declaration of the cbinfo structure and common api, such as power and rtc
++ * operations.
++ *
++ * Copyright 2024 Beijing ESWIN Computing Technology Co., Ltd.
++ *   Authors:
++ *    LinMin<linmin@eswincomputing.com>
++ *
++ */
+ /* Define to prevent recursive inclusion -------------------------------------*/
+ #ifndef __HF_COMMON_H
+ #define __HF_COMMON_H
+@@ -40,7 +25,7 @@ extern "C" {
+ #include "stm32f4xx_hal.h"
+ #include "task.h"
+ 
+-/* types ------------------------------------------------------------*/
++/* types ---------------------------------------------------------------------*/
+ typedef enum {
+ 	IDLE_STATE,
+ 	ATX_PS_ON_STATE,
+@@ -229,6 +214,7 @@ typedef struct {
+ } DIPSwitchInfo;
+ /* constants --------------------------------------------------------*/
+ extern UART_HandleTypeDef huart3;
++extern UART_HandleTypeDef huart6;
+ 
+ /* macro ------------------------------------------------------------*/
+ #define __ALIGN_KERNEL(x, a) __ALIGN_KERNEL_MASK(x, (typeof(x))(a)-1)
+@@ -314,6 +300,7 @@ A cbinfo	64		0
+ #define CONSOLE_TASK_PRIORITY 1
+ #define CONSOLE_STACK_SIZE 1024 // 3000
+ #define consoleHandle huart3
++#define telnetSomConsoleHandle huart6
+ 
+ #define ES_PRODUCTION_LINE_TEST 0
+ 
+@@ -326,6 +313,9 @@ void es_eeprom_wp(uint8_t flag);
+ void som_reset_control(uint8_t reset);
+ int web_cmd_handle(CommandType cmd, void *data, int data_len, uint32_t timeout);
+ 
++void eth_get_address(void);
++
++/* eeprom APIs */
+ int es_init_info_in_eeprom(void);
+ 
+ int es_get_carrier_borad_info(CarrierBoardInfo *pCarrier_board_info);
+@@ -361,6 +351,10 @@ int es_set_som_dip_switch_soft_state(uint8_t som_dip_switch_soft_state);
+ int es_get_som_dip_switch_soft_state_all(int *p_som_dip_switch_soft_ctl_attr, uint8_t *p_som_dip_switch_soft_state);
+ int es_set_som_dip_switch_soft_state_all(int som_dip_switch_soft_ctl_attr, uint8_t som_dip_switch_soft_state);
+ 
++int es_get_som_console_cfg(int *p_som_console_cfg);
++int es_set_som_console_cfg(int som_console_cfg);
++
++
+ int es_eeprom_info_test(void);
+ power_switch_t get_som_power_state(void);
+ void change_som_power_state(power_switch_t newState);
+diff --git a/Core/Inc/hf_crc32.h b/Core/Inc/hf_crc32.h
+new file mode 100644
+index 0000000..5e92441
+--- /dev/null
++++ b/Core/Inc/hf_crc32.h
+@@ -0,0 +1,29 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * Declaration of the crc32 API
++ *
++ * Copyright 2024 Beijing ESWIN Computing Technology Co., Ltd.
++ *   Authors:
++ *    LinMin<linmin@eswincomputing.com>
++ *
++ */
++/* Define to prevent recursive inclusion -------------------------------------*/
++#ifndef __HF_CRC32_H
++#define __HF_CRC32_H
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++/* Includes ------------------------------------------------------------------*/
++#include <stdio.h>
++
++/* types ------------------------------------------------------------*/
++
++uint32_t hf_crc32(const uint8_t *p, uint32_t len);
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif /* __HF_COMMON_H */
+diff --git a/Core/Inc/hf_i2c.h b/Core/Inc/hf_i2c.h
+index 7a80df1..4049b42 100644
+--- a/Core/Inc/hf_i2c.h
++++ b/Core/Inc/hf_i2c.h
+@@ -1,27 +1,12 @@
+-/************************************************************************************
+-* Copyright 2024, Beijing ESWIN Computing Technology Co., Ltd.. All rights reserved.
+-* 
+-* Licensed under the Apache License, Version 2.0 (the "License");
+-* you may not use this file except in compliance with the License.
+-* You may obtain a copy of the License at
+-* 
+-* http://www.apache.org/licenses/LICENSE-2.0
+-* 
+-* Unless required by applicable law or agreed to in writing, software
+-* distributed under the License is distributed on an "AS IS" BASIS,
+-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-* See the License for the specific language governing permissions and
+-* limitations under the License.
+-*************************************************************************************/
+-
+-/************************************************************************************
+-* SPDX-License-Identifier: MIT, Apache
+-* 
+-* Author: xuxiang@eswincomputing.com
+-* 
+-* File Description: hf_i2c.h
+-*  Header file for the hf_i2c.c
+-************************************************************************************/
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * Header file for the hf_i2c.c
++ *
++ * Copyright 2024 Beijing ESWIN Computing Technology Co., Ltd.
++ *   Authors:
++ *    XuXiang<xuxiang@eswincomputing.com>
++ *
++ */
+ /* Define to prevent recursive inclusion -------------------------------------*/
+ #ifndef __HF_I2C_H
+ #define __HF_I2C_H
+diff --git a/Core/Inc/hf_power_process.h b/Core/Inc/hf_power_process.h
+index 15b24e6..2dc58b3 100644
+--- a/Core/Inc/hf_power_process.h
++++ b/Core/Inc/hf_power_process.h
+@@ -1,27 +1,12 @@
+-/************************************************************************************
+-* Copyright 2024, Beijing ESWIN Computing Technology Co., Ltd.. All rights reserved.
+-* 
+-* Licensed under the Apache License, Version 2.0 (the "License");
+-* you may not use this file except in compliance with the License.
+-* You may obtain a copy of the License at
+-* 
+-* http://www.apache.org/licenses/LICENSE-2.0
+-* 
+-* Unless required by applicable law or agreed to in writing, software
+-* distributed under the License is distributed on an "AS IS" BASIS,
+-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-* See the License for the specific language governing permissions and
+-* limitations under the License.
+-*************************************************************************************/
+-
+-/************************************************************************************
+-* SPDX-License-Identifier: MIT, Apache
+-* 
+-* Author: xuxiang@eswincomputing.com
+-* 
+-* File Description: hf_power_process.h
+-*  Header file for the hf_power_process.c
+-************************************************************************************/
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * Header file for the hf_power_process.c
++ *
++ * Copyright 2024 Beijing ESWIN Computing Technology Co., Ltd.
++ *   Authors:
++ *    XuXiang<xuxiang@eswincomputing.com>
++ *
++ */
+ #ifndef __HF_POWER_PROCESS_H
+ #define __HF_POWER_PROCESS_H
+ 
+diff --git a/Core/Inc/hf_spi_slv.h b/Core/Inc/hf_spi_slv.h
+index d4c6fda..0ef5329 100644
+--- a/Core/Inc/hf_spi_slv.h
++++ b/Core/Inc/hf_spi_slv.h
+@@ -1,27 +1,12 @@
+-/************************************************************************************
+-* Copyright 2024, Beijing ESWIN Computing Technology Co., Ltd.. All rights reserved.
+-* 
+-* Licensed under the Apache License, Version 2.0 (the "License");
+-* you may not use this file except in compliance with the License.
+-* You may obtain a copy of the License at
+-* 
+-* http://www.apache.org/licenses/LICENSE-2.0
+-* 
+-* Unless required by applicable law or agreed to in writing, software
+-* distributed under the License is distributed on an "AS IS" BASIS,
+-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-* See the License for the specific language governing permissions and
+-* limitations under the License.
+-*************************************************************************************/
+-
+-/************************************************************************************
+-* SPDX-License-Identifier: MIT, Apache
+-* 
+-* Author: xuxiang@eswincomputing.com
+-* 
+-* File Description: hf_spi_slv.h
+-*  Header file for the hf_spi_slv.c
+-************************************************************************************/
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * Header file for the hf_spi_slv.c
++ *
++ * Copyright 2024 Beijing ESWIN Computing Technology Co., Ltd.
++ *   Authors:
++ *   XuXiang<xuxiang@eswincomputing.com>
++ *
++ */
+ #ifndef __HF_SPI_SLV_H
+ #define __HF_SPI_SLV_H
+ 
+diff --git a/Core/Inc/main.h b/Core/Inc/main.h
+index ca31130..99e4752 100644
+--- a/Core/Inc/main.h
++++ b/Core/Inc/main.h
+@@ -14,6 +14,9 @@
+   * in the root directory of this software component.
+   * If no LICENSE file comes with this software, it is provided AS-IS.
+   *
++  * Copyright 2024 Beijing ESWIN Computing Technology Co., Ltd.
++  *   Authors:
++  *   XuXiang<xuxiang@eswincomputing.com>
+   ******************************************************************************
+   */
+ /* USER CODE END Header */
+@@ -50,7 +53,6 @@ extern TIM_HandleTypeDef htim4;
+ extern TIM_HandleTypeDef htim9;
+ extern TIM_HandleTypeDef htim12;
+ extern UART_HandleTypeDef huart4;
+-extern UART_HandleTypeDef huart6;
+ extern WWDG_HandleTypeDef hwwdg;
+ extern IWDG_HandleTypeDef hiwdg;
+ 
+diff --git a/Core/Inc/sifive_crc32.h b/Core/Inc/sifive_crc32.h
+deleted file mode 100644
+index a1dc213..0000000
+--- a/Core/Inc/sifive_crc32.h
++++ /dev/null
+@@ -1,44 +0,0 @@
+-/************************************************************************************
+-* Copyright 2024, Beijing ESWIN Computing Technology Co., Ltd.. All rights reserved.
+-* 
+-* Licensed under the Apache License, Version 2.0 (the "License");
+-* you may not use this file except in compliance with the License.
+-* You may obtain a copy of the License at
+-* 
+-* http://www.apache.org/licenses/LICENSE-2.0
+-* 
+-* Unless required by applicable law or agreed to in writing, software
+-* distributed under the License is distributed on an "AS IS" BASIS,
+-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-* See the License for the specific language governing permissions and
+-* limitations under the License.
+-*************************************************************************************/
+-
+-/************************************************************************************
+-* SPDX-License-Identifier: MIT, Apache
+-* 
+-* Author: linmin@eswincomputing.com
+-* 
+-* File Description: sifive_crc32.h
+-*  Declaration of the crc32 API
+-************************************************************************************/
+-/* Define to prevent recursive inclusion -------------------------------------*/
+-#ifndef __STM32_CRC32_H
+-#define __STM32_CRC32_H
+-
+-#ifdef __cplusplus
+-extern "C" {
+-#endif
+-
+-/* Includes ------------------------------------------------------------------*/
+-#include <stdio.h>
+-
+-/* types ------------------------------------------------------------*/
+-
+-uint32_t sifive_crc32(const uint8_t *p, uint32_t len);
+-
+-#ifdef __cplusplus
+-}
+-#endif
+-
+-#endif /* __HF_COMMON_H */
+diff --git a/Core/Inc/stm32f4xx_it.h b/Core/Inc/stm32f4xx_it.h
+index 5af1298..503ee03 100644
+--- a/Core/Inc/stm32f4xx_it.h
++++ b/Core/Inc/stm32f4xx_it.h
+@@ -70,6 +70,7 @@ void DMA2_Stream3_IRQHandler(void);
+ void DMA2_Stream6_IRQHandler(void);
+ void ETH_IRQHandler(void);
+ void ETH_WKUP_IRQHandler(void);
++void USART6_IRQHandler(void);
+ /* USER CODE BEGIN EFP */
+ 
+ /* USER CODE END EFP */
+diff --git a/Core/Inc/telnet_server.h b/Core/Inc/telnet_server.h
+new file mode 100644
+index 0000000..d2e02af
+--- /dev/null
++++ b/Core/Inc/telnet_server.h
+@@ -0,0 +1,107 @@
++/*
++ * MIT License
++ * 
++ * Copyright (c) 2022 André Cascadan and Bruno Augusto Casu
++ * 
++ * Permission is hereby granted, free of charge, to any person obtaining a copy
++ * of this software and associated documentation files (the "Software"), to deal
++ * in the Software without restriction, including without limitation the rights
++ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
++ * copies of the Software, and to permit persons to whom the Software is
++ * furnished to do so, subject to the following conditions:
++ * 
++ * The above copyright notice and this permission notice shall be included in all
++ * copies or substantial portions of the Software.
++ * 
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
++ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
++ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
++ * SOFTWARE.
++ * 
++ * 
++ * This file is part of the lwIP based telnet server.
++ *
++ */
++
++/* 1 TAB = 4 Spaces */
++
++#ifndef __TELNET_H__
++#define __TELNET_H__
++
++
++#include "FreeRTOS.h"
++#include "stream_buffer.h"
++
++// LwIP includes
++#include "lwip/api.h"
++
++#include "semphr.h"
++
++#define TELNET_BUFF_SIZE 1024
++
++
++typedef struct
++{
++	// Port do be listened in this telnet connection
++	uint16_t tcp_port;
++
++	void (*receiver_callback)( uint8_t* buff, uint16_t len );
++	void (*command_callback) ( uint8_t* cmd,  uint16_t len );
++
++	osThreadId_t wrt_task_handle;
++	osThreadId_t rcv_task_handle;
++
++	// Output buffer
++	uint8_t*          buff;
++	SemaphoreHandle_t buff_mutex;
++	uint16_t          buff_count;
++
++	uint8_t cmd_buff[10];
++	uint16_t cmd_len;
++
++	struct netconn *conn;
++	struct netconn *newconn;
++
++	enum
++	{
++		 TELNET_CONN_STATUS_NONE = 0,
++		 TELNET_CONN_STATUS_ACCEPTING,
++		 TELNET_CONN_STATUS_CONNECTED,
++		 TELNET_CONN_STATUS_CLOSING
++	} status;
++
++
++} telnet_t;
++
++
++/**
++ * @brief Create a new instance of telnet server in a defined TCP port
++ * 
++ * @param instance           Pointer to the telnet connection handler
++ * @param port               Number of the TCP connection Port
++ * @param receiver_callback  Pointer to the receiver callback function.
++ * @param command_callback   Exclusive callback to receive the telnet commands from client.
++ *                           If defined as NULL commands will be sent to "receiver_callback".
++ *                           In this case, user is responsible to filter commands form
++ *                           characters.
++ */
++void telnet_create( uint16_t port,
++                    void (*receiver_callback)( uint8_t* buff, uint16_t len ),
++                    void (*command_callback) ( uint8_t* cmd,  uint16_t len )  );
++
++
++/**
++ * @brief Sends data  to the client.
++ * 
++ * returns: the amount of bytes actually received by the driver.
++ *
++ * This functions can be user to send characters or telnet commands.
++ */
++uint16_t telnet_transmit(uint8_t* data, uint16_t len);
++
++
++
++#endif /* __TELNET_H__ */
+diff --git a/Core/Inc/telnet_som_console.h b/Core/Inc/telnet_som_console.h
+new file mode 100644
+index 0000000..9784c4e
+--- /dev/null
++++ b/Core/Inc/telnet_som_console.h
+@@ -0,0 +1,22 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * Declaration of the crc32 API
++ *
++ * Copyright 2024 Beijing ESWIN Computing Technology Co., Ltd.
++ *   Authors:
++ *    LinMin<linmin@eswincomputing.com>
++ *
++ */
++/* Define to prevent recursive inclusion -------------------------------------*/
++#ifndef __TELNET_SOM_CONSOLE_H
++#define __TELNET_SOM_CONSOLE_H
++
++extern char cTelSomConcRxData;
++extern QueueHandle_t telSomConQueueRxHandle;
++extern UART_HandleTypeDef *pTelSomConUartDevHandle;
++
++void telenet_receiver_callback(uint8_t* buff, uint16_t len );
++void telSomConsEnableRxInterrupt(void);
++BaseType_t telnetSomConsoleInit(uint16_t usStackSize, UBaseType_t uxPriority, UART_HandleTypeDef *pxUartHandle);
++
++#endif
+diff --git a/Core/Src/console.c b/Core/Src/console.c
+index ec7cbb5..db5a5ba 100644
+--- a/Core/Src/console.c
++++ b/Core/Src/console.c
+@@ -1,10 +1,14 @@
+ 
+-/**
+- ******************************************************************************
+- * @file         console.c
+- * @author       Aaron Escoboza, Github account: https://github.com/aaron-ev
+- * @brief        Command Line Interpreter based on FreeRTOS and STM32 HAL layer
+- ******************************************************************************
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * console.c
++ * Command Line Interpreter based on FreeRTOS and STM32 HAL layer
++ * Originally from:Aaron Escoboza, Github account: https://github.com/aaron-ev
++ *
++ * Copyright 2024 Beijing ESWIN Computing Technology Co., Ltd.
++ *   Authors:
++ *    LinMin<linmin@eswincomputing.com>
++ *
+  */
+ #include "lwip/opt.h"
+ #include "lwip/arch.h"
+@@ -23,6 +27,7 @@
+ #include "web-server.h"
+ #include "hf_power_process.h"
+ #include "hf_spi_slv.h"
++#include "telnet_som_console.h"
+ 
+ #define CONSOLE_VERSION_MAJOR                   1
+ #define CONSOLE_VERSION_MINOR                   0
+@@ -112,6 +117,11 @@ static BaseType_t prvCommandSomPwrLastStateGet(char *pcWriteBuffer, size_t xWrit
+ // eeprom write protect pin set
+ static BaseType_t prvCommandCBWpEEPROM(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString);
+ 
++// get the som console configuration: UART or Telnet
++static BaseType_t prvCommandSomConsoleGet(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString);
++// set the som console: via UART or via Telnet
++static BaseType_t prvCommandSomConsoleSet(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString);
++
+ /**
+ *   @brief  This function is executed in case of error occurrence.
+ *   @retval None
+@@ -175,19 +185,19 @@ static const CLI_Command_Definition_t xCommands[] =
+     },
+     {
+         "setip",
+-        "\r\nsetip <ipaddrr>: Set ip address.\r\n",
++        "\r\nsetip <ipaddr>: Set ip address.\r\n",
+         prvCommandIPSet,
+         1
+     },
+     {
+         "setmask",
+-        "\r\nsetmask <netmask>: Set netmask address.\r\n",
++        "\r\nsetmask <ipaddr>: Set netmask address.\r\n",
+         prvCommandNetMaskSet,
+         1
+     },
+     {
+         "setgateway",
+-        "\r\nsetgateway <netmask>: Set gateway address.\r\n",
++        "\r\nsetgateway <ipaddr>: Set gateway address.\r\n",
+         prvCommandGateWaySet,
+         1
+     },
+@@ -299,6 +309,18 @@ static const CLI_Command_Definition_t xCommands[] =
+         prvCommandCBWpEEPROM,
+         1
+     },
++    {
++        "somconsole-g",
++        "\r\nsomconsole-g: Get the som console configuration. UART or Telnet\r\n",
++        prvCommandSomConsoleGet,
++        0
++    },
++    {
++        "somconsole-s",
++        "\r\nsomconsole-s: Set the som console configuration. 0(via UART), 1(via Telnet).\r\n",
++        prvCommandSomConsoleSet,
++        1
++    },
+     {
+        "echo",
+        "\r\necho <string to echo>\r\n",
+@@ -1377,6 +1399,45 @@ static BaseType_t prvCommandCBWpEEPROM(char *pcWriteBuffer, size_t xWriteBufferL
+     return pdFALSE;
+ }
+ 
++/**
++* @brief Get the som console setting: uart or telnet
++* @param *pcWriteBuffer FreeRTOS CLI write buffer.
++* @param xWriteBufferLen Length of write buffer.
++* @param *pcCommandString pointer to the command name.
++* @retval FreeRTOS status
++*/
++static BaseType_t prvCommandSomConsoleGet(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString)
++{
++    int somConsoleCfg = 0;
++
++    es_get_som_console_cfg(&somConsoleCfg);
++    snprintf(pcWriteBuffer, xWriteBufferLen, "Som Console: %s\n", (somConsoleCfg == 0)?"UART":"Telnet");
++
++    return pdFALSE;
++}
++
++/**
++* @brief Set the som som console: uart or telnet
++* @param *pcWriteBuffer FreeRTOS CLI write buffer.
++* @param xWriteBufferLen Length of write buffer.
++* @param *pcCommandString pointer to the command name.
++* @retval FreeRTOS status
++*/
++static BaseType_t prvCommandSomConsoleSet(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString)
++{
++    const char *cSomConCfg;
++    BaseType_t xParamLen;
++    int somConsoleCfg;
++
++    cSomConCfg = FreeRTOS_CLIGetParameter(pcCommandString, 1, &xParamLen);
++    somConsoleCfg = atoi(cSomConCfg);
++
++    /* set som console */
++    es_set_som_console_cfg(somConsoleCfg);
++
++    return pdFALSE;
++}
++
+ /**
+ * @brief Reads from UART RX buffer. Reads one bye at the time.
+ * @param *cReadChar pointer to where data will be stored.
+@@ -1582,10 +1643,21 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+ {
+     BaseType_t pxHigherPriorityTaskWoken = pdFALSE;
+ 
+-    if (xQueueRxHandle != NULL)
+-    {
+-        xQueueSendToBackFromISR(xQueueRxHandle, &cRxData, &pxHigherPriorityTaskWoken);
++    if (huart == pxUartDevHandle) {
++        if (xQueueRxHandle != NULL)
++        {
++            xQueueSendToBackFromISR(xQueueRxHandle, &cRxData, &pxHigherPriorityTaskWoken);
++        }
++        vConsoleEnableRxInterrupt();
+     }
+-    vConsoleEnableRxInterrupt();
++    #if 1
++    else if (huart == pTelSomConUartDevHandle) {
++        if (telSomConQueueRxHandle != NULL)
++        {
++            xQueueSendToBackFromISR(telSomConQueueRxHandle, &cTelSomConcRxData, &pxHigherPriorityTaskWoken);
++        }
++        telSomConsEnableRxInterrupt();
++    }
++    #endif
+ }
+ #endif
+\ No newline at end of file
+diff --git a/Core/Src/hf_board_init.c b/Core/Src/hf_board_init.c
+index a6575ba..23a220b 100644
+--- a/Core/Src/hf_board_init.c
++++ b/Core/Src/hf_board_init.c
+@@ -1,27 +1,12 @@
+-/************************************************************************************
+-* Copyright 2024, Beijing ESWIN Computing Technology Co., Ltd.. All rights reserved.
+-* 
+-* Licensed under the Apache License, Version 2.0 (the "License");
+-* you may not use this file except in compliance with the License.
+-* You may obtain a copy of the License at
+-* 
+-* http://www.apache.org/licenses/LICENSE-2.0
+-* 
+-* Unless required by applicable law or agreed to in writing, software
+-* distributed under the License is distributed on an "AS IS" BASIS,
+-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-* See the License for the specific language governing permissions and
+-* limitations under the License.
+-*************************************************************************************/
+-
+-/************************************************************************************
+-* SPDX-License-Identifier: MIT, Apache
+-* 
+-* Author: xuxiang@eswincomputing.com
+-* 
+-* File Description: hf_board_init.c
+-*  The hardware initialization functions
+-************************************************************************************/
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * The hardware initialization functions
++ *
++ * Copyright 2024 Beijing ESWIN Computing Technology Co., Ltd.
++ *   Authors:
++ *    XuXiang<xuxiang@eswincomputing.com>
++ *
++ */
+ /* Includes ------------------------------------------------------------------*/
+ #include <stdio.h>
+ 
+diff --git a/Core/Src/hf_common.c b/Core/Src/hf_common.c
+index 3a4b056..d7c0b06 100644
+--- a/Core/Src/hf_common.c
++++ b/Core/Src/hf_common.c
+@@ -1,33 +1,18 @@
+-/************************************************************************************
+-* Copyright 2024, Beijing ESWIN Computing Technology Co., Ltd.. All rights reserved.
+-* 
+-* Licensed under the Apache License, Version 2.0 (the "License");
+-* you may not use this file except in compliance with the License.
+-* You may obtain a copy of the License at
+-* 
+-* http://www.apache.org/licenses/LICENSE-2.0
+-* 
+-* Unless required by applicable law or agreed to in writing, software
+-* distributed under the License is distributed on an "AS IS" BASIS,
+-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-* See the License for the specific language governing permissions and
+-* limitations under the License.
+-*************************************************************************************/
+-
+-/************************************************************************************
+-* SPDX-License-Identifier: MIT, Apache
+-* 
+-* Author: linmin@eswincomputing.com
+-* 
+-* File Description: hf_common.c
+-*  operation on the information stored in the eeprom
+-************************************************************************************/
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * operation on the information stored in the eeprom
++ *
++ * Copyright 2024 Beijing ESWIN Computing Technology Co., Ltd.
++ *   Authors:
++ *    LinMin<linmin@eswincomputing.com>
++ *
++ */
+ /* Includes ------------------------------------------------------------------*/
+ #include <stdlib.h>
+ #include <string.h>
+ #include "lwip.h"
+ #include "hf_common.h"
+-#include "sifive_crc32.h"
++#include "hf_crc32.h"
+ 
+ #include "cmsis_os.h"
+ #include "semphr.h"
+@@ -59,6 +44,8 @@ static MCUServerInfo gMCU_Server_Info;
+ static SomPwrMgtDIPInfo gSOM_PwgMgtDIP_Info;
+ static SemaphoreHandle_t gEEPROM_Mutex;
+ 
++static int gSOM_ConsoleCfg = 0; //0: The default console of SOM is uart; 1: Telnet SOM Console
++
+ /* function prototypes -----------------------------------------------*/
+ #if EEPROM_TEST_DEBUG
+ #define PRIME_SEED_A	0x7091 // 29917
+@@ -273,7 +260,7 @@ static int restore_cbinfo_to_factory(CarrierBoardInfo *pCarrier_Board_Info)
+ 	pCarrier_Board_Info->ethernetMAC3[4] = MAC_ADDR4;
+ 	pCarrier_Board_Info->ethernetMAC3[5] = MAC_ADDR5;
+ 
+-	pCarrier_Board_Info->crc32Checksum = sifive_crc32((uint8_t *)pCarrier_Board_Info, sizeof(CarrierBoardInfo) - 4);
++	pCarrier_Board_Info->crc32Checksum = hf_crc32((uint8_t *)pCarrier_Board_Info, sizeof(CarrierBoardInfo) - 4);
+ #if 0
+ 	/* write to main partition */
+ 	write_cbinfo(pCarrier_Board_Info, cbinfo_main);
+@@ -331,7 +318,7 @@ static int get_carrier_board_info(void)
+ 	print_cbinfo(&gCarrier_Board_Info);
+ 	print_data((uint8_t *)&gCarrier_Board_Info, sizeof(CarrierBoardInfo));
+ 	/* calculate crc32 checksum of main partition */
+-	crc32Checksum = sifive_crc32((uint8_t *)&gCarrier_Board_Info, sizeof(CarrierBoardInfo) - 4);
++	crc32Checksum = hf_crc32((uint8_t *)&gCarrier_Board_Info, sizeof(CarrierBoardInfo) - 4);
+ 	if (crc32Checksum != gCarrier_Board_Info.crc32Checksum) { //main partition is bad
+ 		printf("Bad main checksum,0x%lx is NOT equal to calculated value:0x%lx\n", gCarrier_Board_Info.crc32Checksum, crc32Checksum);
+ 		eeprom_debug("%s:%d\n", __func__, __LINE__);
+@@ -342,7 +329,7 @@ static int get_carrier_board_info(void)
+ 			return -1;
+ 		}
+ 
+-		crc32Checksum = sifive_crc32((uint8_t *)&gCarrier_Board_Info, sizeof(CarrierBoardInfo) - 4);
++		crc32Checksum = hf_crc32((uint8_t *)&gCarrier_Board_Info, sizeof(CarrierBoardInfo) - 4);
+ 		if (crc32Checksum != gCarrier_Board_Info.crc32Checksum) { // backup patition is also bad
+ 			/* restore to factory settings */
+ 			printf("Bad backup checksum,0x%lx is NOT equal to calculated value:0x%lx\n", gCarrier_Board_Info.crc32Checksum, crc32Checksum);
+@@ -362,7 +349,7 @@ static int get_carrier_board_info(void)
+ 			return -1;
+ 		}
+ 		print_cbinfo(&CbinfoBackup);
+-		crc32Checksum = sifive_crc32((uint8_t *)&CbinfoBackup, sizeof(CarrierBoardInfo) - 4);
++		crc32Checksum = hf_crc32((uint8_t *)&CbinfoBackup, sizeof(CarrierBoardInfo) - 4);
+ 		if (crc32Checksum != CbinfoBackup.crc32Checksum) {
+ 			/* recover the backup partition with the main value */
+ 			printf("Bad backup checksum,0x%lx is NOT equal to calculated value:0x%lx\n", CbinfoBackup.crc32Checksum, crc32Checksum);
+@@ -392,7 +379,7 @@ static int get_mcu_server_info(void)
+ 	}
+ 	eeprom_debug("print MCUServerInfo:\n");
+ 	print_data((uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo));
+-	crc32Checksum = sifive_crc32((uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo) - 4);
++	crc32Checksum = hf_crc32((uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo) - 4);
+ 
+ 	if (crc32Checksum != gMCU_Server_Info.crc32Checksum) {
+ 		skip_update_eeprom = 0;
+@@ -417,7 +404,7 @@ static int get_mcu_server_info(void)
+ 		gMCU_Server_Info.gateway_address[2] = GATEWAY_ADDR2;
+ 		gMCU_Server_Info.gateway_address[3] = GATEWAY_ADDR3;
+ 
+-		gMCU_Server_Info.crc32Checksum = sifive_crc32((uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo) - 4);
++		gMCU_Server_Info.crc32Checksum = hf_crc32((uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo) - 4);
+ 		printf("Invalid checksum of mcu server info, update it with default value!\n");
+ 	}
+ 
+@@ -454,7 +441,7 @@ static int get_som_pwrmgt_dip_info(void)
+ 		return -1;
+ 	}
+ 
+-	crc32Checksum = sifive_crc32((uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(gSOM_PwgMgtDIP_Info) - 4);
++	crc32Checksum = hf_crc32((uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(gSOM_PwgMgtDIP_Info) - 4);
+ 
+ 	if (crc32Checksum != gSOM_PwgMgtDIP_Info.crc32Checksum) {
+ 		printf("Invalid checksum of SomPwrMgtDIPInfo, init with default value!!!\n");
+@@ -463,7 +450,7 @@ static int get_som_pwrmgt_dip_info(void)
+ 		gSOM_PwgMgtDIP_Info.som_pwr_last_state = SOM_PWR_LAST_STATE_OFF;
+ 		gSOM_PwgMgtDIP_Info.som_dip_switch_soft_ctl_attr = SOM_DIP_SWITCH_SOFT_CTL_DISABLE;
+ 		gSOM_PwgMgtDIP_Info.som_dip_switch_soft_state = SOM_DIP_SWITCH_STATE_EMMC;
+-		gSOM_PwgMgtDIP_Info.crc32Checksum = sifive_crc32((uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(gSOM_PwgMgtDIP_Info) - 4);
++		gSOM_PwgMgtDIP_Info.crc32Checksum = hf_crc32((uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(gSOM_PwgMgtDIP_Info) - 4);
+ 	}
+ 
+ 	if (skip_update_eeprom == 0) {
+@@ -544,7 +531,7 @@ int es_set_carrier_borad_info(CarrierBoardInfo *pCarrier_Board_Info)
+ 	if (NULL == pCarrier_Board_Info)
+ 		return -1;
+ 
+-	pCarrier_Board_Info->crc32Checksum = sifive_crc32((uint8_t *)pCarrier_Board_Info, sizeof(CarrierBoardInfo) - 4);
++	pCarrier_Board_Info->crc32Checksum = hf_crc32((uint8_t *)pCarrier_Board_Info, sizeof(CarrierBoardInfo) - 4);
+ 
+ 	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
+ 	if (0 != memcmp(pCarrier_Board_Info, &gCarrier_Board_Info, sizeof(CarrierBoardInfo))) {
+@@ -637,7 +624,7 @@ int es_set_mcu_mac(uint8_t *p_mac_address, uint8_t index)
+ 			break;
+ 	}
+ 	if (update_mac) {
+-		gCarrier_Board_Info.crc32Checksum = sifive_crc32((uint8_t *)&gCarrier_Board_Info, sizeof(CarrierBoardInfo) - 4);
++		gCarrier_Board_Info.crc32Checksum = hf_crc32((uint8_t *)&gCarrier_Board_Info, sizeof(CarrierBoardInfo) - 4);
+ 
+ 		hf_i2c_mem_write(&hi2c1, AT24C_ADDR, CARRIER_BOARD_INFO_EEPROM_MAIN_OFFSET,
+ 					(uint8_t *)&gCarrier_Board_Info, sizeof(CarrierBoardInfo));
+@@ -675,7 +662,7 @@ int es_set_mcu_ipaddr(uint8_t *p_ip_address)
+ 	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
+ 	if (0 != memcmp(gMCU_Server_Info.ip_address, p_ip_address, sizeof(gMCU_Server_Info.ip_address))) {
+ 		memcpy(gMCU_Server_Info.ip_address, p_ip_address, sizeof(gMCU_Server_Info.ip_address));
+-		gMCU_Server_Info.crc32Checksum = sifive_crc32((uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo) - 4);
++		gMCU_Server_Info.crc32Checksum = hf_crc32((uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo) - 4);
+ 		hf_i2c_mem_write(&hi2c1, AT24C_ADDR, MCU_SERVER_INFO_EEPROM_OFFSET,
+ 			(uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo));
+ 	}
+@@ -712,7 +699,7 @@ int es_set_mcu_netmask(uint8_t *p_netmask_address)
+ 	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
+ 	if (0 != memcmp(gMCU_Server_Info.netmask_address, p_netmask_address, sizeof(gMCU_Server_Info.netmask_address))) {
+ 		memcpy(gMCU_Server_Info.netmask_address, p_netmask_address, sizeof(gMCU_Server_Info.netmask_address));
+-		gMCU_Server_Info.crc32Checksum = sifive_crc32((uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo) - 4);
++		gMCU_Server_Info.crc32Checksum = hf_crc32((uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo) - 4);
+ 		hf_i2c_mem_write(&hi2c1, AT24C_ADDR, MCU_SERVER_INFO_EEPROM_OFFSET,
+ 			(uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo));
+ 	}
+@@ -745,7 +732,7 @@ int es_set_mcu_gateway(uint8_t *p_gateway_address)
+ 	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
+ 	if (0 != memcmp(gMCU_Server_Info.gateway_address, p_gateway_address, sizeof(gMCU_Server_Info.gateway_address))) {
+ 		memcpy(gMCU_Server_Info.gateway_address, p_gateway_address, sizeof(gMCU_Server_Info.gateway_address));
+-		gMCU_Server_Info.crc32Checksum = sifive_crc32((uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo) - 4);
++		gMCU_Server_Info.crc32Checksum = hf_crc32((uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo) - 4);
+ 		hf_i2c_mem_write(&hi2c1, AT24C_ADDR, MCU_SERVER_INFO_EEPROM_OFFSET,
+ 			(uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo));
+ 	}
+@@ -791,7 +778,7 @@ int es_set_username_password(const char *p_admin_name, const char *p_admin_passw
+ 	if ((0 != strcmp(gMCU_Server_Info.AdminName, p_admin_name)) || (0 != strcmp(gMCU_Server_Info.AdminPassword, p_admin_password))) {
+ 		strcpy(gMCU_Server_Info.AdminName, p_admin_name);
+ 		strcpy(gMCU_Server_Info.AdminPassword, p_admin_password);
+-		gMCU_Server_Info.crc32Checksum = sifive_crc32((uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo) - 4);
++		gMCU_Server_Info.crc32Checksum = hf_crc32((uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo) - 4);
+ 		hf_i2c_mem_write(&hi2c1, AT24C_ADDR, MCU_SERVER_INFO_EEPROM_OFFSET,
+ 			(uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo));
+ 	}
+@@ -839,7 +826,7 @@ int es_set_som_pwr_lost_resume_attr(int isResumePwrLost)
+ 	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
+ 	if (som_pwr_lost_resume_attr != gSOM_PwgMgtDIP_Info.som_pwr_lost_resume_attr) {
+ 		gSOM_PwgMgtDIP_Info.som_pwr_lost_resume_attr = som_pwr_lost_resume_attr;
+-		gSOM_PwgMgtDIP_Info.crc32Checksum = sifive_crc32((uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(gSOM_PwgMgtDIP_Info) - 4);
++		gSOM_PwgMgtDIP_Info.crc32Checksum = hf_crc32((uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(gSOM_PwgMgtDIP_Info) - 4);
+ 		hf_i2c_mem_write(&hi2c1, AT24C_ADDR, SOM_PWRMGT_DIP_INFO_EEPROM_OFFSET,
+ 			(uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(SomPwrMgtDIPInfo));
+ 		eeprom_debug("Update SomPwrMgtDIPInfo in EEPROM for lost_resume_attr\n");
+@@ -881,7 +868,7 @@ int es_set_som_pwr_last_state(int som_pwr_last_state)
+ 	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
+ 	if (som_pwr_last_state_internal_fmt != gSOM_PwgMgtDIP_Info.som_pwr_last_state) {
+ 		gSOM_PwgMgtDIP_Info.som_pwr_last_state = som_pwr_last_state_internal_fmt;
+-		gSOM_PwgMgtDIP_Info.crc32Checksum = sifive_crc32((uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(gSOM_PwgMgtDIP_Info) - 4);
++		gSOM_PwgMgtDIP_Info.crc32Checksum = hf_crc32((uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(gSOM_PwgMgtDIP_Info) - 4);
+ 		hf_i2c_mem_write(&hi2c1, AT24C_ADDR, SOM_PWRMGT_DIP_INFO_EEPROM_OFFSET,
+ 			(uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(SomPwrMgtDIPInfo));
+ 	}
+@@ -922,7 +909,7 @@ int es_set_som_dip_switch_soft_ctl_attr(int som_dip_switch_soft_ctl_attr)
+ 	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
+ 	if (som_dip_swtich_soft_ctl_attr_internal_fmt != gSOM_PwgMgtDIP_Info.som_dip_switch_soft_ctl_attr) {
+ 		gSOM_PwgMgtDIP_Info.som_dip_switch_soft_ctl_attr = som_dip_swtich_soft_ctl_attr_internal_fmt;
+-		gSOM_PwgMgtDIP_Info.crc32Checksum = sifive_crc32((uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(gSOM_PwgMgtDIP_Info) - 4);
++		gSOM_PwgMgtDIP_Info.crc32Checksum = hf_crc32((uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(gSOM_PwgMgtDIP_Info) - 4);
+ 		hf_i2c_mem_write(&hi2c1, AT24C_ADDR, SOM_PWRMGT_DIP_INFO_EEPROM_OFFSET,
+ 			(uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(SomPwrMgtDIPInfo));
+ 	}
+@@ -955,7 +942,7 @@ int es_set_som_dip_switch_soft_state(uint8_t som_dip_switch_soft_state)
+ 	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
+ 	if (som_dip_switch_soft_state_internal_fmt != gSOM_PwgMgtDIP_Info.som_dip_switch_soft_state) {
+ 		gSOM_PwgMgtDIP_Info.som_dip_switch_soft_state = som_dip_switch_soft_state_internal_fmt;
+-		gSOM_PwgMgtDIP_Info.crc32Checksum = sifive_crc32((uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(gSOM_PwgMgtDIP_Info) - 4);
++		gSOM_PwgMgtDIP_Info.crc32Checksum = hf_crc32((uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(gSOM_PwgMgtDIP_Info) - 4);
+ 		hf_i2c_mem_write(&hi2c1, AT24C_ADDR, SOM_PWRMGT_DIP_INFO_EEPROM_OFFSET,
+ 			(uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(SomPwrMgtDIPInfo));
+ 	}
+@@ -1000,7 +987,7 @@ int es_set_som_dip_switch_soft_state_all(int som_dip_switch_soft_ctl_attr, uint8
+ 	    (som_dip_switch_soft_state_internal_fmt != gSOM_PwgMgtDIP_Info.som_dip_switch_soft_state)) {
+ 		gSOM_PwgMgtDIP_Info.som_dip_switch_soft_ctl_attr = som_dip_swtich_soft_ctl_attr_internal_fmt;
+ 		gSOM_PwgMgtDIP_Info.som_dip_switch_soft_state = som_dip_switch_soft_state_internal_fmt;
+-		gSOM_PwgMgtDIP_Info.crc32Checksum = sifive_crc32((uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(gSOM_PwgMgtDIP_Info) - 4);
++		gSOM_PwgMgtDIP_Info.crc32Checksum = hf_crc32((uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(gSOM_PwgMgtDIP_Info) - 4);
+ 		hf_i2c_mem_write(&hi2c1, AT24C_ADDR, SOM_PWRMGT_DIP_INFO_EEPROM_OFFSET,
+ 			(uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(SomPwrMgtDIPInfo));
+ 	}
+@@ -1450,7 +1437,7 @@ int es_restore_userdata_to_factory(void)
+ 	gMCU_Server_Info.gateway_address[2] = GATEWAY_ADDR2;
+ 	gMCU_Server_Info.gateway_address[3] = GATEWAY_ADDR3;
+ 
+-	gMCU_Server_Info.crc32Checksum = sifive_crc32((uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo) - 4);
++	gMCU_Server_Info.crc32Checksum = hf_crc32((uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo) - 4);
+ 
+ 	hf_i2c_mem_write(&hi2c1, AT24C_ADDR, MCU_SERVER_INFO_EEPROM_OFFSET,
+ 		(uint8_t *)&gMCU_Server_Info, sizeof(MCUServerInfo));
+@@ -1460,7 +1447,7 @@ int es_restore_userdata_to_factory(void)
+ 	gSOM_PwgMgtDIP_Info.som_pwr_last_state = SOM_PWR_LAST_STATE_OFF;
+ 	gSOM_PwgMgtDIP_Info.som_dip_switch_soft_ctl_attr = SOM_DIP_SWITCH_SOFT_CTL_DISABLE;
+ 	gSOM_PwgMgtDIP_Info.som_dip_switch_soft_state = SOM_DIP_SWITCH_STATE_EMMC;
+-	gSOM_PwgMgtDIP_Info.crc32Checksum = sifive_crc32((uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(gSOM_PwgMgtDIP_Info) - 4);
++	gSOM_PwgMgtDIP_Info.crc32Checksum = hf_crc32((uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(gSOM_PwgMgtDIP_Info) - 4);
+ 
+ 	hf_i2c_mem_write(&hi2c1, AT24C_ADDR, SOM_PWRMGT_DIP_INFO_EEPROM_OFFSET,
+ 		(uint8_t *)&gSOM_PwgMgtDIP_Info, sizeof(SomPwrMgtDIPInfo));
+@@ -1490,4 +1477,46 @@ int es_restore_userdata_to_factory(void)
+ 	esEXIT_CRITICAL(gEEPROM_Mutex);
+ 
+ 	return 0;
+-}
+\ No newline at end of file
++}
++
++/* get the som console configuration
++   *p_som_console_cfg: return the som console cfg, 0 means via uart, 1 means via telnet
++*/
++int es_get_som_console_cfg(int *p_som_console_cfg)
++{
++	if (NULL == p_som_console_cfg)
++		return -1;
++
++	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
++	*p_som_console_cfg = gSOM_ConsoleCfg;
++	esEXIT_CRITICAL(gEEPROM_Mutex);
++
++	return 0;
++}
++
++/* set the som console configuration
++   som_console_cfg: som console cfg, 0 means via uart, 1 means via telnet
++*/
++int es_set_som_console_cfg(int som_console_cfg)
++{
++	if (som_console_cfg == 1) {
++		#if 0
++		if (SOM_POWER_ON != get_som_power_state()) {
++			printf("Can't set SOM console to telnet, please power on SOM first!!!\n");
++			return -1;
++		}
++		#endif
++		/* Mux High Level: som debug uart is connected with mcu uart6, i.e. output to telnet */
++		HAL_GPIO_WritePin(UART_MUX_SEL_GPIO_Port, UART_MUX_SEL_Pin, GPIO_PIN_SET);
++	}
++	else {
++		/* Mux Low  Level: som debug uart is connect with FT4232 UART, i.e. output to serial port */
++		HAL_GPIO_WritePin(UART_MUX_SEL_GPIO_Port, UART_MUX_SEL_Pin, GPIO_PIN_RESET);
++	}
++
++	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
++	gSOM_ConsoleCfg = som_console_cfg;
++	esEXIT_CRITICAL(gEEPROM_Mutex);
++
++	return 0;
++}
+diff --git a/Core/Src/sifive_crc32.c b/Core/Src/hf_crc32.c
+similarity index 99%
+rename from Core/Src/sifive_crc32.c
+rename to Core/Src/hf_crc32.c
+index b63d990..820ce03 100644
+--- a/Core/Src/sifive_crc32.c
++++ b/Core/Src/hf_crc32.c
+@@ -215,7 +215,7 @@ uint32_t crc32_no_comp(uint32_t crc, const uint8_t *buf, uint32_t len)
+     return le32_to_cpu(crc);
+ }
+ 
+-uint32_t sifive_crc32(const uint8_t *p, uint32_t len)
++uint32_t hf_crc32(const uint8_t *p, uint32_t len)
+ {
+     uint32_t crc = 0xFFFFFFFF;
+ 
+diff --git a/Core/Src/hf_gpio_process.c b/Core/Src/hf_gpio_process.c
+index 1cf187f..e7a13fd 100644
+--- a/Core/Src/hf_gpio_process.c
++++ b/Core/Src/hf_gpio_process.c
+@@ -1,27 +1,12 @@
+-/************************************************************************************
+-* Copyright 2024, Beijing ESWIN Computing Technology Co., Ltd.. All rights reserved.
+-* 
+-* Licensed under the Apache License, Version 2.0 (the "License");
+-* you may not use this file except in compliance with the License.
+-* You may obtain a copy of the License at
+-* 
+-* http://www.apache.org/licenses/LICENSE-2.0
+-* 
+-* Unless required by applicable law or agreed to in writing, software
+-* distributed under the License is distributed on an "AS IS" BASIS,
+-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-* See the License for the specific language governing permissions and
+-* limitations under the License.
+-*************************************************************************************/
+-
+-/************************************************************************************
+-* SPDX-License-Identifier: MIT, Apache
+-* 
+-* Author: xuxiang@eswincomputing.com
+-* 
+-* File Description: hf_gpio_process.c
+-*  GPIO Task to control the power and reset key
+-************************************************************************************/
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * GPIO Task to handle the power and reset key press
++ *
++ * Copyright 2024 Beijing ESWIN Computing Technology Co., Ltd.
++ *   Authors:
++ *    XuXiang<xuxiang@eswincomputing.com>
++ *
++ */
+ /* Includes ------------------------------------------------------------------*/
+ #include <stdio.h>
+ 
+diff --git a/Core/Src/hf_http_process.c b/Core/Src/hf_http_process.c
+index c74e50c..31446e3 100644
+--- a/Core/Src/hf_http_process.c
++++ b/Core/Src/hf_http_process.c
+@@ -1,27 +1,13 @@
+-/************************************************************************************
+-* Copyright 2024, Beijing ESWIN Computing Technology Co., Ltd.. All rights reserved.
+-* 
+-* Licensed under the Apache License, Version 2.0 (the "License");
+-* you may not use this file except in compliance with the License.
+-* You may obtain a copy of the License at
+-* 
+-* http://www.apache.org/licenses/LICENSE-2.0
+-* 
+-* Unless required by applicable law or agreed to in writing, software
+-* distributed under the License is distributed on an "AS IS" BASIS,
+-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-* See the License for the specific language governing permissions and
+-* limitations under the License.
+-*************************************************************************************/
+-
+-/************************************************************************************
+-* SPDX-License-Identifier: MIT, Apache
+-* 
+-* Author: xuxiang@eswincomputing.com
+-* 
+-* File Description: hf_http_process.c
+-*  Http server task
+-************************************************************************************/
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * Http server task
++ *
++ * Copyright 2024 Beijing ESWIN Computing Technology Co., Ltd.
++ *   Authors:
++ *    XuXiang<xuxiang@eswincomputing.com>
++ *    YuanJunHui<yuanjunhui@eswincomputing.com>
++ *
++ */
+ /* Includes ------------------------------------------------------------------*/
+ #include <string.h>
+ #include "main.h"
+@@ -31,6 +17,7 @@
+ #include "dhcp.h"
+ #include "hf_common.h"
+ #include "web-server.h"
++#include "telnet_som_console.h"
+ extern struct netif gnetif;
+ struct dhcp *dhcp;
+ uint8_t ip_address[4] = {0};
+@@ -72,14 +59,9 @@ void dynamic_change_eth(void)
+ 
+ void hf_http_task(void *argument)
+ {
+-	printf("hf_http_task started!!!\r\n");
++	printf("hf_http_task started!!!\n");
+ 
+-  /* init code for LWIP */
+-  eth_get_address();
+-  MX_LWIP_Init();
+-  // httpd_init();
+-  // /* Infinite loop */
+-  osDelay(5000);
++  // osDelay(5000);
+   dhcp = netif_dhcp_data(&gnetif);
+   printf("Static IP address: %s\n", ip4addr_ntoa(&gnetif.ip_addr));
+   printf("Subnet mask: %s\n", ip4addr_ntoa(&gnetif.netmask));
+diff --git a/Core/Src/hf_i2c.c b/Core/Src/hf_i2c.c
+index ebf7d2b..7af04c2 100644
+--- a/Core/Src/hf_i2c.c
++++ b/Core/Src/hf_i2c.c
+@@ -1,27 +1,13 @@
+-/************************************************************************************
+-* Copyright 2024, Beijing ESWIN Computing Technology Co., Ltd.. All rights reserved.
+-* 
+-* Licensed under the Apache License, Version 2.0 (the "License");
+-* you may not use this file except in compliance with the License.
+-* You may obtain a copy of the License at
+-* 
+-* http://www.apache.org/licenses/LICENSE-2.0
+-* 
+-* Unless required by applicable law or agreed to in writing, software
+-* distributed under the License is distributed on an "AS IS" BASIS,
+-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-* See the License for the specific language governing permissions and
+-* limitations under the License.
+-*************************************************************************************/
+-
+-/************************************************************************************
+-* SPDX-License-Identifier: MIT, Apache
+-* 
+-* Author: xuxiang@eswincomputing.com
+-* 
+-* File Description: hf_i2c.c
+-*  I2C hal api, especially for eeprom(memory type), INA226, PAC1934 and PCA9450
+-************************************************************************************/
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * I2C hal api, especially for eeprom(memory type), INA226, PAC1934 and PCA9450
++ *
++ * Copyright 2024 Beijing ESWIN Computing Technology Co., Ltd.
++ *   Authors:
++ *    XuXiang<xuxiang@eswincomputing.com>
++ *    LinMin<linmin@eswincomputing.com>
++ *
++ */
+ #include "stm32f4xx_hal.h"
+ #include "main.h"
+ #include <stdio.h>
+diff --git a/Core/Src/hf_it_callback.c b/Core/Src/hf_it_callback.c
+index fbd1ffc..42cb7a6 100644
+--- a/Core/Src/hf_it_callback.c
++++ b/Core/Src/hf_it_callback.c
+@@ -1,27 +1,12 @@
+-/************************************************************************************
+-* Copyright 2024, Beijing ESWIN Computing Technology Co., Ltd.. All rights reserved.
+-* 
+-* Licensed under the Apache License, Version 2.0 (the "License");
+-* you may not use this file except in compliance with the License.
+-* You may obtain a copy of the License at
+-* 
+-* http://www.apache.org/licenses/LICENSE-2.0
+-* 
+-* Unless required by applicable law or agreed to in writing, software
+-* distributed under the License is distributed on an "AS IS" BASIS,
+-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-* See the License for the specific language governing permissions and
+-* limitations under the License.
+-*************************************************************************************/
+-
+-/************************************************************************************
+-* SPDX-License-Identifier: MIT, Apache
+-* 
+-* Author: xuxiang@eswincomputing.com
+-* 
+-* File Description: hf_it_callback.c
+-*  Interrupt callback for RTC, UART
+-************************************************************************************/
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * Interrupt callback for RTC, UART
++ *
++ * Copyright 2024 Beijing ESWIN Computing Technology Co., Ltd.
++ *   Authors:
++ *    XuXiang<xuxiang@eswincomputing.com>
++ *
++ */
+ #include <stdio.h>
+ #include <string.h>
+ 
+diff --git a/Core/Src/hf_power_process.c b/Core/Src/hf_power_process.c
+index 5b6595b..3e38651 100644
+--- a/Core/Src/hf_power_process.c
++++ b/Core/Src/hf_power_process.c
+@@ -1,27 +1,12 @@
+-/************************************************************************************
+-* Copyright 2024, Beijing ESWIN Computing Technology Co., Ltd.. All rights reserved.
+-* 
+-* Licensed under the Apache License, Version 2.0 (the "License");
+-* you may not use this file except in compliance with the License.
+-* You may obtain a copy of the License at
+-* 
+-* http://www.apache.org/licenses/LICENSE-2.0
+-* 
+-* Unless required by applicable law or agreed to in writing, software
+-* distributed under the License is distributed on an "AS IS" BASIS,
+-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-* See the License for the specific language governing permissions and
+-* limitations under the License.
+-*************************************************************************************/
+-
+-/************************************************************************************
+-* SPDX-License-Identifier: MIT, Apache
+-* 
+-* Author: xuxiang@eswincomputing.com
+-* 
+-* File Description: hf_power_process.c
+-*  Power task which control the power and maintain the power state machine
+-************************************************************************************/
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * Power task which control the power and maintain the power state machine
++ *
++ * Copyright 2024 Beijing ESWIN Computing Technology Co., Ltd.
++ *   Authors:
++ *    XuXiang<xuxiang@eswincomputing.com>
++ *
++ */
+ /* Includes ------------------------------------------------------------------*/
+ #include <stdio.h>
+ 
+@@ -34,6 +19,7 @@
+ #include "hf_power_process.h"
+ #include "hf_spi_slv.h"
+ 
++#include "telnet_som_console.h"
+ /* Private typedef -----------------------------------------------------------*/
+ // #define AUTO_BOOT
+ /* Private define ------------------------------------------------------------*/
+@@ -100,7 +86,7 @@ void hf_power_task(void *parameter)
+ 	HAL_StatusTypeDef status = HAL_OK;
+ 	power_state_t power_state = IDLE_STATE;
+ 	GPIO_PinState pin_state = GPIO_PIN_RESET;
+-	printf("hf_power_task started!!!\r\n");
++	printf("hf_power_task started!!!\n");
+ #ifdef AUTO_BOOT
+ 	change_som_power_state(SOM_POWER_ON);
+ #endif
+@@ -246,6 +232,7 @@ void som_reset_control(uint8_t reset)
+ 		HAL_GPIO_Init(MCU_RESET_SOM_N_GPIO_Port, &GPIO_InitStruct);
+ 		uart_init(UART4);
+ 		uart_init(USART6);
++		telSomConsEnableRxInterrupt();
+ 		SPI2_MASTER_CS_HIGH();
+ 		set_mcu_led_status(LED_SOM_BOOTING);
+ 		chass_led_ctl(pdTRUE);
+diff --git a/Core/Src/hf_protocol_process.c b/Core/Src/hf_protocol_process.c
+index b3b2c60..f845504 100644
+--- a/Core/Src/hf_protocol_process.c
++++ b/Core/Src/hf_protocol_process.c
+@@ -1,29 +1,14 @@
+-/************************************************************************************
+-* Copyright 2024, Beijing ESWIN Computing Technology Co., Ltd.. All rights reserved.
+-* 
+-* Licensed under the Apache License, Version 2.0 (the "License");
+-* you may not use this file except in compliance with the License.
+-* You may obtain a copy of the License at
+-* 
+-* http://www.apache.org/licenses/LICENSE-2.0
+-* 
+-* Unless required by applicable law or agreed to in writing, software
+-* distributed under the License is distributed on an "AS IS" BASIS,
+-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-* See the License for the specific language governing permissions and
+-* limitations under the License.
+-*************************************************************************************/
+-
+-/************************************************************************************
+-* SPDX-License-Identifier: MIT, Apache
+-* 
+-* Author: xuxiang@eswincomputing.com
+-*         huangyifeng@eswincomputing.com
+-* 
+-* File Description: hf_protocol_process.c
+-*  Protocal task used for production line and MCU uart4 communication task reponsibile
+-   for communicating with SoC
+-************************************************************************************/
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * Protocal task used for production line and MCU uart4 communication task reponsibile
++ * for communicating with SoC.
++ *
++ * Copyright 2024 Beijing ESWIN Computing Technology Co., Ltd.
++ *   Authors:
++ *    XuXiang<xuxiang@eswincomputing.com>
++ *    HuangYiFeng<huangyifeng@eswincomputing.com>
++ *
++ */
+ #include "FreeRTOS.h"
+ #include "cmsis_os2.h"
+ #include "hf_common.h"
+diff --git a/Core/Src/hf_spi_slv.c b/Core/Src/hf_spi_slv.c
+index bbdbf0d..0785526 100644
+--- a/Core/Src/hf_spi_slv.c
++++ b/Core/Src/hf_spi_slv.c
+@@ -1,27 +1,12 @@
+-/************************************************************************************
+-* Copyright 2024, Beijing ESWIN Computing Technology Co., Ltd.. All rights reserved.
+-* 
+-* Licensed under the Apache License, Version 2.0 (the "License");
+-* you may not use this file except in compliance with the License.
+-* You may obtain a copy of the License at
+-* 
+-* http://www.apache.org/licenses/LICENSE-2.0
+-* 
+-* Unless required by applicable law or agreed to in writing, software
+-* distributed under the License is distributed on an "AS IS" BASIS,
+-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-* See the License for the specific language governing permissions and
+-* limitations under the License.
+-*************************************************************************************/
+-
+-/************************************************************************************
+-* SPDX-License-Identifier: MIT, Apache
+-* 
+-* Author: xuxiang@eswincomputing.com
+-* 
+-* File Description: hf_spi_slv.c
+-*  SPI api
+-************************************************************************************/
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * hf_spi_slv.c
++ *
++ * Copyright 2024 Beijing ESWIN Computing Technology Co., Ltd.
++ *   Authors:
++ *    XuXiang<xuxiang@eswincomputing.com>
++ *
++ */
+ #include "main.h"
+ #include <stdio.h>
+ #include "hf_spi_slv.h"
+diff --git a/Core/Src/main.c b/Core/Src/main.c
+index 061d416..400ebd0 100644
+--- a/Core/Src/main.c
++++ b/Core/Src/main.c
+@@ -12,6 +12,9 @@
+   * in the root directory of this software component.
+   * If no LICENSE file comes with this software, it is provided AS-IS.
+   *
++  * Copyright 2024 Beijing ESWIN Computing Technology Co., Ltd.
++  *   Authors:
++  *   XuXiang<xuxiang@eswincomputing.com>
+   ******************************************************************************
+   */
+ /* Includes ------------------------------------------------------------------*/
+@@ -19,7 +22,10 @@
+ #include "cmsis_os.h"
+ #include <stdio.h>
+ #include "stm32f4xx_hal_iwdg.h"
++#include "lwip.h"
+ #include "console.h"
++#include "telnet_server.h"
++#include "telnet_som_console.h"
+ 
+ /* Private includes ----------------------------------------------------------*/
+ #include "hf_common.h"
+@@ -56,7 +62,7 @@ const osThreadAttr_t protocol_task_attributes = {
+ osThreadId_t power_task_handle;
+ const osThreadAttr_t power_task_attributes = {
+   .name = "PowerTask",
+-  .stack_size = 1024 * 4,
++  .stack_size = 1024 * 2,
+   .priority = (osPriority_t) osPriorityNormal,
+ };
+ 
+@@ -153,6 +159,10 @@ void hf_main_task(void *argument)
+   es_eeprom_info_test();
+   #endif
+ 
++  /* init code for LWIP */
++  eth_get_address();
++  MX_LWIP_Init();
++
+   power_task_handle = osThreadNew(hf_power_task, NULL, &power_task_attributes);
+   http_task_handle = osThreadNew(hf_http_task, NULL, &http_task_attributes);
+   key_task_handle = osThreadNew(hf_gpio_task, NULL, &gpio_task_attributes);
+@@ -165,14 +175,13 @@ void hf_main_task(void *argument)
+   if (pdTRUE != xbspConsoleInit(CONSOLE_STACK_SIZE, CONSOLE_TASK_PRIORITY, &consoleHandle)) {
+     printf("Err:Failed to create CLI!\n");
+   }
++  telnet_create(23, telenet_receiver_callback, NULL);
+   #endif
+-  // extern void MX_IWDG_Init(void);
+-  // MX_IWDG_Init();
++
+   set_mcu_led_status(LED_MCU_RUNING);
+ 
+   for(;;)
+   {
+-    // HAL_IWDG_Refresh(&hiwdg);
+     osDelay(800);
+   }
+ }
+\ No newline at end of file
+diff --git a/Core/Src/telnet_server.c b/Core/Src/telnet_server.c
+new file mode 100644
+index 0000000..53d3f04
+--- /dev/null
++++ b/Core/Src/telnet_server.c
+@@ -0,0 +1,388 @@
++/*
++ * MIT License
++ * 
++ * Copyright (c) 2022 André Cascadan and Bruno Augusto Casu
++ * 
++ * Permission is hereby granted, free of charge, to any person obtaining a copy
++ * of this software and associated documentation files (the "Software"), to deal
++ * in the Software without restriction, including without limitation the rights
++ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
++ * copies of the Software, and to permit persons to whom the Software is
++ * furnished to do so, subject to the following conditions:
++ * 
++ * The above copyright notice and this permission notice shall be included in all
++ * copies or substantial portions of the Software.
++ * 
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
++ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
++ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
++ * SOFTWARE.
++ * 
++ * 
++ * This file is part of the lwIP based telnet server.
++ * 
++ */
++
++/* 1 TAB = 4 Spaces */
++
++
++// FreeRTOS includes
++#include "cmsis_os.h"  // TODO: Decide which API to use: FreeRTOS or CMSIS. Here they are mixed.
++#include "FreeRTOS.h"
++#include "task.h"
++#include "semphr.h"
++#include "stream_buffer.h"
++
++// LwIP includes
++#include "lwip/api.h"
++
++
++#include "telnet_server.h"
++#include "telnet_som_console.h"
++
++// Current implementation allows only single telnet connection (one instance).
++static telnet_t telnet_instance;
++static telnet_t* instance = &telnet_instance;
++
++/*
++ *  Period of TX buffer polling = 10ms
++ *
++ *  This parameter combined with a buffer size of 1024 bytes
++ *  will result in an average throughput of 100 KBytes per second.
++ */
++static const TickType_t tx_cycle_period = pdMS_TO_TICKS( 10 );
++
++// Process input bytes
++static void process_incoming_bytes (uint8_t *data, int data_len, telnet_t* inst_ptr);
++
++// Callback for netconn interface
++static void netconn_cb (struct netconn *conn, enum netconn_evt evt, u16_t len);
++
++
++
++// Task and attributes
++
++static const osThreadAttr_t wrt_task_attributes = {
++  .name = "TelnetWrtTask",
++  .priority = (osPriority_t) osPriorityNormal,
++  .stack_size = 256 * 4
++};
++
++static const osThreadAttr_t rcv_task_attributes = {
++  .name = "TelnetRcvTask",
++  .priority = (osPriority_t) osPriorityNormal,
++  .stack_size = (256) * 4
++};
++
++// Task functions
++static void wrt_task (void *arg);
++static void rcv_task (void *arg);
++
++
++
++void telnet_create( uint16_t port,
++                    void (*receiver_callback)( uint8_t* buff, uint16_t len ),
++                    void (*command_callback) ( uint8_t* cmd,  uint16_t len )  )
++{
++
++	err_t err;
++
++	// Stores the callback pointers
++	instance->receiver_callback = receiver_callback;
++	instance->command_callback  = command_callback;
++
++	// Initializes command buffer size
++	instance->cmd_len = 0;
++
++	// Stores the port of the TCP connection to the global array
++	instance->tcp_port = port;
++
++	// Starts local listening
++	instance->conn = netconn_new_with_callback(NETCONN_TCP, netconn_cb);
++	if( instance->conn == NULL )
++		return;
++
++	err = netconn_bind(instance->conn, NULL, port);
++	if ( err != ERR_OK )
++		return;
++
++	netconn_listen(instance->conn);
++
++	// No connection still established
++	instance->status = TELNET_CONN_STATUS_NONE;
++
++	// Create the accept sentd task
++	instance->wrt_task_handle = osThreadNew(wrt_task, NULL, &wrt_task_attributes);
++	instance->rcv_task_handle = osThreadNew(rcv_task, NULL, &rcv_task_attributes);
++
++	// Create the uart6 rx task
++	if (pdTRUE != telnetSomConsoleInit(128, CONSOLE_TASK_PRIORITY, &telnetSomConsoleHandle)) {
++	printf("Err:Failed to create telnet som console task!\n");
++	}
++}
++
++
++
++/*
++ * Netconn callback
++ *
++ * This project uses netconn with callback to manage the open/close events
++ */
++void netconn_cb (struct netconn *conn, enum netconn_evt evt, u16_t len)
++{
++	if( evt == NETCONN_EVT_RCVPLUS )
++	{
++		if( len == 0 ) // len = 0 means the connections is being opened or closed by the client
++		{
++			// Switch the connection status according to the current one
++			if( instance->status == TELNET_CONN_STATUS_ACCEPTING)
++				instance->status = TELNET_CONN_STATUS_CONNECTED;
++			else {
++				if (instance->newconn == conn) {
++					instance->status = TELNET_CONN_STATUS_CLOSING;
++				}
++			}
++		}
++	}
++}
++
++
++
++/*
++ * TX task ()
++ *
++ * This task waits for bytes to be transmitted to the client.
++ *
++ * Connection/disconnection is also managed by this task.
++ *
++ */
++static void wrt_task (void *arg)
++{
++
++  err_t accept_err;
++  err_t err;
++  // create the buffer to accumulate bytes to be sent
++  instance->buff       = ( uint8_t*) pvPortMalloc( sizeof(uint8_t)*TELNET_BUFF_SIZE );
++  instance->buff_mutex = xSemaphoreCreateMutex();
++  instance->buff_count = 0;
++
++  /*
++   * Accept loop
++   * Stays waiting for a connection. If connection breaks, it waits for a new one.
++   */
++  for(;;)
++  {
++	  instance->status = TELNET_CONN_STATUS_ACCEPTING;
++	  accept_err = netconn_accept(instance->conn, &instance->newconn);
++	  if( accept_err == ERR_OK )
++	  {
++		  netconn_close (instance->conn); // Stop listening.
++		  // Transfer loop
++		  for(;;)
++		  {
++
++			  vTaskDelay( tx_cycle_period );
++
++			  xSemaphoreTake( instance->buff_mutex, portMAX_DELAY );
++
++			  // Check the connections status before send bytes, if any
++			  if( instance->status == TELNET_CONN_STATUS_CONNECTED && instance->buff_count > 0 )
++				  netconn_write(instance->newconn, instance->buff, instance->buff_count, NETCONN_COPY);
++
++			  instance->buff_count = 0;
++
++			  xSemaphoreGive( instance->buff_mutex );
++
++			  // Force a connections close if a terminating was detected from client
++			  if( instance->status == TELNET_CONN_STATUS_CLOSING )
++				  break;
++
++		  }
++
++		  netconn_close (instance->newconn);
++		  netconn_delete(instance->newconn);
++
++		  // Start listening again
++		  netconn_delete(instance->conn);
++		  vTaskDelay( 1000 ); // Delay for a while to make sure connection has been deleted eventually
++		  instance->conn = netconn_new_with_callback(NETCONN_TCP, netconn_cb);
++		  if( instance->conn == NULL )
++		  		return;
++
++		  	err = netconn_bind(instance->conn, NULL, instance->tcp_port);
++		  	if ( err != ERR_OK )
++		  		return;
++
++		  	netconn_listen(instance->conn);
++
++		  	// No connection still established
++		  	instance->status = TELNET_CONN_STATUS_NONE;
++	  }
++  }
++}
++
++
++
++/*
++ * TX task ()
++ *
++ * This task waits for input bytes from the client.
++ */
++static void rcv_task (void *arg)
++{
++	struct netbuf *rx_netbuf;
++	void *rx_data;
++	uint16_t rx_data_len;
++	err_t recv_err;
++
++	for(;;)
++	{
++
++		if( instance->status != TELNET_CONN_STATUS_CONNECTED )
++		{
++			vTaskDelay(100); // *do nothing* delay if there is no connection.
++		}
++		else
++		{
++			// Iteratively reads all the available data
++			recv_err = netconn_recv(instance->newconn, &rx_netbuf);
++			if ( recv_err == ERR_OK)
++			{
++				// Navigate trough netbuffs until dump all data
++				do
++				{
++					netbuf_data(rx_netbuf, &rx_data, &rx_data_len);
++					process_incoming_bytes (rx_data, rx_data_len, instance);
++
++				}while(  netbuf_next(rx_netbuf) >= 0 );
++
++				netbuf_delete( rx_netbuf );
++			}
++		}
++	}
++}
++
++
++
++/*
++ * Transmit bytes
++ *
++ * This functions is called by the user to send bytes to client.
++ *
++ * Telnet command bytes can also be sent via this functions.
++ */
++uint16_t telnet_transmit(uint8_t* data, uint16_t len)
++{
++  //TODO: Feature: add flexibility for ISR context
++
++	int sent = 0;
++
++	if( instance->buff_mutex == NULL )
++		return 0;
++  
++	if( instance->status != TELNET_CONN_STATUS_CONNECTED )
++		return 0;
++
++  // Iterates until all bytes is fed to the buffer
++  do
++  {
++	  xSemaphoreTake( instance->buff_mutex, portMAX_DELAY );
++	  while( (len > 0) && (instance->buff_count < TELNET_BUFF_SIZE) )
++	  {
++		  instance->buff[instance->buff_count] = data[sent];
++		  ++instance->buff_count;
++		  ++sent;
++		  --len;
++	  }
++	  xSemaphoreGive( instance->buff_mutex );
++
++	  if(len > 0)
++		  vTaskDelay( tx_cycle_period ); // Wait for one TX cycle before going to next iteration
++
++  } while(len > 0);
++
++  return sent;
++}
++
++
++/*
++ * Process input bytes
++ *
++ * Filters out the telnet commands from the regular characters and calls the
++ * proper user callback.
++ */
++static void process_incoming_bytes (uint8_t *data, int data_len, telnet_t* inst_ptr)
++{
++    const uint8_t IAC  = 255; // See RFC 854 for details
++    const uint8_t WILL = 251;
++    const uint8_t DONT = 254;
++    //const uint8_t SB   = 254; TODO: Parse Subnegotiation commands.
++
++    uint8_t* pbuf_payload = data;
++    uint16_t pbuf_len     = data_len;
++
++    /*
++     * If command callback IS NOT defined, all bytes are sent to the receiver callback.
++     *
++     * In this case user is responsible to separate them from characters.
++     */
++	if(inst_ptr->command_callback == NULL)
++	{
++		inst_ptr->receiver_callback( pbuf_payload, pbuf_len );
++	}
++
++	//If command callback IS defined, all bytes are filtered out from the characters
++	else
++	{
++		uint16_t char_offset   = 0;
++		uint16_t char_ctr      = 0;
++
++		for( int i = 0; i < pbuf_len; i++ )
++		{
++			// Counting characters: Command buffer is empty and IAC not found
++			if( (inst_ptr->cmd_len == 0) && (pbuf_payload[i] != IAC) )
++				++char_ctr;
++
++			// Counting command bytes
++			else
++			{
++				// Found IAC with command buffer empty:
++				if( (inst_ptr->cmd_len == 0) && (pbuf_payload[i] == IAC) )
++				{
++					// Process the characters found up to this point
++					if( char_ctr != 0 )
++						inst_ptr->receiver_callback( &pbuf_payload[char_offset], char_ctr );
++
++					inst_ptr->cmd_buff[inst_ptr->cmd_len] = pbuf_payload[i];
++					inst_ptr->cmd_len++;
++				}
++				else if( (inst_ptr->cmd_len == 1) && (pbuf_payload[i] >= WILL) && (pbuf_payload[i] <= DONT) )
++				{
++					inst_ptr->cmd_buff[inst_ptr->cmd_len] = pbuf_payload[i];
++					inst_ptr->cmd_len++;
++				}
++				else if( inst_ptr->cmd_len == 2 && (pbuf_payload[1] >= WILL) && (pbuf_payload[1] <= DONT) )
++				{
++					inst_ptr->cmd_buff[inst_ptr->cmd_len] = pbuf_payload[i];
++					inst_ptr->cmd_len++;
++
++					// Process the command
++					inst_ptr->command_callback( inst_ptr->cmd_buff,  inst_ptr->cmd_len);
++
++					// Restart counting characters. Erase command buffer.
++					inst_ptr->cmd_len = 0;
++					char_offset = i+1;
++					char_ctr = 0;
++				}
++			}
++		}
++
++		// Process the characters found at the end of buffer scanning
++		if( char_ctr != 0 )
++			inst_ptr->receiver_callback( &pbuf_payload[char_offset], char_ctr );
++	}
++}
++
+diff --git a/Core/Src/telnet_som_console.c b/Core/Src/telnet_som_console.c
+new file mode 100644
+index 0000000..af05a6e
+--- /dev/null
++++ b/Core/Src/telnet_som_console.c
+@@ -0,0 +1,131 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * Transfer the som uart console through telenet
++ *
++ * Copyright 2024 Beijing ESWIN Computing Technology Co., Ltd.
++ *   Authors:
++ *    LinMin<linmin@eswincomputing.com>
++ *
++ */
++#include "hf_common.h"
++#include "telnet_server.h"
++
++#define SOM_TEL_CON_MAX_RX_QUEUE_LEN                        300
++
++char cTelSomConcRxData;
++QueueHandle_t telSomConQueueRxHandle = NULL;
++UART_HandleTypeDef *pTelSomConUartDevHandle;
++
++/**
++* @brief Write to UART TX
++* @param *buff buffer to be written.
++* @retval HAL status
++*/
++static HAL_StatusTypeDef vTelSomConsoleWrite(uint8_t *buff, size_t len)
++{
++    HAL_StatusTypeDef status;
++
++    if (pTelSomConUartDevHandle == NULL || *buff == '\0' || len < 1)
++    {
++        return HAL_ERROR;
++    }
++
++    status = HAL_UART_Transmit(pTelSomConUartDevHandle, (uint8_t *)buff, len, portMAX_DELAY);
++    if (status != HAL_OK)
++    {
++        return HAL_ERROR;
++    }
++    return status;
++}
++
++void telenet_receiver_callback(uint8_t* buff, uint16_t len )
++{
++    // printf("len[%d],hex:%x,%x,%x:%s\n", len, buff[0], buff[1], buff[2], buff);
++    /* Forward the telnet data to SOM via uart6 tx port */
++    vTelSomConsoleWrite(buff, len);
++}
++
++/**
++* @brief Reads from UART RX buffer. Reads one bye at the time.
++* @param *cReadChar pointer to where data will be stored.
++* @retval FreeRTOS status
++*/
++static BaseType_t telSomConsoleRead(uint8_t *cReadChar, size_t xLen)
++{
++    BaseType_t xRetVal = pdFALSE;
++
++    if (telSomConQueueRxHandle == NULL || cReadChar == NULL)
++    {
++        return xRetVal;
++    }
++
++    /* Block until the there is input from the user */
++    return xQueueReceive(telSomConQueueRxHandle, cReadChar, portMAX_DELAY);
++}
++
++/**
++* @brief Enables UART RX reception.
++* @param void
++* @retval void
++*/
++void telSomConsEnableRxInterrupt(void)
++{
++    if (pTelSomConUartDevHandle == NULL)
++    {
++        return;
++    }
++    /* UART Rx IT is enabled by reading a character */
++    HAL_UART_Receive_IT(pTelSomConUartDevHandle,(uint8_t*)&cTelSomConcRxData, 1);
++}
++
++/**
++* @brief Task to handle user commands via serial communication.
++* @param *pvParams Data passed at task creation.
++* @retval void
++*/
++void vTaskTelenetSomConsole(void *pvParams)
++{
++    char cReadCh = '\0';
++
++    /* Create a queue to store characters from RX ISR */
++    telSomConQueueRxHandle = xQueueCreate(SOM_TEL_CON_MAX_RX_QUEUE_LEN, sizeof(char));
++    if (telSomConQueueRxHandle == NULL)
++    {
++        goto out_task_console;
++    }
++    telSomConsEnableRxInterrupt();
++ 
++    while(1)
++    {
++        /* Block until there is a new character in RX buffer */
++        telSomConsoleRead((uint8_t*)(&cReadCh), sizeof(cReadCh));
++        /* Forward the som debug data from uart6 rx port to the telnet client */
++        telnet_transmit((uint8_t *)&cReadCh, sizeof(cReadCh));
++    }
++
++out_task_console:
++    if (telSomConQueueRxHandle)
++    {
++        vQueueDelete(telSomConQueueRxHandle);
++    }
++    vTaskDelete(NULL);
++}
++
++/**
++* @brief Initialize the console by registering all commands and creating a task.
++* @param usStackSize Task console stack size
++* @param uxPriority Task console priority
++* @param *pxUartHandle Pointer for uart handle.
++* @retval FreeRTOS status
++*/
++BaseType_t telnetSomConsoleInit(uint16_t usStackSize, UBaseType_t uxPriority, UART_HandleTypeDef *pxUartHandle)
++{
++    if (pxUartHandle == NULL)
++    {
++        return pdFALSE;
++    }
++    pTelSomConUartDevHandle = pxUartHandle;
++
++    return xTaskCreate(vTaskTelenetSomConsole,"TELNET_SOM_CLI", usStackSize, NULL, uxPriority, NULL);
++}
++
+diff --git a/Core/Src/web-server.c b/Core/Src/web-server.c
+index 326b442..1cca94c 100644
+--- a/Core/Src/web-server.c
++++ b/Core/Src/web-server.c
+@@ -1,27 +1,12 @@
+-/************************************************************************************
+-* Copyright 2024, Beijing ESWIN Computing Technology Co., Ltd.. All rights reserved.
+-* 
+-* Licensed under the Apache License, Version 2.0 (the "License");
+-* you may not use this file except in compliance with the License.
+-* You may obtain a copy of the License at
+-* 
+-* http://www.apache.org/licenses/LICENSE-2.0
+-* 
+-* Unless required by applicable law or agreed to in writing, software
+-* distributed under the License is distributed on an "AS IS" BASIS,
+-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-* See the License for the specific language governing permissions and
+-* limitations under the License.
+-*************************************************************************************/
+-
+-/************************************************************************************
+-* SPDX-License-Identifier: MIT, Apache
+-* 
+-* Author: yuanjunhui@eswincomputing.com
+-* 
+-* File Description: web-server.c
+-*  BMC web server
+-************************************************************************************/
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * BMC web server
++ *
++ * Copyright 2024 Beijing ESWIN Computing Technology Co., Ltd.
++ *   Authors:
++ *    YuanJunHui<yuanjunhui@eswincomputing.com>
++ *
++ */
+ #include <stdlib.h>
+ #include "lwip/opt.h"
+ #include "lwip/arch.h"
+@@ -9669,6 +9654,48 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
+ 													$('input[name=\"swctrl\"]').change(function() {\n \
+ 														toggleDipRadios($(this).val() === '1');//select button is sw and last dip-switch data is sw data \n \
+ 													});\n \
++													$(\"input[name='somconsole_method']\").change(function() { \n \
++														var selected_som_method = $(this).val();  \n \
++														$.ajax({ \n \
++															url: '/somconsole', \n \
++															type: 'POST', \n \
++															data: { method: selected_som_method }, \n \
++															success: function(response) { \n \
++																if(response.status===0){\n \ 
++																	alert(\"update success!\");\n \
++																}else{\n \
++																	$('input[name=\"somconsole_method\"][value=\"' + selected_som_method + '\"]').prop('checked', true);\n \
++																	alert(response.message);\n \
++																}\n \
++																console.log('somconsole settings updated successfully.');\n \
++															}, \n \
++															error: function() { \n \
++																console.log('Error sending data'); \n \
++															} \n \
++														}); \n \
++													}); \n \
++													$('#somconsole-refresh-hid').click(function() {\n \
++														$.ajax({\n \
++															async: false,\n \
++															url: '/somconsole',\n \
++															type: 'GET',\n \
++															data: {\n \
++																byhand: \"0\",\n \
++															},\
++															contentType: 'application/x-www-form-urlencoded', \n \
++															success: function(response) {\n \
++																if(response.status===0){\n \
++																	$('input[name=\"somconsole_method\"][value=\"' + response.data.method + '\"]').prop('checked', true);\n \
++																	$('#somconsole_uart').prop('disabled', false);\n \
++																	$('#somconsole_telnet').prop('disabled', false);\n \
++																} \n \
++																console.log('somconsole refreshed successfully.');\n \
++															},\n \
++															error: function(xhr, status, error) {\n \
++																console.error('Error refreshing somconsole:', error);\n \
++															}\n \
++														});\n\
++													});\n\
+ 													$('#logoutForm').submit(function(event) { \n \
+ 														event.preventDefault();  \n \
+ 														$.ajax({ \n \
+@@ -9700,6 +9727,25 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
+ 													$('#board-info-cb-refresh').click(); \n \
+ 													$('#rtc-refresh-hid').click(); \n \
+ 													$('#soc-refresh-hid').click(); \n \
++													$('#somconsole-refresh-hid').click();\n \
++													$.ajax({\n \
++															async: false,\n \
++															url: '/bmc_version',\n \
++															type: 'GET',\n \
++															data: {\n \
++																byhand: \"0\",\n \
++															},\
++															contentType: 'application/x-www-form-urlencoded', \n \
++															success: function(response) {\n \
++																if(response.status===0){\n \
++																	$(\"#version-info\").text(response.data.version);\n \
++																} \n \
++																console.log('somconsole refreshed successfully.');\n \
++															},\n \
++															error: function(xhr, status, error) {\n \
++																console.error('Error refreshing somconsole:', error);\n \
++															}\n \
++														});\n\
+ 													setInterval(function() { \n \
+ 														power_on_change_countdown--; \n \
+ 													}, 1000);  \n \
+@@ -9754,6 +9800,11 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
+ 											.option-row label {\
+ 												margin-right: 20px;\
+ 											}\
++											.container-right { \
++												display: flex; \
++												justify-content: center; \
++												padding: 10px; \
++											}\
+ 											</style> \
+ 									</head> \
+ 									<body> \
+@@ -9765,6 +9816,9 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
+ 												<button type=\"submit\">Exit</button> \
+ 											</form> \
+ 										</div> \
++										<div class=\"container-right\"> \
++											<h3 id='version-info'>BMC Version:</h3> \
++										</div> \
+ 										<div> \
+ 											<h3>Board Information</h3> \
+ 											<h4>SOM Info</h4> \
+@@ -9973,6 +10027,15 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
+ 											<button id=\"rtc-refresh\">refresh</button> <button id=\"rtc-update\">update</button> \
+ 											<button id=\"rtc-refresh-hid\" value=\"0\" style=\"display:none;\">refresh</button> \
+ 										</div> \
++										<div class=\"somconsole\" > \
++											<h3>SOM Console</h3> \
++											<div class=\"network-row\"> \
++											<label>Redirect to:</label>  <br> \
++											<input type=\"radio\" id=\"somconsole_uart\" name=\"somconsole_method\" value=\"0\" checked disabled><label for=\"somconsole_uart\">UART</label><br> \
++											<input type=\"radio\" id=\"somconsole_telnet\" name=\"somconsole_method\" value=\"1\" disabled><label for=\"somconsole_telnet\">TELNET</label><br> \
++											<button id=\"somconsole-refresh-hid\" value=\"0\">refresh</button> \
++											</div> \
++										</div> \
+ 									</body> \
+ 									</html> ";
+ 
+@@ -10566,10 +10629,29 @@ power_info get_power_info(void)
+ 		get_board_power(&power_info.voltage,&power_info.current,&power_info.consumption);
+ #endif
+ 	web_debug("web call get_power_info, consumption %d, current %d, voltage %d, ret %d\n",
+-		power_info->consumption, power_info->current, power_info->voltage, ret);
++		power_info.consumption, power_info.current, power_info.voltage, ret);
+ 	return power_info;
+ }
+ 
++// ret:0(via UART), 1(via Telnet).
++int get_somconsole(void){
++    int method = 0;
++    es_get_som_console_cfg(&method);
++	// printf("#### get_somconsole %d \n",method);
++	return method;
++}
++
++// method:0(via UART), 1(via Telnet).
++// ret:todo
++int set_somconsole(int method){
++    int ret = 0;
++	LWIP_ASSERT("method is 0 or 1",method==0 || method== 1);
++    /* set som console */
++    ret = es_set_som_console_cfg(method);
++	// printf("#### set_somconsole %d \n",method);
++	return ret;
++}
++
+ NETInfo get_net_info(void) {
+ 	NETInfo example;
+ 	ip4_addr_t ip4_addr;
+@@ -11135,6 +11217,43 @@ http_server_netconn_serve(struct netconn *conn)
+ 				sprintf(json_response, json_response_patt,ret);
+ 
+ 
++				char response_header[BUF_SIZE_256];
++				if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 && byhand ){
++					found_session->tick_value=HAL_GetTick();
++					sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",sidValue,MAX_AGE);
++					sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
++				}else{
++					sprintf(response_header, json_header, strlen(json_response));
++				}
++
++				netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
++				netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
++			}else if(strcmp(path, "/somconsole")==0){
++				web_debug("GET location: somconsole \n");
++				int ret=get_somconsole();
++
++				char json_response[BUF_SIZE_128]={0};
++				char *json_response_patt = "{\"status\":0,\"message\":\"success\",\"data\":{\"method\":\"%d\"}}";
++				sprintf(json_response, json_response_patt,ret);
++
++				char response_header[BUF_SIZE_256];
++				if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 && byhand ){
++					found_session->tick_value=HAL_GetTick();
++					sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",sidValue,MAX_AGE);
++					sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
++				}else{
++					sprintf(response_header, json_header, strlen(json_response));
++				}
++
++				netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
++				netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
++			}else if(strcmp(path, "/bmc_version")==0){
++				web_debug("GET location: bmc_version \n");
++
++				char json_response[BUF_SIZE_128]={0};
++				char *json_response_patt = "{\"status\":0,\"message\":\"success\",\"data\":{\"version\":\"BMC Version:%d.%d\"}}";
++				sprintf(json_response, json_response_patt,(uint8_t)(BMC_SOFTWARE_VERSION_MAJOR),(uint8_t)(BMC_SOFTWARE_VERSION_MINOR));
++
+ 				char response_header[BUF_SIZE_256];
+ 				if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 && byhand ){
+ 					found_session->tick_value=HAL_GetTick();
+@@ -11630,6 +11749,45 @@ http_server_netconn_serve(struct netconn *conn)
+ 					netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
+ 					netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
+ 
++				}else if(strcmp(path, "/somconsole")==0 ){	//rtc
++					web_debug("POST location: somconsole \n");
++					char *method_str=NULL;
++
++					kv_pair *current = params.head;
++					while (current) {
++						if(strcmp(current->key,"method")==0){
++							method_str= current->value;
++							break;
++						}
++						current = current->next;
++					}
++					LWIP_ASSERT("method_str!=NULL", method_str!=NULL);
++
++					int method = strcmp(method_str,"0")==0 ? 0 : 1;
++					int set_ret=set_somconsole(method);
++
++					char *json_response_patt =NULL;
++					char json_response[BUF_SIZE_128]={0};
++					if(set_ret==0){
++						json_response_patt="{\"status\":%d,\"message\":\"success!\",\"data\":{}}";//0 success, msg
++						sprintf(json_response, json_response_patt,  set_ret);
++					}else{
++						json_response_patt="{\"status\":%d,\"message\":\"%s\",\"data\":{}}";//0 success, msg
++						sprintf(json_response, json_response_patt, set_ret,"Can not switch to telnet console,please power on som first.");
++					}
++
++					char response_header[BUF_SIZE_256];
++					if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 ){
++						found_session->tick_value=HAL_GetTick();
++						sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",sidValue,MAX_AGE);
++						sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
++					}else{
++						sprintf(response_header, json_header, strlen(json_response));
++					}
++
++					netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
++					netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
++
+ 				}else{
+ 					send_response_200(conn);
+ 				}
+@@ -11686,10 +11844,7 @@ http_server_netconn_thread(void *arg)
+ 			netconn_delete(newconn);
+ 		}else{
+ 			web_debug("http_server_netconn_thread:err %d \n",err);
+-			netconn_close(newconn);
+-			netconn_delete(newconn);
+ 		}
+-		// osDelay(1000);
+ 	}
+ 	while (1);
+ 	netconn_close(conn);
+diff --git a/Core/Src/web-server.h b/Core/Src/web-server.h
+index cbb9a07..47c5f84 100644
+--- a/Core/Src/web-server.h
++++ b/Core/Src/web-server.h
+@@ -1,27 +1,12 @@
+-/************************************************************************************
+-* Copyright 2024, Beijing ESWIN Computing Technology Co., Ltd.. All rights reserved.
+-* 
+-* Licensed under the Apache License, Version 2.0 (the "License");
+-* you may not use this file except in compliance with the License.
+-* You may obtain a copy of the License at
+-* 
+-* http://www.apache.org/licenses/LICENSE-2.0
+-* 
+-* Unless required by applicable law or agreed to in writing, software
+-* distributed under the License is distributed on an "AS IS" BASIS,
+-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-* See the License for the specific language governing permissions and
+-* limitations under the License.
+-*************************************************************************************/
+-
+-/************************************************************************************
+-* SPDX-License-Identifier: MIT, Apache
+-* 
+-* Author: yuanjunhui@eswincomputing.com
+-* 
+-* File Description: web-server.h
+-*  Header file of the BMC web server
+-************************************************************************************/
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * Header file of the BMC web server
++ *
++ * Copyright 2024 Beijing ESWIN Computing Technology Co., Ltd.
++ *   Authors:
++ *    YuanJunHui<yuanjunhui@eswincomputing.com>
++ *
++ */
+ #ifndef __HTTPSERVER_NETCONN_H__
+ #define __HTTPSERVER_NETCONN_H__
+ 
+diff --git a/Makefile b/Makefile
+index 19e47d0..5f72fae 100644
+--- a/Makefile
++++ b/Makefile
+@@ -46,12 +46,14 @@ C_SOURCES =  \
+ Core/Src/main.c \
+ Core/Src/console.c \
+ Core/Src/freertos.c \
+-Core/Src/sifive_crc32.c \
++Core/Src/hf_crc32.c \
+ Core/Src/hf_common.c \
+ Core/Src/hf_power_process.c \
+ Core/Src/hf_http_process.c \
+ Core/Src/hf_gpio_process.c \
+ Core/Src/hf_protocol_process.c \
++Core/Src/telnet_server.c \
++Core/Src/telnet_som_console.c \
+ Core/Src/hf_spi_slv.c \
+ Core/Src/protocol_lib/ringbuffer.c \
+ Core/Src/protocol_lib/protocol.c \
+diff --git a/Middlewares/Third_Party/LwIP/src/include/lwip/opt.h b/Middlewares/Third_Party/LwIP/src/include/lwip/opt.h
+index 3c9352b..5cbbb89 100644
+--- a/Middlewares/Third_Party/LwIP/src/include/lwip/opt.h
++++ b/Middlewares/Third_Party/LwIP/src/include/lwip/opt.h
+@@ -521,7 +521,7 @@
+  * (only needed if you use the sequential API, like api_lib.c)
+  */
+ #if !defined MEMP_NUM_NETBUF || defined __DOXYGEN__
+-#define MEMP_NUM_NETBUF                 2
++#define MEMP_NUM_NETBUF                 4
+ #endif
+ 
+ /**
+@@ -529,7 +529,7 @@
+  * (only needed if you use the sequential API, like api_lib.c)
+  */
+ #if !defined MEMP_NUM_NETCONN || defined __DOXYGEN__
+-#define MEMP_NUM_NETCONN                4
++#define MEMP_NUM_NETCONN                8
+ #endif
+ 
+ /**
+-- 
+2.25.1
+

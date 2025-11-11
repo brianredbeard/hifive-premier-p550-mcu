@@ -1,0 +1,907 @@
+From 0f06f076b5fdc1bcbf3f1994bef28b164a9b4bf9 Mon Sep 17 00:00:00 2001
+From: xuxiang <xuxiang@eswincomputing.com>
+Date: Mon, 13 May 2024 19:42:10 +0800
+Subject: [PATCH 026/109] WIN2030-15279:refactor:power refactor,web callback
+
+Changelogs:
+1. power process refactor
+2. rtc data write/read callback to web-server
+3. add bootsel soft/hw set
+4. To facilitate full functional testing, modify the power-on process
+
+BREAKING CHANGE:
+1. By default, auto-power is not used. If necessary, the corresponding macro definition can be enabled(hf_power_process.c #define AUTO_BOOT)
+2. You can control the som power on and off in the web-server
+3. At power off, it is also possible to read and write eeprom
+
+Change-Id: I25f1bbfa0645d601f65415223af2bb8d08293d9b
+---
+ Core/Inc/hf_common.h             |  71 +++++++++++
+ Core/Src/hf_common.c             | 108 ++++++++++++++++-
+ Core/Src/hf_http_process.c       |  10 +-
+ Core/Src/hf_i2c.c                |   1 +
+ Core/Src/hf_power_process.c      | 201 +++++++++++++++++++++----------
+ Core/Src/hf_protocol_process.c   |  63 +---------
+ Core/Src/main.c                  |  34 +++++-
+ Core/Src/protocol_lib/protocol.h |  61 +---------
+ Core/Src/web-server.c            |  82 ++++++-------
+ 9 files changed, 392 insertions(+), 239 deletions(-)
+
+diff --git a/Core/Inc/hf_common.h b/Core/Inc/hf_common.h
+index 8519e54..b6dfa4c 100644
+--- a/Core/Inc/hf_common.h
++++ b/Core/Inc/hf_common.h
+@@ -117,6 +117,68 @@ typedef struct {
+ 	uint8_t som_dip_switch_soft_state;	// record the DIP Switch software state of the SOM, it is used for SOM bootsel, bit0---bit3 stand for the DIP0---DIP3
+ } SomPwrMgtDIPInfo;
+ 
++
++
++struct gpio_cmd {
++	uint16_t group;
++	uint16_t pin_num;
++	uint8_t driection;
++	uint8_t value;
++};
++
++struct ip_t {
++	uint8_t ip_addr0;
++	uint8_t ip_addr1;
++	uint8_t ip_addr2;
++	uint8_t ip_addr3;
++};
++
++struct netmask_t {
++	uint8_t netmask_addr0;
++	uint8_t netmask_addr1;
++	uint8_t netmask_addr2;
++	uint8_t netmask_addr3;
++};
++
++struct getway_t {
++	uint8_t getway_addr0;
++	uint8_t getway_addr1;
++	uint8_t getway_addr2;
++	uint8_t getway_addr3;
++};
++
++struct eth_mac_t {
++	uint8_t eth_mac_addr0;
++	uint8_t eth_mac_addr1;
++	uint8_t eth_mac_addr2;
++	uint8_t eth_mac_addr3;
++	uint8_t eth_mac_addr4;
++	uint8_t eth_mac_addr5;
++};
++
++struct fan_control_t {
++	uint8_t fan_num;
++	uint8_t duty;
++};
++
++struct spi_slv_w32_t {
++	uint32_t addr;
++	uint32_t value;
++};
++
++struct rtc_date_t {
++  uint16_t Year;
++  uint8_t Month;
++  uint8_t Date;
++  uint8_t WeekDay;
++};
++
++struct rtc_time_t {
++	uint8_t Hours;
++	uint8_t Minutes;
++	uint8_t Seconds;
++};
++
+ /* constants --------------------------------------------------------*/
+ /* macro ------------------------------------------------------------*/
+ #define __ALIGN_KERNEL(x, a)		__ALIGN_KERNEL_MASK(x, (typeof(x))(a) - 1)
+@@ -198,6 +260,15 @@ void change_som_daemon_state(deamon_stats_t newState);
+ 
+ void TriggerSomTimer(void);
+ 
++void set_bootsel(uint8_t is_soft_crtl, uint8_t sel);
++
++uint32_t es_autoboot(void);
++
++int32_t es_set_rtc_date(struct rtc_date_t *sdate);
++int32_t es_set_rtc_time(struct rtc_time_t *stime);
++int32_t es_get_rtc_date(struct rtc_date_t *sdate);
++int32_t es_get_rtc_time(struct rtc_time_t *stime);
++
+ #ifdef __cplusplus
+ }
+ #endif
+diff --git a/Core/Src/hf_common.c b/Core/Src/hf_common.c
+index a9320cf..d930eaf 100644
+--- a/Core/Src/hf_common.c
++++ b/Core/Src/hf_common.c
+@@ -152,7 +152,6 @@ int _write(int fd, char *ch, int len)
+ 	return length;
+ }
+ 
+-
+ void es_eeprom_wp(uint8_t flag)
+ {
+ 	if(flag) {
+@@ -937,4 +936,111 @@ int es_eeprom_info_test(void)
+ 
+ 	#endif
+ 	return 0;
++}
++
++/**
++ * @brief  eic7700 boot sel.
++ * @param  sel 4'b, bit3:bootsel3 ,bit2:bootsel2; bit1:bootsel2; bit0:bootsel0
++ * @retval None
++ */
++void set_bootsel(uint8_t is_soft_crtl, uint8_t sel)
++{
++	GPIO_InitTypeDef GPIO_InitStruct = {0};
++	if(is_soft_crtl){
++		/*Configure GPIO pins : BOOT_SEL0_Pin BOOT_SEL1_Pin BOOT_SEL2_Pin BOOT_SEL3_Pin*/
++		GPIO_InitStruct.Pin = BOOT_SEL0_Pin | BOOT_SEL1_Pin | BOOT_SEL2_Pin | BOOT_SEL3_Pin;
++		GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
++		GPIO_InitStruct.Pull = GPIO_NOPULL;
++		GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
++		HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
++		uint16_t pin_n = BOOT_SEL0_Pin;
++		for (int i = 0; i < 4; i++) {
++			if (sel & 0x1)
++				HAL_GPIO_WritePin(BOOT_SEL0_GPIO_Port, pin_n, GPIO_PIN_SET);
++			else
++				HAL_GPIO_WritePin(BOOT_SEL0_GPIO_Port, pin_n, GPIO_PIN_RESET);
++			sel = sel >> 1;
++			pin_n = pin_n << 1;
++		}
++	}
++	else {
++		/*Configure GPIO pins : BOOT_SEL0_Pin BOOT_SEL1_Pin BOOT_SEL2_Pin BOOT_SEL3_Pin*/
++		GPIO_InitStruct.Pin = BOOT_SEL0_Pin | BOOT_SEL1_Pin | BOOT_SEL2_Pin | BOOT_SEL3_Pin;
++		GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
++		GPIO_InitStruct.Pull = GPIO_NOPULL;
++		GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
++		HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
++	}
++
++}
++
++int32_t es_set_rtc_date(struct rtc_date_t *sdate)
++{
++	RTC_DateTypeDef sDate = {0};
++	sDate.Year = sdate->Year - 2000;
++	sDate.Month = sdate->Month;
++	sDate.Date = sdate->Date;
++	sDate.WeekDay = sdate->WeekDay;
++
++	printf("yy/mm/dd  %04d/%02d/%02d %02d\r\n", sDate.Year + 2000, sDate.Month, sDate.Date,sDate.WeekDay);
++	if (HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BIN) != HAL_OK)
++		return HAL_ERROR;
++	return HAL_OK;
++}
++
++int32_t es_set_rtc_time(struct rtc_time_t *stime)
++{
++	RTC_TimeTypeDef sTime = {0};
++	sTime.Hours = stime->Hours;
++	sTime.Minutes = stime->Minutes;
++	sTime.Seconds = stime->Seconds;
++	sTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
++	sTime.StoreOperation = RTC_STOREOPERATION_SET;
++	// printf("%s hh:mm:ss %02d:%02d:%02d\r\n", __func__, sTime.Hours, sTime.Minutes,sTime.Seconds);
++	if (HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BIN) != HAL_OK)
++		return HAL_ERROR;
++	return HAL_OK;
++}
++
++int32_t es_get_rtc_date(struct rtc_date_t *sdate)
++{
++	RTC_DateTypeDef GetData;
++	RTC_TimeTypeDef GetTime;
++	if (HAL_RTC_GetTime(&hrtc, &GetTime, RTC_FORMAT_BIN) != HAL_OK)
++		return HAL_ERROR;
++	if (HAL_RTC_GetDate(&hrtc, &GetData, RTC_FORMAT_BIN) != HAL_OK)
++		return HAL_ERROR;
++	// printf("yy/mm/dd  %02d/%02d/%02d\r\n", 2000 + GetData.Year, GetData.Month, GetData.Date);
++	sdate->Year = 2000 + GetData.Year;
++	sdate->Month = GetData.Month;
++	sdate->Date = GetData.Date;
++	sdate->WeekDay = GetData.WeekDay;
++	return HAL_OK;
++}
++
++int32_t es_get_rtc_time(struct rtc_time_t *stime)
++{
++	RTC_TimeTypeDef GetTime;
++	RTC_DateTypeDef GetData;
++
++	if (HAL_RTC_GetTime(&hrtc, &GetTime, RTC_FORMAT_BIN) != HAL_OK)
++		return HAL_ERROR;
++	if (HAL_RTC_GetDate(&hrtc, &GetData, RTC_FORMAT_BIN) != HAL_OK)
++		return HAL_ERROR;
++	stime->Hours = GetTime.Hours;
++	stime->Minutes = GetTime.Minutes;
++	stime->Seconds = GetTime.Seconds;
++	// printf("%s hh:mm:ss %02d:%02d:%02d\r\n", __func__, stime->Hours, stime->Minutes, stime->Seconds);
++	return HAL_OK;
++}
++
++uint32_t es_autoboot(void)
++{
++	int32_t som_pwr_last_state = 0;
++	if(is_som_pwr_lost_resume() && !es_get_som_pwr_last_state(&som_pwr_last_state)) {
++		if (som_pwr_last_state){
++			return 1;
++		}
++	}
++	return 0;
+ }
+\ No newline at end of file
+diff --git a/Core/Src/hf_http_process.c b/Core/Src/hf_http_process.c
+index d9bd9c8..46496a2 100644
+--- a/Core/Src/hf_http_process.c
++++ b/Core/Src/hf_http_process.c
+@@ -49,15 +49,7 @@ void dynamic_change_eth(void)
+ void hf_http_task(void *argument)
+ {
+ 	printf("hf_http_task started!!!\r\n");
+-  osDelay(5000);
+-  /* get board info from eeprom where the MAC is stored */
+-  if(es_init_info_in_eeprom()) {
+-    printf("severe error: get info from eeprom failed!!!");
+-    while(1);
+-  }
+-  #if ES_EEPROM_INFO_TEST
+-  es_eeprom_info_test();
+-  #endif
++
+   /* init code for LWIP */
+   eth_get_address();
+   MX_LWIP_Init();
+diff --git a/Core/Src/hf_i2c.c b/Core/Src/hf_i2c.c
+index 1df2544..b388f75 100644
+--- a/Core/Src/hf_i2c.c
++++ b/Core/Src/hf_i2c.c
+@@ -11,6 +11,7 @@ int hf_i2c_reg_write(I2C_HandleTypeDef *hi2c, uint8_t slave_addr,
+ 							   data_ptr, 0x1, 0xff);
+ 	if (status != HAL_OK) {
+ 		printf("I2Cx_write_Error(%x) reg %x; status %x\r\n", slave_addr, reg_addr, status);
++		return status;
+ 	}
+ 	while (HAL_I2C_GetState(hi2c) != HAL_I2C_STATE_READY);
+ 	while (HAL_I2C_IsDeviceReady(hi2c, slave_addr, 0xff, 0xff) == HAL_TIMEOUT);
+diff --git a/Core/Src/hf_power_process.c b/Core/Src/hf_power_process.c
+index e798c92..c21545d 100644
+--- a/Core/Src/hf_power_process.c
++++ b/Core/Src/hf_power_process.c
+@@ -9,7 +9,8 @@
+ #include "hf_i2c.h"
+ #include "hf_spi_slv.h"
+ /* Private typedef -----------------------------------------------------------*/
+-#define AUTO_BOOT
++// #define AUTO_BOOT
++#define POWER_TESET_MODE
+ /* Private define ------------------------------------------------------------*/
+ #define ATX_POWER_GOOD GPIO_PIN_RESET
+ #define ATX_POWER_FAIL GPIO_PIN_SET
+@@ -29,44 +30,25 @@ static void pmic_power_on(uint8_t turnon);
+ static void atx_power_on(uint8_t turnon);
+ static void power_led_on(uint8_t turnon);
+ static int pmic_b6out_105v(void);
++power_switch_t get_som_power_state(void);
++void change_som_power_state(power_switch_t newState);
++void set_power_off(void);
+ 
+-#define MAXTRYCOUNT		10
++// #define MAXTRYCOUNT		10
++#define MAXTRYCOUNT		40
+ int try_count = 0;
+-
+-power_switch_t get_som_power_state(void)
+-{
+-	power_switch_t state;
+-
+-	taskENTER_CRITICAL();
+-	state = som_power_state;
+-	taskEXIT_CRITICAL();
+-	return state;
+-}
+-
+-void change_som_power_state(power_switch_t newState)
+-{
+-	// Enter critical section to ensure thread safety when traversing and deleting
+-	taskENTER_CRITICAL();
+-	som_power_state = newState;
+-	taskEXIT_CRITICAL();
+-}
+-
++#ifndef POWER_TESET_MODE
+ void hf_power_task(void *parameter)
+ {
+ 	HAL_StatusTypeDef status = HAL_OK;
+ 	power_state_t power_state = IDLE_STATE;
+ 	GPIO_PinState pin_state = GPIO_PIN_RESET;
+ 	printf("hf_power_task started!!!\r\n");
+-
+ #ifdef AUTO_BOOT
+-	power_state = ATX_PS_ON_STATE;
+ 	change_som_power_state(SOM_POWER_ON);
+ #endif
+-
+ 	power_led_on(pdFALSE);
+-
+ 	while (1) {
+-		taskENTER_CRITICAL();
+ 		switch (power_state) {
+ 		case ATX_PS_ON_STATE:
+ 			printf("ATX_PS_ON_STATE\r\n");
+@@ -102,7 +84,8 @@ void hf_power_task(void *parameter)
+ 				osDelay(200);
+ 				status = pmic_b6out_105v();
+ 				osDelay(50);
+-			}while(pin_state != pdTRUE && try_count--);
++				printf("pmic_b6out_105v status %x\r\n",status);
++			}while(status != pdTRUE && try_count--);
+ 			if(try_count <= 0)
+ 			{
+ 				printf("SOM_STATUS_CHECK_STATE fail\r\n");
+@@ -119,25 +102,81 @@ void hf_power_task(void *parameter)
+ 		case RESET_SOM:
+ 			break;
+ 		case POWERON:
+-			if (som_power_state == SOM_POWER_OFF) {
++			if (get_som_power_state() == SOM_POWER_OFF) {
++				power_state = STOP_POWER;
++			}
++			break;
++		case STOP_POWER:
++			printf("STOP_POWER\r\n");
++			set_power_off();
++			change_som_power_state(SOM_POWER_OFF);
++			power_state = IDLE_STATE;
++			break;
++		case IDLE_STATE:
++			if (get_som_power_state() == SOM_POWER_ON) {
++				power_state = ATX_PS_ON_STATE;
++			}
++			break;
++		}
++		osDelay(100);
++	}
++}
++#else
++void hf_power_task(void *parameter)
++{
++	HAL_StatusTypeDef status = HAL_OK;
++	power_state_t power_state = IDLE_STATE;
++	GPIO_PinState pin_state = GPIO_PIN_RESET;
++	printf("hf_power_task started!!!\r\n");
++	osDelay(1000);
++	if(es_autoboot())
++		change_som_power_state(SOM_POWER_ON);
++#ifdef AUTO_BOOT
++	change_som_power_state(SOM_POWER_ON);
++#endif
++	power_led_on(pdFALSE);
++	while (1) {
++		taskENTER_CRITICAL();
++		switch (power_state) {
++		case ATX_PS_ON_STATE:
++			printf("ATX_PS_ON_STATE\r\n");
++			power_state = DC_PWR_GOOD_STATE;
++			break;
++		case DC_PWR_GOOD_STATE:
++			printf("DC_PWR_GOOD_STATE\r\n");
++			power_state = SOM_STATUS_CHECK_STATE;
++			i2c_init(I2C3);
++			break;
++		case SOM_STATUS_CHECK_STATE:
++			printf("SOM_STATUS_CHECK_STATE\r\n");
++			pmic_power_on(pdTRUE);
++			do
++			{
++				osDelay(200);
++				status = pmic_b6out_105v();
++				osDelay(50);
++			}while(status != pdTRUE);
++			som_reset_control(pdFALSE);
++			pmic_status_led_on(pdTRUE);
++			power_led_on(pdTRUE);
++			power_state = POWERON;
++			printf("POWERON\r\n");
++			break;
++		case RESET_SOM:
++			break;
++		case POWERON:
++			if (get_som_power_state() == SOM_POWER_OFF) {
+ 				power_state = STOP_POWER;
+ 			}
+ 			break;
+ 		case STOP_POWER:
+ 			printf("STOP_POWER\r\n");
+-			i2c_deinit(I2C3);
+-			i2c_deinit(I2C1); // dvb v2 move to board init
+-			pmic_power_on(pdFALSE);
+-			osDelay(10);
+-			atx_power_on(pdFALSE);
+-			osDelay(10);
+-			pmic_status_led_on(pdFALSE);
+-			power_led_on(pdFALSE);
+-			som_power_state = SOM_POWER_OFF;
++			set_power_off();
++			change_som_power_state(SOM_POWER_OFF);
+ 			power_state = IDLE_STATE;
+ 			break;
+ 		case IDLE_STATE:
+-			if (som_power_state == SOM_POWER_ON) {
++			if (get_som_power_state() == SOM_POWER_ON) {
+ 				power_state = ATX_PS_ON_STATE;
+ 			}
+ 			break;
+@@ -146,6 +185,42 @@ void hf_power_task(void *parameter)
+ 		osDelay(100);
+ 	}
+ }
++#endif
++
++void power_test_dome(void)
++{
++	#ifdef POWER_TESET_MODE
++	uint8_t pin_state = 0;
++	printf("atx_power_on\r\n");
++	atx_power_on(pdTRUE);
++	do
++	{
++		pin_state = get_dc_power_status();
++		osDelay(100);
++	} while (pin_state != pdTRUE);
++	printf("dc_power good\r\n");
++	osDelay(100);
++	i2c_init(I2C1);
++	#endif
++}
++
++void set_power_off(void)
++{
++	i2c_deinit(I2C3);
++	#ifndef POWER_TESET_MODE
++	i2c_deinit(I2C1); // dvb v2 move to board init
++	#endif
++	pmic_power_on(pdFALSE);
++	osDelay(10);
++	#ifndef POWER_TESET_MODE
++	atx_power_on(pdFALSE);
++	osDelay(10);
++	#endif
++	es_set_som_pwr_last_state(SOM_PWR_LAST_STATE_OFF);
++	pmic_status_led_on(pdFALSE);
++	power_led_on(pdFALSE);
++}
++
+ 
+ /**
+  * @brief  atx power switch .
+@@ -223,6 +298,7 @@ static void pmic_status_led_on(uint8_t turnon)
+ void som_reset_control(uint8_t reset)
+ {
+ 	GPIO_InitTypeDef GPIO_InitStruct = {0};
++	int dip_switch_soft_ctl_attr = 0, dip_switch_soft_state = 0;
+ 	if (reset) {
+ 		GPIO_InitStruct.Pin = MCU_RESET_SOM_N_Pin;
+ 		GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+@@ -232,7 +308,14 @@ void som_reset_control(uint8_t reset)
+ 		HAL_GPIO_WritePin(MCU_RESET_SOM_N_GPIO_Port, MCU_RESET_SOM_N_Pin, GPIO_PIN_RESET);
+ 		uart_deinit(UART4);
+ 		uart_deinit(USART6);
++		SPI2_FLASH_CS_LOW();
++		set_bootsel(0, 0);
+ 	} else {
++		if(!es_get_som_dip_switch_soft_ctl_attr(&dip_switch_soft_ctl_attr) && !es_get_som_dip_switch_soft_state(&dip_switch_soft_state))
++			if(dip_switch_soft_ctl_attr == 1)
++				set_bootsel(1, dip_switch_soft_state);
++			else
++				set_bootsel(0, 0);
+ 		HAL_GPIO_WritePin(MCU_RESET_SOM_N_GPIO_Port, MCU_RESET_SOM_N_Pin, GPIO_PIN_SET);
+ 		GPIO_InitStruct.Pin = MCU_RESET_SOM_N_Pin;
+ 		GPIO_InitStruct.Pull = GPIO_NOPULL;
+@@ -241,6 +324,7 @@ void som_reset_control(uint8_t reset)
+ 		HAL_GPIO_Init(MCU_RESET_SOM_N_GPIO_Port, &GPIO_InitStruct);
+ 		uart_init(UART4);
+ 		uart_init(USART6);
++		SPI2_FLASH_CS_HIGH();
+ 	}
+ }
+ 
+@@ -268,30 +352,23 @@ static int pmic_b6out_105v(void)
+ 	uint8_t reg_add = 0x1e, reg_dat = 0x12, read_dat;
+ 	hf_i2c_reg_write(&hi2c3, PCA9450_ADDR, reg_add, &reg_dat);
+ 	hf_i2c_reg_read(&hi2c3, PCA9450_ADDR, reg_add, &read_dat);
+-	return (reg_dat == read_dat);
++	return reg_dat == read_dat ? 1 : 0;
+ }
+ 
+-/**
+- * @brief  eic7700 boot sel.
+- * @param  sel 4'b, bit3:bootsel3 ,bit2:bootsel2; bit1:bootsel2; bit0:bootsel0
+- * @retval None
+- */
+-void bootsel(uint8_t sel)
++power_switch_t get_som_power_state(void)
+ {
+-	/*Configure GPIO pins : BOOT_SEL0_Pin BOOT_SEL1_Pin BOOT_SEL2_Pin BOOT_SEL3_Pin*/
+-	GPIO_InitTypeDef GPIO_InitStruct = {0};
+-	GPIO_InitStruct.Pin = BOOT_SEL0_Pin | BOOT_SEL1_Pin | BOOT_SEL2_Pin | BOOT_SEL3_Pin;
+-	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+-	GPIO_InitStruct.Pull = GPIO_NOPULL;
+-	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+-	HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+-	uint16_t pin_n = BOOT_SEL0_Pin;
+-	for (int i = 0; i < 4; i++) {
+-		if (sel & 0x1)
+-			HAL_GPIO_WritePin(BOOT_SEL0_GPIO_Port, pin_n, GPIO_PIN_SET);
+-		else
+-			HAL_GPIO_WritePin(BOOT_SEL0_GPIO_Port, pin_n, GPIO_PIN_RESET);
+-		sel = sel >> 1;
+-		pin_n = pin_n << 1;
+-	}
+-}
+\ No newline at end of file
++	power_switch_t state;
++
++	taskENTER_CRITICAL();
++	state = som_power_state;
++	taskEXIT_CRITICAL();
++	return state;
++}
++
++void change_som_power_state(power_switch_t newState)
++{
++	// Enter critical section to ensure thread safety when traversing and deleting
++	taskENTER_CRITICAL();
++	som_power_state = newState;
++	taskEXIT_CRITICAL();
++}
+diff --git a/Core/Src/hf_protocol_process.c b/Core/Src/hf_protocol_process.c
+index 0f0e067..cd418a7 100644
+--- a/Core/Src/hf_protocol_process.c
++++ b/Core/Src/hf_protocol_process.c
+@@ -115,67 +115,6 @@ int32_t es_set_eth(struct ip_t *ip, struct netmask_t *netmask, struct getway_t *
+ 	return HAL_OK;
+ }
+ 
+-int32_t es_set_rtc_date(struct rtc_date_t *sdate)
+-{
+-	RTC_DateTypeDef sDate = {0};
+-	uint16_t year =  (sdate->Year >> 8) | (sdate->Year && 0xff) << 8;
+-	sDate.Year = year - 2000;
+-	sDate.Month = sdate->Month;
+-	sDate.Date = sdate->Date;
+-	sDate.WeekDay = sdate->WeekDay;
+-
+-	// printf("yy/mm/dd  %04d/%02d/%02d %02d\r\n", sDate.Year + 2000, sDate.Month, sDate.Date,sDate.WeekDay);
+-	if (HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BIN) != HAL_OK)
+-		return HAL_ERROR;
+-	return HAL_OK;
+-}
+-
+-int32_t es_set_rtc_time(struct rtc_time_t *stime)
+-{
+-	RTC_TimeTypeDef sTime = {0};
+-	sTime.Hours = stime->Hours;
+-	sTime.Minutes = stime->Minutes;
+-	sTime.Seconds = stime->Seconds;
+-	sTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
+-	sTime.StoreOperation = RTC_STOREOPERATION_SET;
+-	// printf("%s hh:mm:ss %02d:%02d:%02d\r\n", __func__, sTime.Hours, sTime.Minutes,sTime.Seconds);
+-	if (HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BIN) != HAL_OK)
+-		return HAL_ERROR;
+-	return HAL_OK;
+-}
+-
+-int32_t es_get_rtc_date(struct rtc_date_t *sdate)
+-{
+-	RTC_DateTypeDef GetData;
+-	RTC_TimeTypeDef GetTime;
+-	if (HAL_RTC_GetTime(&hrtc, &GetTime, RTC_FORMAT_BIN) != HAL_OK)
+-		return HAL_ERROR;
+-	if (HAL_RTC_GetDate(&hrtc, &GetData, RTC_FORMAT_BIN) != HAL_OK)
+-		return HAL_ERROR;
+-	// printf("yy/mm/dd  %02d/%02d/%02d\r\n", 2000 + GetData.Year, GetData.Month, GetData.Date);
+-	sdate->Year = 2000 + GetData.Year;
+-	sdate->Month = GetData.Month;
+-	sdate->Date = GetData.Date;
+-	sdate->WeekDay = GetData.WeekDay;
+-	return HAL_OK;
+-}
+-
+-int32_t es_get_rtc_time(struct rtc_time_t *stime)
+-{
+-	RTC_TimeTypeDef GetTime;
+-	RTC_DateTypeDef GetData;
+-
+-	if (HAL_RTC_GetTime(&hrtc, &GetTime, RTC_FORMAT_BIN) != HAL_OK)
+-		return HAL_ERROR;
+-	if (HAL_RTC_GetDate(&hrtc, &GetData, RTC_FORMAT_BIN) != HAL_OK)
+-		return HAL_ERROR;
+-	stime->Hours = GetTime.Hours;
+-	stime->Minutes = GetTime.Minutes;
+-	stime->Seconds = GetTime.Seconds;
+-	// printf("%s hh:mm:ss %02d:%02d:%02d\r\n", __func__, stime->Hours, stime->Minutes, stime->Seconds);
+-	return HAL_OK;
+-}
+-
+ extern uint32_t pwm_period;
+ uint32_t fan0_duty = 0;
+ uint32_t fan1_duty = 0;
+@@ -333,6 +272,8 @@ void es_process_cmd(b_frame_class_t *pframe)
+ 		break;
+ 	case CMD_SET_DATE:
+ 		if (pframe->frame.len == (sizeof(struct rtc_date_t) - 1)) {
++			uint16_t year =  (pframe->frame.data.rtc_date.Year >> 8) | (pframe->frame.data.rtc_date.Year && 0xff) << 8;
++			pframe->frame.data.rtc_date.Year = year;
+ 			if (es_set_rtc_date(&pframe->frame.data.rtc_date) == HAL_OK)
+ 				req_type = REQ_OK;
+ 		}
+diff --git a/Core/Src/main.c b/Core/Src/main.c
+index 775313f..10d7b2d 100644
+--- a/Core/Src/main.c
++++ b/Core/Src/main.c
+@@ -146,23 +146,47 @@ static void mcu_status_led_on(uint8_t turnon)
+ extern void get_rtc_info(void);
+ extern void hf_power_task (void* parameter);
+ extern void hf_gpio_task (void* parameter);
++
++
++typedef struct {
++  int dip01;
++  int dip02;
++  int dip03;
++	int dip04;
++	int swctrl;//0 hw,1,sw
++} DIPSwitchInfo;
++
++extern int get_dip_switch(DIPSwitchInfo *dipSwitchInfo);
++extern int set_dip_switch(DIPSwitchInfo dipSwitchInfo);
++
++
+ void hf_main_task(void *argument)
+ {
++  printf("HiFive 106SC!\n");
++  extern void power_test_dome(void);
++  mcu_status_led_on(pdTRUE);
++  power_test_dome();
++
++  /* get board info from eeprom where the MAC is stored */
++  if(es_init_info_in_eeprom()) {
++    printf("severe error: get info from eeprom failed!!!");
++    while(1);
++  }
++  #if ES_EEPROM_INFO_TEST
++  es_eeprom_info_test();
++  #endif
+ 
+   power_task_handle = osThreadNew(hf_power_task, NULL, &power_task_attributes);
+-  key_task_handle = osThreadNew(hf_gpio_task, NULL, &gpio_task_attributes);
+   http_task_handle = osThreadNew(hf_http_task, NULL, &http_task_attributes);
++  key_task_handle = osThreadNew(hf_gpio_task, NULL, &gpio_task_attributes);
+   // moniter_task_handle = osThreadNew(MoniterTask, NULL, &MoniterTask_attributes);
+   protocol_task_handle = osThreadNew(protocol_task, NULL, &protocol_task_attributes);
+   uart4_protocol_task_handle = osThreadNew(uart4_protocol_task, NULL, &protocol_task_attributes);
+   daemon_keelive_task_handle = osThreadNew(deamon_keeplive_task, NULL, &daemon_keeplive_task_attributes);
+-  osDelay(900);
+-  printf("HiFive 106SC!\n");
+   // extern void MX_IWDG_Init(void);
+-
+ 	// MX_IWDG_Init();
+ 
+-  mcu_status_led_on(pdTRUE);
++  // mcu_status_led_on(pdTRUE);
+   // extern uint32_t PWM2_T_Count;
+   // extern uint32_t PWM2_D_Count;
+   // uint32_t uiFrequency;
+diff --git a/Core/Src/protocol_lib/protocol.h b/Core/Src/protocol_lib/protocol.h
+index 192fd4b..7dec12e 100644
+--- a/Core/Src/protocol_lib/protocol.h
++++ b/Core/Src/protocol_lib/protocol.h
+@@ -5,6 +5,7 @@
+ #include "stdint.h"
+ #include "string.h"
+ #include "stm32f4xx_hal.h"
++#include "hf_common.h"
+ 
+ #define B_ERROR 1
+ #define B_SUCCESS 0
+@@ -18,66 +19,6 @@ typedef struct {
+ 	const char *end;
+ } b_frame_t;
+ 
+-struct gpio_cmd {
+-	uint16_t group;
+-	uint16_t pin_num;
+-	uint8_t driection;
+-	uint8_t value;
+-};
+-
+-struct ip_t {
+-	uint8_t ip_addr0;
+-	uint8_t ip_addr1;
+-	uint8_t ip_addr2;
+-	uint8_t ip_addr3;
+-};
+-
+-struct netmask_t {
+-	uint8_t netmask_addr0;
+-	uint8_t netmask_addr1;
+-	uint8_t netmask_addr2;
+-	uint8_t netmask_addr3;
+-};
+-
+-struct getway_t {
+-	uint8_t getway_addr0;
+-	uint8_t getway_addr1;
+-	uint8_t getway_addr2;
+-	uint8_t getway_addr3;
+-};
+-
+-struct eth_mac_t {
+-	uint8_t eth_mac_addr0;
+-	uint8_t eth_mac_addr1;
+-	uint8_t eth_mac_addr2;
+-	uint8_t eth_mac_addr3;
+-	uint8_t eth_mac_addr4;
+-	uint8_t eth_mac_addr5;
+-};
+-
+-struct rtc_date_t {
+-  uint16_t Year;
+-  uint8_t Month;
+-  uint8_t Date;
+-  uint8_t WeekDay;
+-};
+-
+-struct rtc_time_t {
+-	uint8_t Hours;
+-	uint8_t Minutes;
+-	uint8_t Seconds;
+-};
+-
+-struct fan_control_t {
+-	uint8_t fan_num;
+-	uint8_t duty;
+-};
+-
+-struct spi_slv_w32_t {
+-	uint32_t addr;
+-	uint32_t value;
+-};
+-
+ struct frame_data {
+ 	uint8_t is_valid;
+ 	uint8_t cmd;
+diff --git a/Core/Src/web-server.c b/Core/Src/web-server.c
+index 3b15aa7..1ce65e4 100644
+--- a/Core/Src/web-server.c
++++ b/Core/Src/web-server.c
+@@ -10766,20 +10766,19 @@ typedef struct {
+ 	int swctrl;//0 hw,1,sw
+ } DIPSwitchInfo;
+ 
+-DIPSwitchInfo get_dip_switch(){
++int get_dip_switch(DIPSwitchInfo *dipSwitchInfo)
++{
+ 	uint8_t som_dip_switch_state;
+-	DIPSwitchInfo dipSwitchInfo;
+-
+ 	es_get_som_dip_switch_soft_state(&som_dip_switch_state);
+-	dipSwitchInfo.dip01 = 0x1 & som_dip_switch_state;
+-	dipSwitchInfo.dip02 = (0x2 & som_dip_switch_state) >> 1;
+-	dipSwitchInfo.dip03 = (0x4 & som_dip_switch_state) >> 2;
+-	dipSwitchInfo.dip04 = (0x8 & som_dip_switch_state) >> 3;
+-	dipSwitchInfo.swctrl = 0;//todooooooooooo
+-
+-	return dipSwitchInfo;
++	dipSwitchInfo->dip01 = 0x1 & som_dip_switch_state;
++	dipSwitchInfo->dip02 = (0x2 & som_dip_switch_state) >> 1;
++	dipSwitchInfo->dip03 = (0x4 & som_dip_switch_state) >> 2;
++	dipSwitchInfo->dip04 = (0x8 & som_dip_switch_state) >> 3;
++	return 0;
+ }
+-int set_dip_switch(DIPSwitchInfo dipSwitchInfo){
++
++int set_dip_switch(DIPSwitchInfo dipSwitchInfo)
++{
+ 	uint8_t som_dip_switch_state;
+ 
+ 	som_dip_switch_state =  ((0x1 & dipSwitchInfo.dip04) << 3) | ((0x1 & dipSwitchInfo.dip03) << 2)
+@@ -10859,36 +10858,36 @@ typedef struct {
+ 	int seconds;
+ } RTCInfo;
+ 
+-RTCInfo get_rtcinfo(){
+-	printf("TODO call get_rtcinfo\n");
+-	RTCInfo example= {
+-        2024,
+-        5,
+-        10,
+-        13,
+-		33,
+-		59,
+-		59
+-    };
+-    return example;
++int get_rtcinfo(RTCInfo *rtcInfo)
++{
++	struct rtc_date_t date = {0};
++	struct rtc_time_t time = {0};
++
++	es_get_rtc_date(&date);
++	es_get_rtc_time(&time);
++	rtcInfo->year = date.Year;
++	rtcInfo->month = date.Month;
++	rtcInfo->date = date.Date;
++	rtcInfo->weekday = date.WeekDay;
++	rtcInfo->hours = time.Hours;
++	rtcInfo->minutes = time.Minutes;
++	rtcInfo->seconds = time.Seconds;
++    return 0;
+ }
+ 
+ int set_rtcinfo(RTCInfo rtcInfo){
+-	printf("TODO call set_rtcinfo\n");
+-	RTCInfo get_rtcinfo(){
+-	printf("TODO call get_rtcinfo\n");
+-	RTCInfo example= {
+-        2024,
+-        5,
+-        10,
+-        13,
+-		33,
+-		59,
+-		59
+-    };
+-    return example;
+-}
+-return 0;
++	struct rtc_date_t date = {0};
++	struct rtc_time_t time = {0};
++	date.Year = rtcInfo.year;
++	date.Month = rtcInfo.month;
++	date.Date = rtcInfo.date;
++	date.WeekDay = rtcInfo.weekday;
++	time.Hours = rtcInfo.hours;
++	time.Minutes = rtcInfo.minutes;
++	time.Seconds = rtcInfo.seconds;
++	es_set_rtc_date(&date);
++	es_set_rtc_time(&time);
++	return 0;
+ }
+ 
+ int get_soc_status(){
+@@ -11159,8 +11158,8 @@ int get_soc_status(){
+ 
+ 			}else if(strcmp(path, "/dip_switch")==0 ){ //get dip_switch
+ 				printf("GET location: dip_switch \n");
+-				DIPSwitchInfo dipSwitchInfo= get_dip_switch();
+-
++				DIPSwitchInfo dipSwitchInfo= {0};
++				get_dip_switch(&dipSwitchInfo);
+ 				char json_response[BUF_SIZE_128]={0};
+ 				 // 创建JSON格式的字符串
+                 char *json_response_patt = "{\"status\":0,\"message\":\"success\",\"data\":{\"dip01\":\"%d\",\"dip02\":\"%d\",\"dip03\":\"%d\",\"dip04\":\"%d\",\"swctrl\":\"%d\"}}";
+@@ -11301,7 +11300,8 @@ int get_soc_status(){
+ 
+             }else if(strcmp(path, "/rtc")==0 ){
+                 printf("get ,location: /rtc \n");
+-				RTCInfo rtcInfo=get_rtcinfo();
++				RTCInfo rtcInfo = {0};
++				get_rtcinfo(&rtcInfo);
+ 
+                	char json_response[BUF_SIZE_256]={0};
+ 				 // 创建JSON格式的字符串
+-- 
+2.25.1
+

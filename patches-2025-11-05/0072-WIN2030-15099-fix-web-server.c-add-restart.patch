@@ -1,0 +1,171 @@
+From 934ef19489c8f252c6c816a145ffce2f0958346b Mon Sep 17 00:00:00 2001
+From: yuan junhui <yuanjunhui@eswincomputing.com>
+Date: Thu, 6 Jun 2024 10:53:35 +0800
+Subject: [PATCH 072/109] WIN2030-15099:fix(web-server.c):add restart
+
+Changelogs:
+01,reset rename to reboot
+02,add restart
+
+Change-Id: I8750e4cff1e6e5c8e46f70394dc8d7f48f5db3c7
+---
+ Core/Src/web-server.c | 81 +++++++++++++++++++++++++++++++++++--------
+ 1 file changed, 67 insertions(+), 14 deletions(-)
+
+diff --git a/Core/Src/web-server.c b/Core/Src/web-server.c
+index a4c4925..a75cf2f 100644
+--- a/Core/Src/web-server.c
++++ b/Core/Src/web-server.c
+@@ -9167,7 +9167,8 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
+ 													$('#power-on-change').click(function() {\n \
+ 														var power_status = $('#power-on-change').val();\n \
+ 														$('#power-consum-refresh').prop(\"disabled\", true); \n \
+-														$('#reset').prop(\"disabled\", true); \n \
++														$('#reboot').prop(\"disabled\", true); \n \
++														$('#restart').prop(\"disabled\", true); \n \
+ 														$('#soc-refresh').prop(\"disabled\", true); \n \
+ 														power_on_change_countdown=5;//5*1000ms \n \
+ 														$.ajax({\n \
+@@ -9215,25 +9216,47 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
+ 															}\n \
+ 														});\n \
+ 													});\n\
+-													$('#reset').click(function() { \n \
++													$('#reboot').click(function() { \n \
++														if($('#power-on-change').val()==='1' || power_on_change_countdown > 0 ){ //off status \n \
++															return; \n \
++														}\n \
++                                                        $.ajax({ \n\
++                                                            url: '/reboot',\n \
++                                                            type: 'POST',\n \
++                                                            contentType: 'application/x-www-form-urlencoded', \n \
++                                                            success: function(response) {\n \
++                                                                if(response.status===0){\n \
++                                                                    alert(\"reboot success!\");\n \
++                                                                }else{\n \
++                                                                    alert(response.message);\n \
++                                                                }\n \
++                                                                console.log('reboot successfully.');\n \
++                                                            },\n \
++                                                            error: function(xhr, status, error) {\n \
++                                                                alert(\"reboot failed!\");\n \
++                                                                console.error('Error reboot:', error);\n \
++                                                            }\n \
++                                                        });\n \
++                                                    });\n \
++													$('#restart').click(function() { \n \
+ 														if($('#power-on-change').val()==='1' || power_on_change_countdown > 0 ){ //off status \n \
+ 															return; \n \
+ 														}\n \
+ 														$.ajax({ \n\
+-															url: '/reset',\n \
++                                                            url: '/restart',\n \
+ 															type: 'POST',\n \
+ 															contentType: 'application/x-www-form-urlencoded', \n \
+ 															success: function(response) {\n \
+ 																if(response.status===0){\n \
+-																	alert(\"reset success!\");\n \
++                                                                    alert(\"restart success!\");\n \
+ 																}else{\n \
+ 																	alert(response.message);\n \
+ 																}\n \
+-																console.log('Reset successfully.');\n \
++                                                                console.log('restart successfully.');\n \
+ 															},\n \
+ 															error: function(xhr, status, error) {\n \
+-																alert(\"reset failed!\");\n \
+-																console.error('Error Reset:', error);\n \
++                                                                alert(\"restart failed!\");\n \
++                                                                console.error('Error restart:', error);\n \
+ 															}\n \
+ 														});\n \
+ 													});\n \
+@@ -9375,7 +9398,8 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
+ 													$('#power-on-refresh-hid').click(function() {\n \
+ 														$('#power-on-change').prop(\"disabled\", true); \n \
+ 														$('#power-consum-refresh').prop(\"disabled\", true); \n \
+-														$('#reset').prop(\"disabled\", true); \n \
++														$('#reboot').prop(\"disabled\", true); \n \
++														$('#restart').prop(\"disabled\", true); \n \
+ 														$('#soc-refresh').prop(\"disabled\", true); \n \
+ 														$('#power-on-change').text('loading,,,');\n \
+ 														$.ajax({\n \
+@@ -9394,14 +9418,16 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
+ 																		$('#power-on-change').text('powerON');\n \
+ 																		$('#power-on-change').val('1');\n \
+ 																		$('#power-consum-refresh').prop(\"disabled\", true); \n \
+-																		$('#reset').prop(\"disabled\", true); \n \
++																		$('#reboot').prop(\"disabled\", true); \n \
++																		$('#restart').prop(\"disabled\", true); \n \
+ 																		$('#soc-refresh').prop(\"disabled\", true); \n \
+ 																	}else{\n \
+ 																		$('#power-status-label').text('Power Status (ON):');\n \
+ 																		$('#power-on-change').text('powerOFF');\n \
+ 																		$('#power-on-change').val('0');\n \
+ 																		$('#power-consum-refresh').prop(\"disabled\", false); \n \
+-																		$('#reset').prop(\"disabled\", false); \n \
++																		$('#reboot').prop(\"disabled\", false); \n \
++																		$('#restart').prop(\"disabled\", false); \n \
+ 																		$('#soc-refresh').prop(\"disabled\", false); \n \
+ 																	}\n \
+ 																}\n \
+@@ -9772,9 +9798,12 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
+ 											<button id=\"soc-refresh-hid\" value=\"0\" style=\"display:none;\" >refresh</button> \
+ 											</div> \
+ 										</div> \
+-										<div class=\"reset\"> \
++										<div class=\"reboot\"> \
++											<div class=\"network-row\"> \
++												<label>Reboot:</label> <button id=\"reboot\" >Reboot</button>   <br> \
++											</div> \
+ 											<div class=\"network-row\"> \
+-												<label>Reset:</label> <button id=\"reset\" >Reset</button>   <br> \
++												<label>Restart:</label> <button id=\"restart\" >Restart</button>   <br> \
+ 											</div> \
+ 										</div> \
+ 										<div> \
+@@ -11354,8 +11383,8 @@ http_server_netconn_serve(struct netconn *conn)
+ 					netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
+ 					netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
+ 
+-				}else if(strcmp(path, "/reset")==0 ){
+-					web_debug("POST location: reset \n");
++				}else if(strcmp(path, "/reboot")==0 ){
++					web_debug("POST location: reboot \n");
+ 					int reset_ret=xSOMRebootHandle();
+ 					char *json_response_patt =NULL;
+ 					char json_response[BUF_SIZE_64]={0};
+@@ -11367,6 +11396,30 @@ http_server_netconn_serve(struct netconn *conn)
+ 						sprintf(json_response, json_response_patt, reset_ret,reset_ret);
+ 					}
+ 
++                    char response_header[BUF_SIZE_256];
++					if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 ){
++						found_session->tick_value=HAL_GetTick();
++						sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",sidValue,MAX_AGE);
++						sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
++					}else{
++						sprintf(response_header, json_header, strlen(json_response));
++					}
++
++                    netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
++                    netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
++				}else if(strcmp(path, "/restart")==0 ){
++					web_debug("POST location: restart \n");
++					int restart_ret=xSOMRestartHandle();
++                    char *json_response_patt =NULL;
++					char json_response[BUF_SIZE_64]={0};
++					if(restart_ret==0){
++						json_response_patt="{\"status\":%d,\"message\":\"success!\",\"data\":{}}";//0 success, msg
++						sprintf(json_response, json_response_patt, restart_ret);
++					}else{
++						json_response_patt="{\"status\":%d,\"message\":\"error retcode %d\",\"data\":{}}";//0 success, msg
++						sprintf(json_response, json_response_patt, restart_ret,restart_ret);
++					}
++
+ 					char response_header[BUF_SIZE_256];
+ 					if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 ){
+ 						found_session->tick_value=HAL_GetTick();
+-- 
+2.25.1
+

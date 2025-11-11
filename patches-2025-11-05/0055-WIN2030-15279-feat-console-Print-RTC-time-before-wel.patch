@@ -1,0 +1,63 @@
+From df4f619361eb13e954913b2cf0d027a4c101c513 Mon Sep 17 00:00:00 2001
+From: linmin <linmin@eswincomputing.com>
+Date: Fri, 24 May 2024 10:02:59 +0800
+Subject: [PATCH 055/109] WIN2030-15279:feat(console):Print RTC time before
+ welcome
+
+Changelogs:
+1.Print RTC time when console task print welcome message.
+
+Change-Id: I731d0e7401aaf96598aaf7d60441815f59610b68
+---
+ Core/Src/console.c | 19 ++++++++++---------
+ 1 file changed, 10 insertions(+), 9 deletions(-)
+
+diff --git a/Core/Src/console.c b/Core/Src/console.c
+index a8ef1d8..244596e 100644
+--- a/Core/Src/console.c
++++ b/Core/Src/console.c
+@@ -504,6 +504,7 @@ static BaseType_t prvCommandSomBoardInfoGet(char *pcWriteBuffer, size_t xWriteBu
+     som_info *psomInfo = &somInfo;
+     char *pcWb = pcWriteBuffer;
+     size_t len, size = xWriteBufferLen;
++    char boardSn[19] = {0};
+ 
+     ret = web_cmd_handle(CMD_READ_BOARD_INFO, psomInfo, sizeof(som_info), 1000);
+     if (HAL_OK != ret) {
+@@ -531,17 +532,13 @@ static BaseType_t prvCommandSomBoardInfoGet(char *pcWriteBuffer, size_t xWriteBu
+         len = snprintf(pcWb, size, "bom_variant:0x%x\r\n", psomInfo->bom_variant);
+         pcWb += len;
+         size -= len;
+-        len = snprintf(pcWb, size, "SN(hex):");
+-        pcWb += len;
+-        size -= len;
+-        for (int i = 0; i < sizeof(psomInfo->sn); i++) {
+-            pcWb += snprintf(pcWb, size, "%x", psomInfo->sn[i]);
+-            size--;
+-        }
+-        len = snprintf(pcWb, size, "\r\n");
++
++        memcpy(boardSn, psomInfo->sn, sizeof(psomInfo->sn));
++        len = snprintf(pcWb, size, "SN:%s\r\n", boardSn);
+         pcWb += len;
+         size -= len;
+-        len = snprintf(pcWb, size, "status:%d\n", psomInfo->status);
++
++        len = snprintf(pcWb, size, "status:0x%x\r\n", psomInfo->status);
+     }
+ 
+     return pdFALSE;
+@@ -1282,6 +1279,10 @@ void vTaskConsole(void *pvParams)
+         goto out_task_console;
+     }
+ 
++    /* print RTC time */
++    prvCommandRtcGet(pcOutputString, MAX_OUT_STR_LEN, NULL);
++    vConsoleWrite(pcOutputString);
++
+     vConsoleWrite(pcWelcomeMsg);
+     vConsoleEnableRxInterrupt();
+     vConsoleWrite(prvpcPrompt);
+-- 
+2.25.1
+

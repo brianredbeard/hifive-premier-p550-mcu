@@ -1,0 +1,102 @@
+From 7751f80b2489ac1bdba515547fe67b1a14e311bb Mon Sep 17 00:00:00 2001
+From: yuan junhui <yuanjunhui@eswincomputing.com>
+Date: Mon, 27 May 2024 13:58:27 +0800
+Subject: [PATCH 060/109] WIN2030-15099:fix(web-server.c):soc status
+
+Changelogs:
+01,soc status is stopped when power off
+
+Change-Id: Icd8c6650f65df382d62a675dfe9eec3fdc050bcd
+---
+ Core/Src/web-server.c | 18 +++++++++++++-----
+ 1 file changed, 13 insertions(+), 5 deletions(-)
+
+diff --git a/Core/Src/web-server.c b/Core/Src/web-server.c
+index 31b0330..6e72efe 100644
+--- a/Core/Src/web-server.c
++++ b/Core/Src/web-server.c
+@@ -9086,7 +9086,7 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
+ 														return macAddressRegex.test(mac);\n \
+ 													}\n \
+ 													function validateIPAddress(ip) {\n \
+-														var ipRegex = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;\n \
++														var ipRegex = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?).(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?).(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?).(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;\n \
+ 														return ipRegex.test(ip);\n \
+ 													}\n \
+                                                     $('#net-work-update').click(function() { \n \
+@@ -9167,6 +9167,7 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
+ 													 	var power_status = $('#power-on-change').val();\n \
+ 														$('#power-consum-refresh').prop(\"disabled\", true); \n \
+ 														$('#reset').prop(\"disabled\", true); \n \
++														$('#soc-refresh').prop(\"disabled\", true); \n \
+                                                         $.ajax({\n \
+                                                             url: '/power_status',\n \
+                                                             type: 'POST',\n \
+@@ -9214,7 +9215,7 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
+                                                         });\n \
+                                                     });\n\
+ 													$('#reset').click(function() { \n \
+-														if($('#power-on-change').val()===1){ //off status \n \
++														if($('#power-on-change').val()==='1'){ //off status \n \
+ 															return; \n \
+ 														}\n \
+                                                         $.ajax({ \n\
+@@ -9366,6 +9367,7 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
+ 														$('#power-on-change').prop(\"disabled\", true); \n \
+ 														$('#power-consum-refresh').prop(\"disabled\", true); \n \
+ 														$('#reset').prop(\"disabled\", true); \n \
++														$('#soc-refresh').prop(\"disabled\", true); \n \
+ 														$('#power-on-change').text('loading,,,');\n \
+                                                         $.ajax({\n \
+ 															async: false,\n \
+@@ -9384,12 +9386,14 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
+ 																		$('#power-on-change').val('1');\n \
+ 																		$('#power-consum-refresh').prop(\"disabled\", true); \n \
+ 																		$('#reset').prop(\"disabled\", true); \n \
++																		$('#soc-refresh').prop(\"disabled\", true); \n \
+ 																	}else{\n \
+ 																		$('#power-status-label').text('Power Status (ON):');\n \
+ 																		$('#power-on-change').text('powerOFF');\n \
+ 																		$('#power-on-change').val('0');\n \
+ 																		$('#power-consum-refresh').prop(\"disabled\", false); \n \
+ 																		$('#reset').prop(\"disabled\", false); \n \
++																		$('#soc-refresh').prop(\"disabled\", false); \n \
+ 																	}\n \
+ 																}\n \
+ 															},\n \
+@@ -9574,6 +9578,10 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
+                                                         });\n \
+                                                     });\n \
+ 													$('#soc-refresh-hid').click(function() {\n \
++														if($('#power-on-change').val()==='1'){ //off status \n \
++															$('#soc-status').val(\"stopped\");\n \
++															return; \n \
++														}\n \
+                                                         $.ajax({\n \
+ 															async: false,\n \
+                                                             url: '/soc-status',\n \
+@@ -9589,10 +9597,10 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
+ 																		$('#soc-status').val(\"stopped\");\n \
+ 																	} \n \
+ 																}\n \
+-                                                                console.log('rtc refreshed successfully.');\n \
++                                                                console.log('soc status refreshed successfully.');\n \
+                                                             },\n \
+                                                             error: function(xhr, status, error) {\n \
+-                                                                console.error('Error refreshing rtc:', error);\n \
++                                                                console.error('Error refreshing soc status:', error);\n \
+                                                             }\n \
+                                                         });\n \
+                                                     });\n \
+@@ -10618,7 +10626,7 @@ int set_rtcinfo(RTCInfo rtcInfo){
+ //0,working,1,stopped
+ int get_soc_status()
+ {
+-	return SOM_DAEMON_ON == get_som_daemon_state() ? 0 : 1;
++	return get_som_power_state() == SOM_POWER_ON ? (SOM_DAEMON_ON == get_som_daemon_state() ? 0 : 1): 1 ;
+ }
+ 
+  /** Serve one HTTP connection accepted in the http thread */
+-- 
+2.25.1
+

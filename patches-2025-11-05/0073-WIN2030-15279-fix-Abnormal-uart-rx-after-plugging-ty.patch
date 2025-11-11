@@ -1,0 +1,65 @@
+From 2ebc9f7b3bbcfe5f5a732f9386e7c777fdf47e6c Mon Sep 17 00:00:00 2001
+From: xuxiang <xuxiang@eswincomputing.com>
+Date: Thu, 6 Jun 2024 17:06:27 +0800
+Subject: [PATCH 073/109] WIN2030-15279:fix:Abnormal uart rx after plugging
+ type-c
+
+Changelogs:
+1. Change uart3rx from ReceiveToIdle_DMA to ReceiveToIdle_IT
+
+Change-Id: Icec4ed17447f9a5a8d08b1c4a8c40ab76aa31a4d
+---
+ Core/Src/hf_board_init.c       | 2 --
+ Core/Src/hf_it_callback.c      | 6 +++---
+ Core/Src/hf_protocol_process.c | 3 ++-
+ 3 files changed, 5 insertions(+), 6 deletions(-)
+
+diff --git a/Core/Src/hf_board_init.c b/Core/Src/hf_board_init.c
+index b35ae14..c23327e 100644
+--- a/Core/Src/hf_board_init.c
++++ b/Core/Src/hf_board_init.c
+@@ -642,8 +642,6 @@ static void MX_GPIO_Init(void)
+ 	/*Configure GPIO pin Output Level */
+ 	HAL_GPIO_WritePin(GPIOA, SPI1_NSS_Pin, GPIO_PIN_SET);
+ 	HAL_GPIO_WritePin(GPIOA, JTAG_MUX_SEL_Pin | JTAG_MUX_EN_Pin, GPIO_PIN_RESET);
+-	/* som jtag to pin */
+-	HAL_GPIO_WritePin(GPIOA, JTAG_MUX_SEL_Pin, GPIO_PIN_SET);
+ 
+ 	/*Configure GPIO pin Output Level */
+ 	HAL_GPIO_WritePin(GPIOB, EEPROM_WP_Pin, GPIO_PIN_SET);
+diff --git a/Core/Src/hf_it_callback.c b/Core/Src/hf_it_callback.c
+index 36c9f7e..34eb0af 100644
+--- a/Core/Src/hf_it_callback.c
++++ b/Core/Src/hf_it_callback.c
+@@ -85,11 +85,11 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
+ 	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+ 
+ 	if (huart->Instance == USART3) {
+-		printf("%s Size %d sizeof(UART3_RxBuf) %d\n", __func__, Size, sizeof(RxBuf));
++		// printf("uart3_rx Size %d\n", Size);
+ 		es_frame_put(&frame_uart3, RxBuf, Size);
+ 		memset(RxBuf, 0, sizeof(RxBuf) / sizeof(uint8_t));
+-		HAL_UARTEx_ReceiveToIdle_DMA(&huart3, RxBuf, RxBuf_SIZE);
+-		__HAL_DMA_DISABLE_IT(&hdma_usart3_rx, DMA_IT_HT);
++		HAL_UARTEx_ReceiveToIdle_IT(&huart3, RxBuf, RxBuf_SIZE);
++		// HAL_UARTEx_ReceiveToIdle_DMA(&huart3, RxBuf, RxBuf_SIZE);
+ 	} else if (huart->Instance == UART4) {
+ 		//printf("[%s %d]: Size %d sizeof(UART4_RxMsg) %d\n", __func__, __LINE__, Size, sizeof(UART4_RxMsg));
+ 		if (HAL_UART_RXEVENT_TC == huart->RxEventType) {
+diff --git a/Core/Src/hf_protocol_process.c b/Core/Src/hf_protocol_process.c
+index 3c43a45..5c9ca03 100644
+--- a/Core/Src/hf_protocol_process.c
++++ b/Core/Src/hf_protocol_process.c
+@@ -364,7 +364,8 @@ void protocol_task(void *argument)
+ 	frame_uart3.uart = &huart3;
+ 	es_frame_init(&frame_uart3, &frame_info);
+ 	/* enable uart3 dma rx */
+-	HAL_UARTEx_ReceiveToIdle_DMA(frame_uart3.uart, RxBuf, RxBuf_SIZE);
++	HAL_UARTEx_ReceiveToIdle_IT(frame_uart3.uart, RxBuf, RxBuf_SIZE);
++	// HAL_UARTEx_ReceiveToIdle_DMA(frame_uart3.uart, RxBuf, RxBuf_SIZE);
+ 	for (;;) {
+ 		switch (protocol_status) {
+ 		case CHECK_HEAD:
+-- 
+2.25.1
+

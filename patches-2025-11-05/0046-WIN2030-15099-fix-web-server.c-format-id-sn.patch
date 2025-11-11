@@ -1,0 +1,42 @@
+From 40868785117a2e3e740ca5cade50a0385c5557f4 Mon Sep 17 00:00:00 2001
+From: zhongshunci <zhongshunci@eswincomputing.com>
+Date: Tue, 21 May 2024 19:35:03 +0800
+Subject: [PATCH 046/109]  WIN2030-15099:fix(web-server.c):format id,sn
+
+Changelogs:
+01,format id,sn
+
+Change-Id: I4a0d49264fd014695079f5b0b014d10827f090e6
+---
+ Core/Src/web-server.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/Core/Src/web-server.c b/Core/Src/web-server.c
+index d63369d..dafd6ce 100644
+--- a/Core/Src/web-server.c
++++ b/Core/Src/web-server.c
+@@ -10871,8 +10871,8 @@ int get_soc_status()
+ 				int rett = get_som_info(pSimpleInfo);
+ 
+ 				char json_response[BUF_SIZE_256]={0};
+-                char *json_response_patt = "{\"status\":%d,\"message\":\"success\",\"data\":{\"magicNumber\":\"%d\",\"formatVersionNumber\":\"%d\",\"productIdentifier\":\"%d\",\"pcbRevision\":\"%d\",\"boardSerialNumber\":\"%.18s\"}}";
+-                sprintf(json_response, json_response_patt,rett,pSimpleInfo->magic,pSimpleInfo->version,pSimpleInfo->id,pSimpleInfo->pcb,pSimpleInfo->sn);
++                char *json_response_patt = "{\"status\":%d,\"message\":\"success\",\"data\":{\"magicNumber\":\"0x%x\",\"formatVersionNumber\":\"%c\",\"productIdentifier\":\"%c%c\",\"pcbRevision\":\"%c\",\"boardSerialNumber\":\"%.18s\"}}";
++                sprintf(json_response, json_response_patt,rett,pSimpleInfo->magic,pSimpleInfo->version,(char)(pSimpleInfo->id >> 8), (char)(pSimpleInfo->id & 0xFF),pSimpleInfo->pcb,pSimpleInfo->sn);
+ 
+                 char response_header[BUF_SIZE_256];
+                 if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 && byhand ){
+@@ -10892,8 +10892,8 @@ int get_soc_status()
+ 				CBSimpleInfo simpleInfo=get_cb_info();
+ 
+                	char json_response[BUF_SIZE_256]={0};
+-                char *json_response_patt = "{\"status\":0,\"message\":\"success\",\"data\":{\"magicNumber\":\"%d\",\"formatVersionNumber\":\"%d\",\"productIdentifier\":\"%d\",\"pcbRevision\":\"%d\",\"boardSerialNumber\":\"%.18s\"}}";
+-                sprintf(json_response, json_response_patt,simpleInfo.magicNumber,simpleInfo.formatVersionNumber,simpleInfo.productIdentifier,simpleInfo.pcbRevision,simpleInfo.boardSerialNumber);
++                char *json_response_patt = "{\"status\":0,\"message\":\"success\",\"data\":{\"magicNumber\":\"0x%x\",\"formatVersionNumber\":\"%c\",\"productIdentifier\":\"%c%c\",\"pcbRevision\":\"%c\",\"boardSerialNumber\":\"%.18s\"}}";
++                sprintf(json_response, json_response_patt,simpleInfo.magicNumber,simpleInfo.formatVersionNumber, (char)(simpleInfo.productIdentifier >> 8), (char)(simpleInfo.productIdentifier & 0xFF),simpleInfo.pcbRevision,simpleInfo.boardSerialNumber);
+ 
+                 char response_header[BUF_SIZE_256];
+                 if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 && byhand ){
+-- 
+2.25.1
+

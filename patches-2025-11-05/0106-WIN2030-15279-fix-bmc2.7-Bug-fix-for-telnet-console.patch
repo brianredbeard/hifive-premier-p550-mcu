@@ -1,0 +1,76 @@
+From 69e65e0d79577587fe2ef636c6491544dadb5bba Mon Sep 17 00:00:00 2001
+From: linmin <linmin@eswincomputing.com>
+Date: Tue, 26 Nov 2024 13:59:44 +0800
+Subject: [PATCH 106/109] WIN2030-15279:fix(bmc2.7):Bug fix for telnet console
+
+Changelogs:
+1.Fix "the issue of crashing the MCU by doing port scan through nmap".
+  The telnet console task exited unexpectly and uncorrectly if there was a
+  binding error casued by the port scanning through nmap. This caused the
+  mcu to crash.
+2.add web-server.c print error code
+
+Change-Id: I7ff834e54119a3fdfdf5b66749401f2f70c5c2f6
+Signed-off-by: linmin <linmin@eswincomputing.com>
+---
+ Core/Src/telnet_server.c | 22 ++++++++++++++--------
+ Core/Src/web-server.c    |  3 ++-
+ 2 files changed, 16 insertions(+), 9 deletions(-)
+
+diff --git a/Core/Src/telnet_server.c b/Core/Src/telnet_server.c
+index 53d3f04..4b2f068 100644
+--- a/Core/Src/telnet_server.c
++++ b/Core/Src/telnet_server.c
+@@ -205,21 +205,27 @@ static void wrt_task (void *arg)
+ 		  netconn_close (instance->newconn);
+ 		  netconn_delete(instance->newconn);
+ 
++START_LISTEN_AGAIN:
+ 		  // Start listening again
+ 		  netconn_delete(instance->conn);
++RETRY_CREATE_NETCONN:
+ 		  vTaskDelay( 1000 ); // Delay for a while to make sure connection has been deleted eventually
+ 		  instance->conn = netconn_new_with_callback(NETCONN_TCP, netconn_cb);
+-		  if( instance->conn == NULL )
+-		  		return;
++		  if( instance->conn == NULL ) {
++			printf("%s: failed to create TCP connection!!!\n", __func__);
++			goto RETRY_CREATE_NETCONN;
++		  }
+ 
+-		  	err = netconn_bind(instance->conn, NULL, instance->tcp_port);
+-		  	if ( err != ERR_OK )
+-		  		return;
++		err = netconn_bind(instance->conn, NULL, instance->tcp_port);
++		if ( err != ERR_OK ) {
++			printf("%s: err %d, failed to bind TCP!!!\n", __func__, err);
++			goto START_LISTEN_AGAIN;
++		}
+ 
+-		  	netconn_listen(instance->conn);
++		netconn_listen(instance->conn);
+ 
+-		  	// No connection still established
+-		  	instance->status = TELNET_CONN_STATUS_NONE;
++		// No connection still established
++		instance->status = TELNET_CONN_STATUS_NONE;
+ 	  }
+   }
+ }
+diff --git a/Core/Src/web-server.c b/Core/Src/web-server.c
+index 1cca94c..e8730f4 100644
+--- a/Core/Src/web-server.c
++++ b/Core/Src/web-server.c
+@@ -11809,7 +11809,8 @@ http_server_netconn_serve(struct netconn *conn)
+ 		free(buf_copy);
+ 		free(found_session_user_name);
+ 	}else{
+-		LWIP_ASSERT("receive ret err != ERR_OK",0);
++		// LWIP_ASSERT("receive ret err != ERR_OK",0);
++		printf("web-server receive ret err:%d \n",err);
+ 	}
+ 
+ 	netbuf_delete(inbuf);
+-- 
+2.25.1
+

@@ -1,0 +1,571 @@
+From a8ef556caa907e01fb47de99783dc5e0645b46f3 Mon Sep 17 00:00:00 2001
+From: linmin <linmin@eswincomputing.com>
+Date: Mon, 17 Jun 2024 15:31:50 +0800
+Subject: [PATCH 093/109] WIN2030-15279:chore(license statement):Added license
+ statement
+
+Changelogs:
+1.Added license statement to the files that created by ESWIN
+
+Change-Id: I1f4cb0e21e58b79ebb453a54d400cad1b7ce2d2e
+---
+ Core/Inc/hf_common.h           | 25 +++++++++++++++++++++
+ Core/Inc/hf_i2c.h              | 24 ++++++++++++++++++++
+ Core/Inc/hf_power_process.h    | 24 ++++++++++++++++++++
+ Core/Inc/hf_spi_slv.h          | 24 ++++++++++++++++++++
+ Core/Inc/sifive_crc32.h        | 25 ++++++++++++++++++++-
+ Core/Src/hf_board_init.c       | 40 ++++++++++++++++++++--------------
+ Core/Src/hf_common.c           | 24 ++++++++++++++++++++
+ Core/Src/hf_gpio_process.c     | 24 ++++++++++++++++++++
+ Core/Src/hf_http_process.c     | 24 ++++++++++++++++++++
+ Core/Src/hf_i2c.c              | 24 ++++++++++++++++++++
+ Core/Src/hf_it_callback.c      | 24 ++++++++++++++++++++
+ Core/Src/hf_power_process.c    | 24 ++++++++++++++++++++
+ Core/Src/hf_protocol_process.c | 26 ++++++++++++++++++++++
+ Core/Src/hf_spi_slv.c          | 24 ++++++++++++++++++++
+ Core/Src/web-server.c          | 24 ++++++++++++++++++++
+ Core/Src/web-server.h          | 24 ++++++++++++++++++++
+ 16 files changed, 387 insertions(+), 17 deletions(-)
+
+diff --git a/Core/Inc/hf_common.h b/Core/Inc/hf_common.h
+index 9c9bb5a..756eca7 100644
+--- a/Core/Inc/hf_common.h
++++ b/Core/Inc/hf_common.h
+@@ -1,3 +1,28 @@
++/************************************************************************************
++* Copyright 2024, Beijing ESWIN Computing Technology Co., Ltd.. All rights reserved.
++* 
++* Licensed under the Apache License, Version 2.0 (the "License");
++* you may not use this file except in compliance with the License.
++* You may obtain a copy of the License at
++* 
++* http://www.apache.org/licenses/LICENSE-2.0
++* 
++* Unless required by applicable law or agreed to in writing, software
++* distributed under the License is distributed on an "AS IS" BASIS,
++* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++* See the License for the specific language governing permissions and
++* limitations under the License.
++*************************************************************************************/
++
++/************************************************************************************
++* SPDX-License-Identifier: MIT, Apache
++* 
++* Author: linmin@eswincomputing.com
++* 
++* File Description: hf_common.h
++*  Declaration of the cbinfo structure and common api, such as power and
++   rtc operations.
++************************************************************************************/
+ /* Define to prevent recursive inclusion -------------------------------------*/
+ #ifndef __HF_COMMON_H
+ #define __HF_COMMON_H
+diff --git a/Core/Inc/hf_i2c.h b/Core/Inc/hf_i2c.h
+index 57cf27f..7a80df1 100644
+--- a/Core/Inc/hf_i2c.h
++++ b/Core/Inc/hf_i2c.h
+@@ -1,3 +1,27 @@
++/************************************************************************************
++* Copyright 2024, Beijing ESWIN Computing Technology Co., Ltd.. All rights reserved.
++* 
++* Licensed under the Apache License, Version 2.0 (the "License");
++* you may not use this file except in compliance with the License.
++* You may obtain a copy of the License at
++* 
++* http://www.apache.org/licenses/LICENSE-2.0
++* 
++* Unless required by applicable law or agreed to in writing, software
++* distributed under the License is distributed on an "AS IS" BASIS,
++* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++* See the License for the specific language governing permissions and
++* limitations under the License.
++*************************************************************************************/
++
++/************************************************************************************
++* SPDX-License-Identifier: MIT, Apache
++* 
++* Author: xuxiang@eswincomputing.com
++* 
++* File Description: hf_i2c.h
++*  Header file for the hf_i2c.c
++************************************************************************************/
+ /* Define to prevent recursive inclusion -------------------------------------*/
+ #ifndef __HF_I2C_H
+ #define __HF_I2C_H
+diff --git a/Core/Inc/hf_power_process.h b/Core/Inc/hf_power_process.h
+index ddb995c..15b24e6 100644
+--- a/Core/Inc/hf_power_process.h
++++ b/Core/Inc/hf_power_process.h
+@@ -1,3 +1,27 @@
++/************************************************************************************
++* Copyright 2024, Beijing ESWIN Computing Technology Co., Ltd.. All rights reserved.
++* 
++* Licensed under the Apache License, Version 2.0 (the "License");
++* you may not use this file except in compliance with the License.
++* You may obtain a copy of the License at
++* 
++* http://www.apache.org/licenses/LICENSE-2.0
++* 
++* Unless required by applicable law or agreed to in writing, software
++* distributed under the License is distributed on an "AS IS" BASIS,
++* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++* See the License for the specific language governing permissions and
++* limitations under the License.
++*************************************************************************************/
++
++/************************************************************************************
++* SPDX-License-Identifier: MIT, Apache
++* 
++* Author: xuxiang@eswincomputing.com
++* 
++* File Description: hf_power_process.h
++*  Header file for the hf_power_process.c
++************************************************************************************/
+ #ifndef __HF_POWER_PROCESS_H
+ #define __HF_POWER_PROCESS_H
+ 
+diff --git a/Core/Inc/hf_spi_slv.h b/Core/Inc/hf_spi_slv.h
+index 98a68ab..d4c6fda 100644
+--- a/Core/Inc/hf_spi_slv.h
++++ b/Core/Inc/hf_spi_slv.h
+@@ -1,3 +1,27 @@
++/************************************************************************************
++* Copyright 2024, Beijing ESWIN Computing Technology Co., Ltd.. All rights reserved.
++* 
++* Licensed under the Apache License, Version 2.0 (the "License");
++* you may not use this file except in compliance with the License.
++* You may obtain a copy of the License at
++* 
++* http://www.apache.org/licenses/LICENSE-2.0
++* 
++* Unless required by applicable law or agreed to in writing, software
++* distributed under the License is distributed on an "AS IS" BASIS,
++* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++* See the License for the specific language governing permissions and
++* limitations under the License.
++*************************************************************************************/
++
++/************************************************************************************
++* SPDX-License-Identifier: MIT, Apache
++* 
++* Author: xuxiang@eswincomputing.com
++* 
++* File Description: hf_spi_slv.h
++*  Header file for the hf_spi_slv.c
++************************************************************************************/
+ #ifndef __HF_SPI_SLV_H
+ #define __HF_SPI_SLV_H
+ 
+diff --git a/Core/Inc/sifive_crc32.h b/Core/Inc/sifive_crc32.h
+index 17ea8f1..a1dc213 100644
+--- a/Core/Inc/sifive_crc32.h
++++ b/Core/Inc/sifive_crc32.h
+@@ -1,3 +1,27 @@
++/************************************************************************************
++* Copyright 2024, Beijing ESWIN Computing Technology Co., Ltd.. All rights reserved.
++* 
++* Licensed under the Apache License, Version 2.0 (the "License");
++* you may not use this file except in compliance with the License.
++* You may obtain a copy of the License at
++* 
++* http://www.apache.org/licenses/LICENSE-2.0
++* 
++* Unless required by applicable law or agreed to in writing, software
++* distributed under the License is distributed on an "AS IS" BASIS,
++* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++* See the License for the specific language governing permissions and
++* limitations under the License.
++*************************************************************************************/
++
++/************************************************************************************
++* SPDX-License-Identifier: MIT, Apache
++* 
++* Author: linmin@eswincomputing.com
++* 
++* File Description: sifive_crc32.h
++*  Declaration of the crc32 API
++************************************************************************************/
+ /* Define to prevent recursive inclusion -------------------------------------*/
+ #ifndef __STM32_CRC32_H
+ #define __STM32_CRC32_H
+@@ -11,7 +35,6 @@ extern "C" {
+ 
+ /* types ------------------------------------------------------------*/
+ 
+-uint32_t GetCRC32(uint8_t* pbuffer, uint32_t length);
+ uint32_t sifive_crc32(const uint8_t *p, uint32_t len);
+ 
+ #ifdef __cplusplus
+diff --git a/Core/Src/hf_board_init.c b/Core/Src/hf_board_init.c
+index 2e533c5..d912512 100644
+--- a/Core/Src/hf_board_init.c
++++ b/Core/Src/hf_board_init.c
+@@ -1,19 +1,27 @@
+-/**
+- ******************************************************************************
+- * @file           : main.c
+- * @brief          : Main program body
+- ******************************************************************************
+- * @attention
+- *
+- * Copyright (c) 2024 STMicroelectronics.
+- * All rights reserved.
+- *
+- * This software is licensed under terms that can be found in the LICENSE file
+- * in the root directory of this software component.
+- * If no LICENSE file comes with this software, it is provided AS-IS.
+- *
+- ******************************************************************************
+- */
++/************************************************************************************
++* Copyright 2024, Beijing ESWIN Computing Technology Co., Ltd.. All rights reserved.
++* 
++* Licensed under the Apache License, Version 2.0 (the "License");
++* you may not use this file except in compliance with the License.
++* You may obtain a copy of the License at
++* 
++* http://www.apache.org/licenses/LICENSE-2.0
++* 
++* Unless required by applicable law or agreed to in writing, software
++* distributed under the License is distributed on an "AS IS" BASIS,
++* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++* See the License for the specific language governing permissions and
++* limitations under the License.
++*************************************************************************************/
++
++/************************************************************************************
++* SPDX-License-Identifier: MIT, Apache
++* 
++* Author: xuxiang@eswincomputing.com
++* 
++* File Description: hf_board_init.c
++*  The hardware initialization functions
++************************************************************************************/
+ /* Includes ------------------------------------------------------------------*/
+ #include <stdio.h>
+ 
+diff --git a/Core/Src/hf_common.c b/Core/Src/hf_common.c
+index 7b62243..995124d 100644
+--- a/Core/Src/hf_common.c
++++ b/Core/Src/hf_common.c
+@@ -1,3 +1,27 @@
++/************************************************************************************
++* Copyright 2024, Beijing ESWIN Computing Technology Co., Ltd.. All rights reserved.
++* 
++* Licensed under the Apache License, Version 2.0 (the "License");
++* you may not use this file except in compliance with the License.
++* You may obtain a copy of the License at
++* 
++* http://www.apache.org/licenses/LICENSE-2.0
++* 
++* Unless required by applicable law or agreed to in writing, software
++* distributed under the License is distributed on an "AS IS" BASIS,
++* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++* See the License for the specific language governing permissions and
++* limitations under the License.
++*************************************************************************************/
++
++/************************************************************************************
++* SPDX-License-Identifier: MIT, Apache
++* 
++* Author: linmin@eswincomputing.com
++* 
++* File Description: hf_common.c
++*  operation on the information stored in the eeprom
++************************************************************************************/
+ /* Includes ------------------------------------------------------------------*/
+ #include <stdlib.h>
+ #include <string.h>
+diff --git a/Core/Src/hf_gpio_process.c b/Core/Src/hf_gpio_process.c
+index 0829638..566bd15 100644
+--- a/Core/Src/hf_gpio_process.c
++++ b/Core/Src/hf_gpio_process.c
+@@ -1,3 +1,27 @@
++/************************************************************************************
++* Copyright 2024, Beijing ESWIN Computing Technology Co., Ltd.. All rights reserved.
++* 
++* Licensed under the Apache License, Version 2.0 (the "License");
++* you may not use this file except in compliance with the License.
++* You may obtain a copy of the License at
++* 
++* http://www.apache.org/licenses/LICENSE-2.0
++* 
++* Unless required by applicable law or agreed to in writing, software
++* distributed under the License is distributed on an "AS IS" BASIS,
++* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++* See the License for the specific language governing permissions and
++* limitations under the License.
++*************************************************************************************/
++
++/************************************************************************************
++* SPDX-License-Identifier: MIT, Apache
++* 
++* Author: xuxiang@eswincomputing.com
++* 
++* File Description: hf_gpio_process.c
++*  GPIO Task to control the power and reset key
++************************************************************************************/
+ /* Includes ------------------------------------------------------------------*/
+ #include <stdio.h>
+ 
+diff --git a/Core/Src/hf_http_process.c b/Core/Src/hf_http_process.c
+index e5736b1..c74e50c 100644
+--- a/Core/Src/hf_http_process.c
++++ b/Core/Src/hf_http_process.c
+@@ -1,3 +1,27 @@
++/************************************************************************************
++* Copyright 2024, Beijing ESWIN Computing Technology Co., Ltd.. All rights reserved.
++* 
++* Licensed under the Apache License, Version 2.0 (the "License");
++* you may not use this file except in compliance with the License.
++* You may obtain a copy of the License at
++* 
++* http://www.apache.org/licenses/LICENSE-2.0
++* 
++* Unless required by applicable law or agreed to in writing, software
++* distributed under the License is distributed on an "AS IS" BASIS,
++* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++* See the License for the specific language governing permissions and
++* limitations under the License.
++*************************************************************************************/
++
++/************************************************************************************
++* SPDX-License-Identifier: MIT, Apache
++* 
++* Author: xuxiang@eswincomputing.com
++* 
++* File Description: hf_http_process.c
++*  Http server task
++************************************************************************************/
+ /* Includes ------------------------------------------------------------------*/
+ #include <string.h>
+ #include "main.h"
+diff --git a/Core/Src/hf_i2c.c b/Core/Src/hf_i2c.c
+index a4e3348..76113ee 100644
+--- a/Core/Src/hf_i2c.c
++++ b/Core/Src/hf_i2c.c
+@@ -1,3 +1,27 @@
++/************************************************************************************
++* Copyright 2024, Beijing ESWIN Computing Technology Co., Ltd.. All rights reserved.
++* 
++* Licensed under the Apache License, Version 2.0 (the "License");
++* you may not use this file except in compliance with the License.
++* You may obtain a copy of the License at
++* 
++* http://www.apache.org/licenses/LICENSE-2.0
++* 
++* Unless required by applicable law or agreed to in writing, software
++* distributed under the License is distributed on an "AS IS" BASIS,
++* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++* See the License for the specific language governing permissions and
++* limitations under the License.
++*************************************************************************************/
++
++/************************************************************************************
++* SPDX-License-Identifier: MIT, Apache
++* 
++* Author: xuxiang@eswincomputing.com
++* 
++* File Description: hf_i2c.c
++*  I2C hal api, especially for eeprom(memory type), INA226, PAC1934 and PCA9450
++************************************************************************************/
+ #include "stm32f4xx_hal.h"
+ #include "main.h"
+ #include <stdio.h>
+diff --git a/Core/Src/hf_it_callback.c b/Core/Src/hf_it_callback.c
+index 34eb0af..fbd1ffc 100644
+--- a/Core/Src/hf_it_callback.c
++++ b/Core/Src/hf_it_callback.c
+@@ -1,3 +1,27 @@
++/************************************************************************************
++* Copyright 2024, Beijing ESWIN Computing Technology Co., Ltd.. All rights reserved.
++* 
++* Licensed under the Apache License, Version 2.0 (the "License");
++* you may not use this file except in compliance with the License.
++* You may obtain a copy of the License at
++* 
++* http://www.apache.org/licenses/LICENSE-2.0
++* 
++* Unless required by applicable law or agreed to in writing, software
++* distributed under the License is distributed on an "AS IS" BASIS,
++* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++* See the License for the specific language governing permissions and
++* limitations under the License.
++*************************************************************************************/
++
++/************************************************************************************
++* SPDX-License-Identifier: MIT, Apache
++* 
++* Author: xuxiang@eswincomputing.com
++* 
++* File Description: hf_it_callback.c
++*  Interrupt callback for RTC, UART
++************************************************************************************/
+ #include <stdio.h>
+ #include <string.h>
+ 
+diff --git a/Core/Src/hf_power_process.c b/Core/Src/hf_power_process.c
+index 29b1c46..cb2c97b 100644
+--- a/Core/Src/hf_power_process.c
++++ b/Core/Src/hf_power_process.c
+@@ -1,3 +1,27 @@
++/************************************************************************************
++* Copyright 2024, Beijing ESWIN Computing Technology Co., Ltd.. All rights reserved.
++* 
++* Licensed under the Apache License, Version 2.0 (the "License");
++* you may not use this file except in compliance with the License.
++* You may obtain a copy of the License at
++* 
++* http://www.apache.org/licenses/LICENSE-2.0
++* 
++* Unless required by applicable law or agreed to in writing, software
++* distributed under the License is distributed on an "AS IS" BASIS,
++* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++* See the License for the specific language governing permissions and
++* limitations under the License.
++*************************************************************************************/
++
++/************************************************************************************
++* SPDX-License-Identifier: MIT, Apache
++* 
++* Author: xuxiang@eswincomputing.com
++* 
++* File Description: hf_power_process.c
++*  Power task which control the power and maintain the power state machine
++************************************************************************************/
+ /* Includes ------------------------------------------------------------------*/
+ #include <stdio.h>
+ 
+diff --git a/Core/Src/hf_protocol_process.c b/Core/Src/hf_protocol_process.c
+index b955738..36f9ec2 100644
+--- a/Core/Src/hf_protocol_process.c
++++ b/Core/Src/hf_protocol_process.c
+@@ -1,3 +1,29 @@
++/************************************************************************************
++* Copyright 2024, Beijing ESWIN Computing Technology Co., Ltd.. All rights reserved.
++* 
++* Licensed under the Apache License, Version 2.0 (the "License");
++* you may not use this file except in compliance with the License.
++* You may obtain a copy of the License at
++* 
++* http://www.apache.org/licenses/LICENSE-2.0
++* 
++* Unless required by applicable law or agreed to in writing, software
++* distributed under the License is distributed on an "AS IS" BASIS,
++* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++* See the License for the specific language governing permissions and
++* limitations under the License.
++*************************************************************************************/
++
++/************************************************************************************
++* SPDX-License-Identifier: MIT, Apache
++* 
++* Author: xuxiang@eswincomputing.com
++*         huangyifeng@eswincomputing.com
++* 
++* File Description: hf_protocol_process.c
++*  Protocal task used for production line and MCU uart4 communication task reponsibile
++   for communicating with SoC
++************************************************************************************/
+ #include "FreeRTOS.h"
+ #include "cmsis_os2.h"
+ #include "hf_common.h"
+diff --git a/Core/Src/hf_spi_slv.c b/Core/Src/hf_spi_slv.c
+index c5dac15..bbdbf0d 100644
+--- a/Core/Src/hf_spi_slv.c
++++ b/Core/Src/hf_spi_slv.c
+@@ -1,3 +1,27 @@
++/************************************************************************************
++* Copyright 2024, Beijing ESWIN Computing Technology Co., Ltd.. All rights reserved.
++* 
++* Licensed under the Apache License, Version 2.0 (the "License");
++* you may not use this file except in compliance with the License.
++* You may obtain a copy of the License at
++* 
++* http://www.apache.org/licenses/LICENSE-2.0
++* 
++* Unless required by applicable law or agreed to in writing, software
++* distributed under the License is distributed on an "AS IS" BASIS,
++* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++* See the License for the specific language governing permissions and
++* limitations under the License.
++*************************************************************************************/
++
++/************************************************************************************
++* SPDX-License-Identifier: MIT, Apache
++* 
++* Author: xuxiang@eswincomputing.com
++* 
++* File Description: hf_spi_slv.c
++*  SPI api
++************************************************************************************/
+ #include "main.h"
+ #include <stdio.h>
+ #include "hf_spi_slv.h"
+diff --git a/Core/Src/web-server.c b/Core/Src/web-server.c
+index 8b98e3d..326b442 100644
+--- a/Core/Src/web-server.c
++++ b/Core/Src/web-server.c
+@@ -1,3 +1,27 @@
++/************************************************************************************
++* Copyright 2024, Beijing ESWIN Computing Technology Co., Ltd.. All rights reserved.
++* 
++* Licensed under the Apache License, Version 2.0 (the "License");
++* you may not use this file except in compliance with the License.
++* You may obtain a copy of the License at
++* 
++* http://www.apache.org/licenses/LICENSE-2.0
++* 
++* Unless required by applicable law or agreed to in writing, software
++* distributed under the License is distributed on an "AS IS" BASIS,
++* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++* See the License for the specific language governing permissions and
++* limitations under the License.
++*************************************************************************************/
++
++/************************************************************************************
++* SPDX-License-Identifier: MIT, Apache
++* 
++* Author: yuanjunhui@eswincomputing.com
++* 
++* File Description: web-server.c
++*  BMC web server
++************************************************************************************/
+ #include <stdlib.h>
+ #include "lwip/opt.h"
+ #include "lwip/arch.h"
+diff --git a/Core/Src/web-server.h b/Core/Src/web-server.h
+index e0ebe50..cbb9a07 100644
+--- a/Core/Src/web-server.h
++++ b/Core/Src/web-server.h
+@@ -1,3 +1,27 @@
++/************************************************************************************
++* Copyright 2024, Beijing ESWIN Computing Technology Co., Ltd.. All rights reserved.
++* 
++* Licensed under the Apache License, Version 2.0 (the "License");
++* you may not use this file except in compliance with the License.
++* You may obtain a copy of the License at
++* 
++* http://www.apache.org/licenses/LICENSE-2.0
++* 
++* Unless required by applicable law or agreed to in writing, software
++* distributed under the License is distributed on an "AS IS" BASIS,
++* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++* See the License for the specific language governing permissions and
++* limitations under the License.
++*************************************************************************************/
++
++/************************************************************************************
++* SPDX-License-Identifier: MIT, Apache
++* 
++* Author: yuanjunhui@eswincomputing.com
++* 
++* File Description: web-server.h
++*  Header file of the BMC web server
++************************************************************************************/
+ #ifndef __HTTPSERVER_NETCONN_H__
+ #define __HTTPSERVER_NETCONN_H__
+ 
+-- 
+2.25.1
+

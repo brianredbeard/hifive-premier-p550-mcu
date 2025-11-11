@@ -1,0 +1,1118 @@
+From 22698e502a607fa5f14cfa9ab0aba9e9112ddba6 Mon Sep 17 00:00:00 2001
+From: gengzonglin <gengzonglin@eswincomputing.com>
+Date: Thu, 13 Feb 2025 09:07:38 +0800
+Subject: [PATCH 107/109] WIN2030-15279:feat(telnet mcu console):Add telnet mcu
+ console function.
+
+Changelogs:
+1.Add port 25 for telnet mcu console.
+2.Parse console data from the telnet connection.
+3.Multi-client connections are allowed.
+4.Add CLI process critical resource protect.
+
+Signed-off-by: gengzonglin <gengzonglin@eswincomputing.com>
+Change-Id: I199cf9b94d4cdee3f56db3ceacdf06b9695c7893
+---
+ Core/Inc/FreeRTOSConfig.h                     |   2 +-
+ Core/Inc/console.h                            |  12 +
+ Core/Inc/hf_common.h                          |   2 +-
+ Core/Inc/telnet_mcu_console.h                 |  60 +++++
+ Core/Inc/telnet_mcu_server.h                  |  60 +++++
+ Core/Src/console.c                            |  28 ++-
+ Core/Src/hf_common.c                          |  16 +-
+ Core/Src/main.c                               |   7 +-
+ Core/Src/telnet_mcu_console.c                 | 222 ++++++++++++++++++
+ Core/Src/telnet_mcu_server.c                  | 211 +++++++++++++++++
+ LWIP/Target/ethernetif.c                      |  31 ++-
+ Makefile                                      |   2 +
+ .../FreeRTOS/Source/FreeRTOS_CLI.c            |  37 ++-
+ .../FreeRTOS/Source/include/FreeRTOS_CLI.h    |  10 +
+ .../Third_Party/LwIP/src/include/lwip/opt.h   |  14 +-
+ 15 files changed, 673 insertions(+), 41 deletions(-)
+ create mode 100644 Core/Inc/telnet_mcu_console.h
+ create mode 100644 Core/Inc/telnet_mcu_server.h
+ create mode 100644 Core/Src/telnet_mcu_console.c
+ create mode 100644 Core/Src/telnet_mcu_server.c
+
+diff --git a/Core/Inc/FreeRTOSConfig.h b/Core/Inc/FreeRTOSConfig.h
+index 83df28a..44b2009 100644
+--- a/Core/Inc/FreeRTOSConfig.h
++++ b/Core/Inc/FreeRTOSConfig.h
+@@ -68,7 +68,7 @@
+ #define configTICK_RATE_HZ                       ((TickType_t)1000)
+ #define configMAX_PRIORITIES                     ( 56 )
+ #define configMINIMAL_STACK_SIZE                 ((uint16_t)128)
+-#define configTOTAL_HEAP_SIZE                    ((size_t)(36 * 1024))
++#define configTOTAL_HEAP_SIZE                    ((size_t)(48 * 1024))
+ #define configMAX_TASK_NAME_LEN                  ( 16 )
+ #define configUSE_TRACE_FACILITY                 1
+ #define configUSE_STATS_FORMATTING_FUNCTIONS     1
+diff --git a/Core/Inc/console.h b/Core/Inc/console.h
+index 38a6208..b31a2a2 100644
+--- a/Core/Inc/console.h
++++ b/Core/Inc/console.h
+@@ -11,6 +11,18 @@
+ 
+ #include "FreeRTOS.h"
+ 
++/* ASCII code definition */
++#define ASCII_TAB                               '\t'  /* Tabulate              */
++#define ASCII_CR                                '\r'  /* Carriage return       */
++#define ASCII_LF                                '\n'  /* Line feed             */
++#define ASCII_BACKSPACE                         '\b'  /* Back space            */
++#define ASCII_FORM_FEED                         '\f'  /* Form feed             */
++#define ASCII_DEL                               127   /* Delete                */
++#define ASCII_CTRL_PLUS_C                         3   /* CTRL + C              */
++#define ASCII_CTRL_PLUS_A                         1   /* CTRL + A              */
++#define ASCII_NACK                               21   /* Negative acknowledge  */
++#define ASCII_SPACE                              32   /* Space                 */
++
+ BaseType_t xbspConsoleInit(uint16_t usStackSize, UBaseType_t uxPriority, UART_HandleTypeDef *pxUartHandle);
+ 
+ #endif
+diff --git a/Core/Inc/hf_common.h b/Core/Inc/hf_common.h
+index c65bdb1..afd47dc 100644
+--- a/Core/Inc/hf_common.h
++++ b/Core/Inc/hf_common.h
+@@ -237,7 +237,7 @@ extern UART_HandleTypeDef huart6;
+ #endif
+ /* define ------------------------------------------------------------*/
+ #define BMC_SOFTWARE_VERSION_MAJOR                   2
+-#define BMC_SOFTWARE_VERSION_MINOR                   7
++#define BMC_SOFTWARE_VERSION_MINOR                   8
+ 
+ #define MAGIC_NUMBER	0x45505EF1
+ 
+diff --git a/Core/Inc/telnet_mcu_console.h b/Core/Inc/telnet_mcu_console.h
+new file mode 100644
+index 0000000..d9d35aa
+--- /dev/null
++++ b/Core/Inc/telnet_mcu_console.h
+@@ -0,0 +1,60 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * Declaration of the crc32 API
++ *
++ * Copyright 2024 Beijing ESWIN Computing Technology Co., Ltd.
++ *   Authors:
++ *    GengZonglin<gengzonglin@eswincomputing.com>
++ *
++ */
++
++#ifndef __TELNET_MCU_CONSOLE_H
++#define __TELNET_MCU_CONSOLE_H
++#include "FreeRTOS.h"
++#include "semphr.h"
++
++#define MAX_PC_IN_STR_LEN                          64
++#define MAX_PC_OUT_STR_LEN                         600
++#define MAX_PC_USERNAME_PSW_LEN                    MAX_PC_IN_STR_LEN
++/*telnet console handle instance*/
++typedef struct
++{
++    SemaphoreHandle_t s_mutex;
++    struct netconn *newconn;
++
++    char pc_Input_string[MAX_PC_IN_STR_LEN];
++    char pc_prev_input_string[MAX_PC_IN_STR_LEN];
++    char pc_output_string[MAX_PC_OUT_STR_LEN];
++
++    uint8_t pc_input_char_Idx;
++
++    enum
++    {
++        MCU_CONSOLE_STATUS_INIT = 0,
++        MCU_CONSOLE_STATUS_LOGIN_NAME,
++        MCU_CONSOLE_STATUS_LOGIN_PASSWORD,
++        MCU_CONSOLE_STATUS_VERIFIED,
++        MCU_CONSOLE_STATUS_CLOSING
++    }mcu_console_status;
++
++} telnet_console_t;
++
++/**
++* @brief Task to handle user commands via serial communication.
++*
++* @param *buff        Store the command data that get from netconn.
++* @param *buff        Command data length.
++ *@param *inst_ptr    Telnet console connect instance pointer.
++* @retval void
++*/
++void telenet_mcu_console(uint8_t* buff, uint16_t buflen, telnet_console_t* inst_ptr);
++
++/**
++* @brief Initialize the console variable values and print welcome message.
++*
++* @param *inst_ptr    Telnet console connect instance pointer.
++* @retval void
++*/
++void telenet_mcu_console_init(telnet_console_t* inst_ptr);
++
++#endif
+diff --git a/Core/Inc/telnet_mcu_server.h b/Core/Inc/telnet_mcu_server.h
+new file mode 100644
+index 0000000..a66dafb
+--- /dev/null
++++ b/Core/Inc/telnet_mcu_server.h
+@@ -0,0 +1,60 @@
++/*
++ * MIT License
++ *
++ * Copyright (c) 2022 André Cascadan and Bruno Augusto Casu
++ *
++ * Permission is hereby granted, free of charge, to any person obtaining a copy
++ * of this software and associated documentation files (the "Software"), to deal
++ * in the Software without restriction, including without limitation the rights
++ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
++ * copies of the Software, and to permit persons to whom the Software is
++ * furnished to do so, subject to the following conditions:
++ *
++ * The above copyright notice and this permission notice shall be included in all
++ * copies or substantial portions of the Software.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
++ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
++ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
++ * SOFTWARE.
++ *
++ *
++ * This file is part of the lwIP based telnet server.
++ *
++ */
++
++#ifndef __TELNET_MCU_H__
++#define __TELNET_MCU_H__
++#include "FreeRTOS.h"
++#include "semphr.h"
++
++#define TELNET_NO_OPERATION_TIME 300000  /*unit is ms*/
++#define MAX_TELNET_CONN_NUM      3
++
++typedef struct
++{
++    struct netconn *s_conn;
++    uint8_t connections;   /*always less than MAX_CONN_NUM*/
++    SemaphoreHandle_t s_mutex;
++} telnet_server_t;
++/**
++ * @brief Create a new telnet server in a defined TCP port
++ *
++ * @param port               Number of the TCP connection Port
++ */
++void telnet_mcu_create( uint16_t port);
++
++
++/**
++ * @brief A wrapper function that transmit data to client from port 25.
++ *
++ * @param data          A pointer to the data buffer that needs to be sent.
++ * @param inst_ptr      Telnet console connect instance pointer.
++ * @retval              How much data was actually sent.
++ */
++void telnet_mcu_transmit(const char *data, telnet_console_t* inst_ptr);
++
++#endif /* __TELNET_H__ */
+diff --git a/Core/Src/console.c b/Core/Src/console.c
+index db5a5ba..6e15754 100644
+--- a/Core/Src/console.c
++++ b/Core/Src/console.c
+@@ -28,6 +28,10 @@
+ #include "hf_power_process.h"
+ #include "hf_spi_slv.h"
+ #include "telnet_som_console.h"
++#include "console.h"
++#include "semphr.h"
++
++extern SemaphoreHandle_t gEEPROM_Mutex;
+ 
+ #define CONSOLE_VERSION_MAJOR                   1
+ #define CONSOLE_VERSION_MINOR                   0
+@@ -36,16 +40,6 @@
+ #define MAX_OUT_STR_LEN                         600
+ #define MAX_RX_QUEUE_LEN                        300
+ 
+-                                                      /* ASCII code definition */
+-#define ASCII_TAB                               '\t'  /* Tabulate              */
+-#define ASCII_CR                                '\r'  /* Carriage return       */
+-#define ASCII_LF                                '\n'  /* Line feed             */
+-#define ASCII_BACKSPACE                         '\b'  /* Back space            */
+-#define ASCII_FORM_FEED                         '\f'  /* Form feed             */
+-#define ASCII_DEL                               127   /* Delete                */
+-#define ASCII_CTRL_PLUS_C                         3   /* CTRL + C              */
+-#define ASCII_NACK                               21   /* Negative acknowledge  */
+-
+ char cRxData;
+ QueueHandle_t xQueueRxHandle;
+ UART_HandleTypeDef *pxUartDevHandle;
+@@ -727,7 +721,9 @@ static BaseType_t prvCommandIPSet(char *pcWriteBuffer, size_t xWriteBufferLen, c
+     ip.ip_addr1 = 0xff & (naddr >> 8);
+     ip.ip_addr2 = 0xff & (naddr >> 16);
+     ip.ip_addr3 = 0xff & (naddr >> 24);
++    esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
+     es_set_eth(&ip, NULL, NULL, NULL);
++    esEXIT_CRITICAL(gEEPROM_Mutex);
+ 
+     snprintf(pcWriteBuffer, xWriteBufferLen, "ip addr set to %s(0x%lx)\r\n", pcIPaddr, naddr);
+ out:
+@@ -763,7 +759,9 @@ static BaseType_t prvCommandNetMaskSet(char *pcWriteBuffer, size_t xWriteBufferL
+     netmask.netmask_addr1 = 0xff & (naddr >> 8);
+     netmask.netmask_addr2 = 0xff & (naddr >> 16);
+     netmask.netmask_addr3 = 0xff & (naddr >> 24);
++    esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
+     es_set_eth(NULL, &netmask, NULL, NULL);
++    esEXIT_CRITICAL(gEEPROM_Mutex);
+ 
+     snprintf(pcWriteBuffer, xWriteBufferLen, "netmask addr set to %s(0x%lx)\r\n", pcIPaddr, naddr);
+ out:
+@@ -799,7 +797,9 @@ static BaseType_t prvCommandGateWaySet(char *pcWriteBuffer, size_t xWriteBufferL
+     gw.getway_addr1 = 0xff & (naddr >> 8);
+     gw.getway_addr2 = 0xff & (naddr >> 16);
+     gw.getway_addr3 = 0xff & (naddr >> 24);
++    esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
+     es_set_eth(NULL, NULL, &gw, NULL);
++    esEXIT_CRITICAL(gEEPROM_Mutex);
+ 
+     snprintf(pcWriteBuffer, xWriteBufferLen, "gateway addr set to %s(0x%lx)\r\n", pcIPaddr, naddr);
+ out:
+@@ -1304,11 +1304,12 @@ static BaseType_t prvCommandDevmemWrite(char *pcWriteBuffer, size_t xWriteBuffer
+     cValue = FreeRTOS_CLIGetParameter(pcCommandString, 2, &xParamLen);
+     value = atoh(cValue, xParamLen);
+ 
++    esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
+     /* Write memory/io and fill FreeRTOS write buffer */
+     if (HAL_OK != es_spi_write((uint8_t *)&value, memAddr, 4)) {
+         snprintf(pcWriteBuffer, xWriteBufferLen, "Failed to write mem/io at 0x%lx%lx\n", memAddrHigh, memAddrLow);
+     }
+-
++    esEXIT_CRITICAL(gEEPROM_Mutex);
+     return pdFALSE;
+ }
+ 
+@@ -1386,6 +1387,7 @@ static BaseType_t prvCommandCBWpEEPROM(char *pcWriteBuffer, size_t xWriteBufferL
+     cEEPROM_WP = FreeRTOS_CLIGetParameter(pcCommandString, 1, &xParamLen);
+     WP_En = atoi(cEEPROM_WP);
+ 
++    esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
+     /* change write protect pin value */
+     if (!WP_En) {
+         HAL_GPIO_WritePin(EEPROM_WP_GPIO_Port, EEPROM_WP_Pin, GPIO_PIN_RESET);
+@@ -1395,7 +1397,7 @@ static BaseType_t prvCommandCBWpEEPROM(char *pcWriteBuffer, size_t xWriteBufferL
+         HAL_GPIO_WritePin(EEPROM_WP_GPIO_Port, EEPROM_WP_Pin, GPIO_PIN_SET);
+         snprintf(pcWriteBuffer, xWriteBufferLen, "EEPROM Write protect enabled!\r\n");
+     }
+-
++    esEXIT_CRITICAL(gEEPROM_Mutex);
+     return pdFALSE;
+ }
+ 
+@@ -1540,6 +1542,7 @@ void vTaskConsole(void *pvParams)
+                 {
+                     vConsoleWrite("\r\n");
+                     strncpy(pcPrevInputString, pcInputString, MAX_IN_STR_LEN);
++                    FreeRTOS_CLILock();
+                     do
+                     {
+                         xMoreDataToProcess = FreeRTOS_CLIProcessCommand
+@@ -1550,6 +1553,7 @@ void vTaskConsole(void *pvParams)
+                                             );
+                         vConsoleWrite(pcOutputString);
+                     } while (xMoreDataToProcess != pdFALSE);
++                    FreeRTOS_CLIUnLock();
+                 }
+                 uInputIndex = 0;
+                 memset(pcInputString, 0x00, MAX_IN_STR_LEN);
+diff --git a/Core/Src/hf_common.c b/Core/Src/hf_common.c
+index 5a3e5f8..37571aa 100644
+--- a/Core/Src/hf_common.c
++++ b/Core/Src/hf_common.c
+@@ -42,7 +42,7 @@ static CarrierBoardInfo gCarrier_Board_Info;
+ 
+ static MCUServerInfo gMCU_Server_Info;
+ static SomPwrMgtDIPInfo gSOM_PwgMgtDIP_Info;
+-static SemaphoreHandle_t gEEPROM_Mutex;
++SemaphoreHandle_t gEEPROM_Mutex;
+ 
+ static int gSOM_ConsoleCfg = 0; //0: The default console of SOM is uart; 1: Telnet SOM Console
+ 
+@@ -1224,6 +1224,7 @@ int es_eeprom_info_test(void)
+ void set_bootsel(uint8_t is_soft_crtl, uint8_t sel)
+ {
+ 	GPIO_InitTypeDef GPIO_InitStruct = {0};
++	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
+ 	if(is_soft_crtl){
+ 		/*Configure GPIO pins : BOOT_SEL0_Pin BOOT_SEL1_Pin BOOT_SEL2_Pin BOOT_SEL3_Pin*/
+ 		GPIO_InitStruct.Pin = BOOT_SEL0_Pin | BOOT_SEL1_Pin | BOOT_SEL2_Pin | BOOT_SEL3_Pin;
+@@ -1249,6 +1250,7 @@ void set_bootsel(uint8_t is_soft_crtl, uint8_t sel)
+ 		GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+ 		HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+ 	}
++	esEXIT_CRITICAL(gEEPROM_Mutex);
+ }
+ 
+ int get_bootsel(int *pCtl_attr, uint8_t *pSel)
+@@ -1340,8 +1342,12 @@ int32_t es_set_rtc_date(struct rtc_date_t *sdate)
+ 	sDate.WeekDay = sdate->WeekDay;
+ 
+ 	printf("yy/mm/dd  %04d/%02d/%02d %02d\r\n", sDate.Year + 2000, sDate.Month, sDate.Date,sDate.WeekDay);
+-	if (HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BIN) != HAL_OK)
++	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
++	if (HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BIN) != HAL_OK) {
++		esEXIT_CRITICAL(gEEPROM_Mutex);
+ 		return HAL_ERROR;
++	}
++	esEXIT_CRITICAL(gEEPROM_Mutex);
+ 	return HAL_OK;
+ }
+ 
+@@ -1353,9 +1359,13 @@ int32_t es_set_rtc_time(struct rtc_time_t *stime)
+ 	sTime.Seconds = stime->Seconds;
+ 	sTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
+ 	sTime.StoreOperation = RTC_STOREOPERATION_SET;
++	esENTER_CRITICAL(gEEPROM_Mutex, portMAX_DELAY);
+ 	// printf("%s hh:mm:ss %02d:%02d:%02d\r\n", __func__, sTime.Hours, sTime.Minutes,sTime.Seconds);
+-	if (HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BIN) != HAL_OK)
++	if (HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BIN) != HAL_OK) {
++		esEXIT_CRITICAL(gEEPROM_Mutex);
+ 		return HAL_ERROR;
++	}
++	esEXIT_CRITICAL(gEEPROM_Mutex);
+ 	return HAL_OK;
+ }
+ 
+diff --git a/Core/Src/main.c b/Core/Src/main.c
+index 400ebd0..81c3ac1 100644
+--- a/Core/Src/main.c
++++ b/Core/Src/main.c
+@@ -26,7 +26,8 @@
+ #include "console.h"
+ #include "telnet_server.h"
+ #include "telnet_som_console.h"
+-
++#include "telnet_mcu_console.h"
++#include "telnet_mcu_server.h"
+ /* Private includes ----------------------------------------------------------*/
+ #include "hf_common.h"
+ /* Private typedef -----------------------------------------------------------*/
+@@ -69,7 +70,7 @@ const osThreadAttr_t power_task_attributes = {
+ osThreadId_t key_task_handle;
+ const osThreadAttr_t gpio_task_attributes = {
+   .name = "KeyTask",
+-  .stack_size = 1024 * 2,
++  .stack_size = 256 * 3,
+   .priority = (osPriority_t) osPriorityNormal,
+ };
+ 
+@@ -177,7 +178,7 @@ void hf_main_task(void *argument)
+   }
+   telnet_create(23, telenet_receiver_callback, NULL);
+   #endif
+-
++  telnet_mcu_create(25);
+   set_mcu_led_status(LED_MCU_RUNING);
+ 
+   for(;;)
+diff --git a/Core/Src/telnet_mcu_console.c b/Core/Src/telnet_mcu_console.c
+new file mode 100644
+index 0000000..702187e
+--- /dev/null
++++ b/Core/Src/telnet_mcu_console.c
+@@ -0,0 +1,222 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * Transfer the mcu console through telenet
++ *
++ * Copyright 2024 Beijing ESWIN Computing Technology Co., Ltd.
++ *   Authors:
++ *    GengZonglin<gengzonglin@eswincomputing.com>
++ *
++ */
++#include <stdlib.h>
++#include <string.h>
++#include "hf_common.h"
++#include "telnet_server.h"
++#include "telnet_mcu_console.h"
++#include "telnet_mcu_server.h"
++#include "console.h"
++#include "FreeRTOS_CLI.h"
++
++#define TEMP_LOGIN_USER_NAME_SPACE  (inst_ptr->pc_prev_input_string)
++
++static const char *pcWelcomeMsg = "Welcome to the console. Please enter your login username and password.\r\n";
++
++static const char *pcLoginUsername = "user: ";
++static const char *pcLoginPassword = "password: ";
++static const char *pcLoginFail = "Invalid username or password. Please try again.\r\n";
++static const char *pcLoginSucess = "Login success. Enter 'help' to view a list of available commands.\r\n";
++
++static const char *prvpcPrompt = "\r\n#cmd: ";
++
++static void telenet_mcu_console_username(telnet_console_t* inst_ptr)
++{
++    if(inst_ptr->pc_input_char_Idx != 0) {
++        /* use prev input buffer to store login user name. */
++        strncpy(TEMP_LOGIN_USER_NAME_SPACE, inst_ptr->pc_Input_string, MAX_PC_USERNAME_PSW_LEN);
++        telnet_mcu_transmit("\r\n", inst_ptr);
++        telnet_mcu_transmit(pcLoginPassword, inst_ptr);
++        inst_ptr->mcu_console_status = MCU_CONSOLE_STATUS_LOGIN_PASSWORD;
++    } else {
++        // telnet_mcu_transmit("\r\n");
++        telnet_mcu_transmit(pcLoginUsername, inst_ptr);
++        inst_ptr->mcu_console_status = MCU_CONSOLE_STATUS_LOGIN_NAME;
++    }
++}
++
++static void telenet_mcu_console_login_verify(telnet_console_t* inst_ptr)
++{
++    BaseType_t loginSuccess;
++    char loginPassword[MAX_PC_USERNAME_PSW_LEN];
++    char sys_username[MAX_PC_USERNAME_PSW_LEN]="admin";
++	char sys_password[MAX_PC_USERNAME_PSW_LEN]="123456";
++    if(inst_ptr->pc_input_char_Idx != 0) {
++        strncpy(loginPassword, inst_ptr->pc_Input_string, MAX_PC_USERNAME_PSW_LEN);
++
++        es_get_username_password(sys_username, sys_password);
++        loginSuccess = (strcmp(TEMP_LOGIN_USER_NAME_SPACE, sys_username) == 0 && 
++                        strcmp(loginPassword, sys_password) == 0)?0:1;
++        if(loginSuccess) {
++            inst_ptr->mcu_console_status = MCU_CONSOLE_STATUS_LOGIN_NAME;
++            telnet_mcu_transmit("\r\n", inst_ptr);
++            telnet_mcu_transmit(pcLoginFail, inst_ptr);
++            telnet_mcu_transmit(pcLoginUsername, inst_ptr);
++        } else {
++            inst_ptr->mcu_console_status = MCU_CONSOLE_STATUS_VERIFIED;
++            telnet_mcu_transmit("\r\n", inst_ptr);
++            telnet_mcu_transmit(pcLoginSucess, inst_ptr);
++            telnet_mcu_transmit(prvpcPrompt, inst_ptr);
++        }
++    } else {
++        // telnet_mcu_transmit("\r\n");
++        telnet_mcu_transmit(pcLoginPassword, inst_ptr);
++        inst_ptr->mcu_console_status = MCU_CONSOLE_STATUS_LOGIN_PASSWORD;
++    }
++}
++
++static void telenet_mcu_console_normal(telnet_console_t* inst_ptr)
++{
++    BaseType_t more_data_to_process;
++
++    if(inst_ptr->pc_input_char_Idx != 0)
++    {
++        strncpy(inst_ptr->pc_prev_input_string, inst_ptr->pc_Input_string, MAX_PC_IN_STR_LEN);
++        FreeRTOS_CLILock();
++        do
++        {
++            more_data_to_process = FreeRTOS_CLIProcessCommand
++                                (
++                                    inst_ptr->pc_Input_string,    /* Command string*/
++                                    inst_ptr->pc_output_string,   /* Output buffer */
++                                    MAX_PC_OUT_STR_LEN   /* Output buffer size */
++                                );
++            telnet_mcu_transmit(inst_ptr->pc_output_string, inst_ptr);
++        } while (more_data_to_process != pdFALSE);
++        FreeRTOS_CLIUnLock();
++    }
++
++    telnet_mcu_transmit(prvpcPrompt, inst_ptr);
++}
++
++/**
++* @brief mcu console command processing.
++*
++* @param *inst_ptr     Telnet console connect instance pointer.
++* @retval void
++*/
++void telenet_mcu_console_processing(telnet_console_t* inst_ptr)
++{
++    switch (inst_ptr->mcu_console_status)
++    {
++        case MCU_CONSOLE_STATUS_LOGIN_NAME:
++            telenet_mcu_console_username(inst_ptr);
++            break;
++        case MCU_CONSOLE_STATUS_LOGIN_PASSWORD:
++            telenet_mcu_console_login_verify(inst_ptr);
++            break;
++        case MCU_CONSOLE_STATUS_VERIFIED:
++            telenet_mcu_console_normal(inst_ptr);
++            break;
++        default:
++            break;
++    }
++    inst_ptr->pc_input_char_Idx = 0;
++    memset(inst_ptr->pc_Input_string, 0x00, MAX_PC_IN_STR_LEN);
++    memset(inst_ptr->pc_output_string, 0x00, MAX_PC_OUT_STR_LEN);
++}
++
++/**
++* @brief Task to handle user commands via serial communication.
++*
++* @param *buff        Store the command data that get from netconn.
++* @param *buff        Command data length.
++* @param *inst_ptr    Telnet console connect instance pointer.
++* @retval void
++*/
++void telenet_mcu_console(uint8_t* buff, uint16_t buflen, telnet_console_t* inst_ptr)
++{
++    char read_char = '\0';
++    uint8_t buf_char_idx = 0;
++
++    while(buf_char_idx < buflen)
++    {
++        read_char = buff[buf_char_idx];
++        buf_char_idx++;
++        switch (read_char)
++        {
++            case ASCII_CR:
++                /*ingore line feed. case ASCII_LF:*/
++                telenet_mcu_console_processing(inst_ptr);
++                break;
++            case ASCII_FORM_FEED:
++                telnet_mcu_transmit("\x1b[2J\x1b[0;0H", inst_ptr);
++                telnet_mcu_transmit("\n", inst_ptr);
++                telnet_mcu_transmit(prvpcPrompt, inst_ptr);
++                break;
++            case ASCII_CTRL_PLUS_C:
++            case ASCII_CTRL_PLUS_A:
++                inst_ptr->pc_input_char_Idx = 0;
++                memset(inst_ptr->pc_Input_string, 0x00, MAX_PC_IN_STR_LEN);
++                telnet_mcu_transmit("\n", inst_ptr);
++                telnet_mcu_transmit(prvpcPrompt, inst_ptr);
++                break;
++            case ASCII_DEL:
++            case ASCII_NACK:
++            case ASCII_BACKSPACE:
++                if (inst_ptr->pc_input_char_Idx > 0)
++                {
++                    inst_ptr->pc_input_char_Idx--;
++                    inst_ptr->pc_Input_string[inst_ptr->pc_input_char_Idx] = '\0';
++                    telnet_mcu_transmit("\b \b", inst_ptr);
++                }
++                break;
++            case ASCII_SPACE:
++                /*ingore first SPACE*/
++                if (inst_ptr->pc_input_char_Idx > 0)
++                {
++                    if (inst_ptr->pc_input_char_Idx < (MAX_PC_IN_STR_LEN - 1 ))
++                    {
++                        inst_ptr->pc_Input_string[inst_ptr->pc_input_char_Idx] = read_char;
++                        inst_ptr->pc_input_char_Idx++;
++                    }
++                }
++                break;
++            case ASCII_TAB:
++                while (inst_ptr->pc_input_char_Idx)
++                {
++                    inst_ptr->pc_input_char_Idx--;
++                    telnet_mcu_transmit("\b \b", inst_ptr);
++                }
++                strncpy(inst_ptr->pc_Input_string, inst_ptr->pc_prev_input_string, MAX_PC_IN_STR_LEN);
++                inst_ptr->pc_input_char_Idx = (unsigned char)strlen(inst_ptr->pc_Input_string);
++                telnet_mcu_transmit(inst_ptr->pc_Input_string, inst_ptr);
++                break;
++            default:
++                /* Check if read character is between [Space] and [~] in ASCII table */
++                if (inst_ptr->pc_input_char_Idx < (MAX_PC_IN_STR_LEN - 1 ) && (read_char > 32 && read_char <= 126))
++                {
++                    inst_ptr->pc_Input_string[inst_ptr->pc_input_char_Idx] = read_char;
++                    inst_ptr->pc_input_char_Idx++;
++                }
++                break;
++        }
++    }
++}
++
++/**
++* @brief Initialize the console variable values and print welcome message.
++*
++* @param *inst_ptr     Telnet console connect instance pointer.
++* @retval void
++*/
++void telenet_mcu_console_init(telnet_console_t* inst_ptr)
++{
++    memset(inst_ptr->pc_Input_string, 0x00, MAX_PC_IN_STR_LEN);
++    memset(inst_ptr->pc_prev_input_string, 0x00, MAX_PC_IN_STR_LEN);
++    memset(inst_ptr->pc_output_string, 0x00, MAX_PC_OUT_STR_LEN);
++    inst_ptr->pc_input_char_Idx = 0;
++
++    inst_ptr->mcu_console_status = MCU_CONSOLE_STATUS_LOGIN_NAME;
++
++    telnet_mcu_transmit("\r\n", inst_ptr);
++    telnet_mcu_transmit(pcWelcomeMsg, inst_ptr);
++    telnet_mcu_transmit(pcLoginUsername, inst_ptr);
++}
+diff --git a/Core/Src/telnet_mcu_server.c b/Core/Src/telnet_mcu_server.c
+new file mode 100644
+index 0000000..770c877
+--- /dev/null
++++ b/Core/Src/telnet_mcu_server.c
+@@ -0,0 +1,211 @@
++/*
++ * MIT License
++ *
++ * Copyright (c) 2022 André Cascadan and Bruno Augusto Casu
++ *
++ * Permission is hereby granted, free of charge, to any person obtaining a copy
++ * of this software and associated documentation files (the "Software"), to deal
++ * in the Software without restriction, including without limitation the rights
++ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
++ * copies of the Software, and to permit persons to whom the Software is
++ * furnished to do so, subject to the following conditions:
++ *
++ * The above copyright notice and this permission notice shall be included in all
++ * copies or substantial portions of the Software.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
++ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
++ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
++ * SOFTWARE.
++ *
++ *
++ * This file is part of the lwIP based telnet server.
++ *
++ */
++
++#include <stdlib.h>
++#include <string.h>
++#include "cmsis_os.h"
++#include "FreeRTOS.h"
++#include "task.h"
++#include "semphr.h"
++#include "stream_buffer.h"
++#include "lwip/api.h"
++#include "telnet_server.h"
++#include "telnet_mcu_console.h"
++#include "telnet_mcu_server.h"
++
++
++static const char *pcConnFaile = "The number of connections exceeds the limit of 3.\r\n";
++/*server connection define.*/
++telnet_server_t telnet_server;
++
++// Task and attributes
++static const osThreadAttr_t server_listening_attributes = {
++  .name = "TelnetListen",
++  .attr_bits = osThreadDetached,
++  .priority = (osPriority_t) osPriorityNormal,
++  .stack_size = 256 * 4
++};
++
++static const osThreadAttr_t server_senssion_attributes = {
++  .name = "TelnetSession",
++  .attr_bits = osThreadDetached,
++  .priority = (osPriority_t) osPriorityNormal,
++  .stack_size = (256) * 6
++};
++
++// Task functions
++static void telnet_mcu_server_listening (void *arg);
++static void telnet_mcu_server_senssion (void *arg);
++
++/**
++ * @brief Create a new telnet server in a defined TCP port
++ *
++ * @param port               Number of the TCP connection Port
++ */
++void telnet_mcu_create( uint16_t port)
++{
++	err_t err;
++create_conn_again:
++	vTaskDelay( 1000 ); // Delay for a while to make sure connection has been deleted eventually
++	telnet_server.s_conn = netconn_new(NETCONN_TCP);
++	if(telnet_server.s_conn == NULL ) {
++		printf("%s: failed to create TCP connection!!!\n", __func__);
++		goto create_conn_again;
++	}
++
++	err = netconn_bind(telnet_server.s_conn, NULL, port); 
++	if ( err != ERR_OK ) {
++		printf("%s: err %d, failed to bind TCP!!!\n", __func__, err);
++		netconn_delete(telnet_server.s_conn);
++		goto create_conn_again;
++	}
++
++	netconn_listen(telnet_server.s_conn);
++
++	osThreadNew(telnet_mcu_server_listening, NULL, &server_listening_attributes);
++}
++
++/*
++ * Telnet server connection listening task ()
++ *
++ * Listen for connection requests from client telnet ports.
++ * Once connection request arrives, it is accepted and an instance is created.
++ *
++ */
++static void telnet_mcu_server_listening (void *arg)
++{
++	struct netconn *newconn;
++	err_t accept_err;
++	telnet_server.s_mutex = xSemaphoreCreateMutex();
++	telnet_server.connections = 0;
++  	for(;;)
++  	{
++		/* Keep listening until accept the next connection. */
++		accept_err = netconn_accept(telnet_server.s_conn, &newconn);
++		if( accept_err == ERR_OK )
++		{
++			if(telnet_server.connections >= MAX_TELNET_CONN_NUM) {
++				netconn_write(newconn, pcConnFaile, strlen(pcConnFaile), NETCONN_COPY);
++				vTaskDelay(1000); 
++				netconn_close (newconn);
++				netconn_delete(newconn);
++				continue;
++			}
++
++			telnet_console_t *c_instance = 
++					( telnet_console_t*) pvPortMalloc( sizeof(telnet_console_t) );
++			if( c_instance != NULL ) {
++				c_instance->s_mutex = telnet_server.s_mutex;
++				c_instance->newconn = newconn;
++
++				if(osThreadNew(telnet_mcu_server_senssion, c_instance, 
++						&server_senssion_attributes) == NULL) {
++					netconn_close (newconn);
++					netconn_delete(newconn);
++					vPortFree(c_instance);
++					continue;
++				}
++			} else {
++				netconn_close (newconn);
++				netconn_delete(newconn);
++				continue;
++			}
++
++			xSemaphoreTake(telnet_server.s_mutex, portMAX_DELAY);
++			telnet_server.connections ++;
++			xSemaphoreGive(telnet_server.s_mutex);
++		}
++  	}
++}
++
++/*
++ * telnet mcu server session task.
++ *
++ * This task waits and process input bytes from the client.
++ *
++ */
++static void telnet_mcu_server_senssion(void *arg)
++{
++	struct netbuf *rx_netbuf;
++	void *rx_data;
++	uint16_t rx_data_len;
++	err_t recv_err;
++	telnet_console_t *instance = (telnet_console_t *)arg;
++
++	telenet_mcu_console_init(instance);
++	netconn_set_recvtimeout(instance->newconn, TELNET_NO_OPERATION_TIME);
++
++	for(;;)
++	{
++		// Iteratively reads all the available data
++		recv_err = netconn_recv(instance->newconn, &rx_netbuf);
++		if ( recv_err == ERR_OK)
++		{
++			if(netbuf_data(rx_netbuf, &rx_data, &rx_data_len) == ERR_OK ) {
++				if((rx_data_len > 0) && (rx_data_len < MAX_PC_IN_STR_LEN))
++					telenet_mcu_console(rx_data, rx_data_len, instance);
++				else
++					printf("Telnet console get a invalid PKT! len = %d\n", rx_data_len);
++			}
++			netbuf_delete( rx_netbuf );
++		} else {
++			/*If no client commands are received within a certain amount of time 
++			  or the client closes the connection,
++			  then the local server resources should be released.*/
++			printf("net connection closed by err = %d\n", recv_err);
++			xSemaphoreTake(telnet_server.s_mutex, portMAX_DELAY);
++			telnet_server.connections --;
++			xSemaphoreGive(telnet_server.s_mutex);
++
++			netconn_close (instance->newconn);
++			netconn_delete(instance->newconn);
++			vPortFree(instance);
++			osThreadExit();
++		}
++	}
++}
++
++/**
++ * @brief A wrapper function that transmit data to client from port 25.
++ *
++ * @param data          A pointer to the data buffer that needs to be sent.
++ * @param inst_ptr      Telnet console instance.
++ * @retval              void.
++ */
++void telnet_mcu_transmit(const char *data, telnet_console_t* inst_ptr)
++{
++	err_t err = ERR_ARG;
++	size_t data_len;
++	data_len = strlen(data);
++	if (data_len < MAX_PC_OUT_STR_LEN) {
++		err = netconn_write(inst_ptr->newconn, data, data_len, NETCONN_COPY);
++	}
++	if (err != ERR_OK) {
++		printf("Telnet console send data failed! err = %d \n",err);
++	}
++}
+diff --git a/LWIP/Target/ethernetif.c b/LWIP/Target/ethernetif.c
+index 76e2515..6117553 100644
+--- a/LWIP/Target/ethernetif.c
++++ b/LWIP/Target/ethernetif.c
+@@ -41,7 +41,7 @@
+ #define TIME_WAITING_FOR_INPUT ( portMAX_DELAY )
+ /* USER CODE BEGIN OS_THREAD_STACK_SIZE_WITH_RTOS */
+ /* Stack size of the interface thread */
+-#define INTERFACE_THREAD_STACK_SIZE ( 1024 )
++#define INTERFACE_THREAD_STACK_SIZE ( 256 * 5 )
+ /* USER CODE END OS_THREAD_STACK_SIZE_WITH_RTOS */
+ /* Network interface name */
+ #define IFNAME0 's'
+@@ -317,8 +317,17 @@ static void low_level_init(struct netif *netif)
+     HAL_ETH_SetMACConfig(&heth, &MACConf);
+ 
+     HAL_ETH_Start_IT(&heth);
++    osDelay(1000);
+     netif_set_up(netif);
+     netif_set_link_up(netif);
++    #if LWIP_ARP
++    osDelay(5000);
++    if (netif->flags & (NETIF_FLAG_ETHARP)) {
++      etharp_gratuitous(netif);
++      osDelay(1000);
++      etharp_gratuitous(netif);
++    }
++    #endif
+ 
+ /* USER CODE BEGIN PHY_POST_CONFIG */
+ 
+@@ -390,9 +399,10 @@ static err_t low_level_output(struct netif *netif, struct pbuf *p)
+   pbuf_ref(p);
+ 
+   if (HAL_ETH_Transmit_IT(&heth, &TxConfig) == HAL_OK) {
+-    while(osSemaphoreAcquire(TxPktSemaphore, TIME_WAITING_FOR_INPUT)!=osOK)
++    if(osSemaphoreAcquire(TxPktSemaphore, 3000)!=osOK)
+ 
+     {
++      printf("GZL%s %d sned data failed  \n", __func__, __LINE__);
+     }
+ 
+     HAL_ETH_ReleaseTxPacket(&heth);
+@@ -763,7 +773,7 @@ void ethernet_link_thread(void* argument)
+ 
+   struct netif *netif = (struct netif *) argument;
+ /* USER CODE BEGIN ETH link init */
+-
++  
+ /* USER CODE END ETH link init */
+ 
+   for(;;)
+@@ -811,14 +821,25 @@ void ethernet_link_thread(void* argument)
+       MACConf.DuplexMode = duplex;
+       MACConf.Speed = speed;
+       HAL_ETH_SetMACConfig(&heth, &MACConf);
++      osDelay(1000);
+       HAL_ETH_Start_IT(&heth);
+-      netif_set_up(netif);
++      osDelay(2000);
++      netif_set_up(netif);      
+       netif_set_link_up(netif);
++      /*Wait link stable, then send gratuitous ARP again.*/
++      #if LWIP_ARP
++      osDelay(5000);
++      if (netif->flags & (NETIF_FLAG_ETHARP)) {
++        etharp_gratuitous(netif);
++        osDelay(1000);
++        etharp_gratuitous(netif);
++      }
++      #endif
+     }
+   }
+ 
+ /* USER CODE BEGIN ETH link Thread core code for User BSP */
+-
++  
+ /* USER CODE END ETH link Thread core code for User BSP */
+ 
+     osDelay(100);
+diff --git a/Makefile b/Makefile
+index 5f72fae..3864a58 100644
+--- a/Makefile
++++ b/Makefile
+@@ -54,6 +54,8 @@ Core/Src/hf_gpio_process.c \
+ Core/Src/hf_protocol_process.c \
+ Core/Src/telnet_server.c \
+ Core/Src/telnet_som_console.c \
++Core/Src/telnet_mcu_server.c \
++Core/Src/telnet_mcu_console.c \
+ Core/Src/hf_spi_slv.c \
+ Core/Src/protocol_lib/ringbuffer.c \
+ Core/Src/protocol_lib/protocol.c \
+diff --git a/Middlewares/Third_Party/FreeRTOS/Source/FreeRTOS_CLI.c b/Middlewares/Third_Party/FreeRTOS/Source/FreeRTOS_CLI.c
+index 9257f5a..2424cdb 100644
+--- a/Middlewares/Third_Party/FreeRTOS/Source/FreeRTOS_CLI.c
++++ b/Middlewares/Third_Party/FreeRTOS/Source/FreeRTOS_CLI.c
+@@ -31,6 +31,7 @@
+ /* FreeRTOS includes. */
+ #include "FreeRTOS.h"
+ #include "task.h"
++#include "semphr.h"
+ 
+ /* Utils includes. */
+ #include "FreeRTOS_CLI.h"
+@@ -92,12 +93,13 @@ attempted.
+ configAPPLICATION_PROVIDES_cOutputBuffer is provided to allow the application
+ writer to provide their own cOutputBuffer declaration in cases where the
+ buffer needs to be placed at a fixed address (rather than by the linker). */
+-#if( configAPPLICATION_PROVIDES_cOutputBuffer == 0 )
+-	static char cOutputBuffer[ configCOMMAND_INT_MAX_OUTPUT_SIZE ];
+-#else
+-	extern char cOutputBuffer[ configCOMMAND_INT_MAX_OUTPUT_SIZE ];
+-#endif
++// #if( configAPPLICATION_PROVIDES_cOutputBuffer == 0 )
++// 	static char cOutputBuffer[ configCOMMAND_INT_MAX_OUTPUT_SIZE ];
++// #else
++// 	extern char cOutputBuffer[ configCOMMAND_INT_MAX_OUTPUT_SIZE ];
++// #endif
+ 
++SemaphoreHandle_t gCLI_Mutex;
+ 
+ /*-----------------------------------------------------------*/
+ 
+@@ -135,6 +137,8 @@ BaseType_t xReturn = pdFAIL;
+ 		}
+ 		taskEXIT_CRITICAL();
+ 
++		gCLI_Mutex = xSemaphoreCreateMutex();
++
+ 		xReturn = pdPASS;
+ 	}
+ 
+@@ -217,10 +221,10 @@ size_t xCommandStringLength;
+ }
+ /*-----------------------------------------------------------*/
+ 
+-char *FreeRTOS_CLIGetOutputBuffer( void )
+-{
+-	return cOutputBuffer;
+-}
++// char *FreeRTOS_CLIGetOutputBuffer( void )
++// {
++// 	return cOutputBuffer;
++// }
+ /*-----------------------------------------------------------*/
+ 
+ const char *FreeRTOS_CLIGetParameter( const char *pcCommandString, UBaseType_t uxWantedParameter, BaseType_t *pxParameterStringLength )
+@@ -348,3 +352,18 @@ BaseType_t xLastCharacterWasSpace = pdFALSE;
+ 	return cParameters;
+ }
+ 
++/*
++ * Lock the critical resource for current process.
++ */
++void FreeRTOS_CLILock(void)
++{
++	xSemaphoreTake(gCLI_Mutex, portMAX_DELAY);
++}
++
++/*
++ * UnLock the critical resource for current process.
++ */
++void FreeRTOS_CLIUnLock(void)
++{
++	xSemaphoreGive(gCLI_Mutex);
++} 
+diff --git a/Middlewares/Third_Party/FreeRTOS/Source/include/FreeRTOS_CLI.h b/Middlewares/Third_Party/FreeRTOS/Source/include/FreeRTOS_CLI.h
+index ce6c801..4801256 100644
+--- a/Middlewares/Third_Party/FreeRTOS/Source/include/FreeRTOS_CLI.h
++++ b/Middlewares/Third_Party/FreeRTOS/Source/include/FreeRTOS_CLI.h
+@@ -94,6 +94,16 @@ char *FreeRTOS_CLIGetOutputBuffer( void );
+  */
+ const char *FreeRTOS_CLIGetParameter( const char *pcCommandString, UBaseType_t uxWantedParameter, BaseType_t *pxParameterStringLength );
+ 
++/*
++ * Lock the critical resource for current process.
++ */
++void FreeRTOS_CLILock(void);
++
++/*
++ * UnLock the critical resource for current process.
++ */
++void FreeRTOS_CLIUnLock(void);
++
+ /* *INDENT-OFF* */
+ #ifdef __cplusplus
+     }
+diff --git a/Middlewares/Third_Party/LwIP/src/include/lwip/opt.h b/Middlewares/Third_Party/LwIP/src/include/lwip/opt.h
+index 5cbbb89..77c44c3 100644
+--- a/Middlewares/Third_Party/LwIP/src/include/lwip/opt.h
++++ b/Middlewares/Third_Party/LwIP/src/include/lwip/opt.h
+@@ -408,7 +408,7 @@
+  * this should be set high.
+  */
+ #if !defined MEMP_NUM_PBUF || defined __DOXYGEN__
+-#define MEMP_NUM_PBUF                   16
++#define MEMP_NUM_PBUF                   30
+ #endif
+ 
+ /**
+@@ -433,7 +433,7 @@
+  * (requires the LWIP_TCP option)
+  */
+ #if !defined MEMP_NUM_TCP_PCB || defined __DOXYGEN__
+-#define MEMP_NUM_TCP_PCB                5
++#define MEMP_NUM_TCP_PCB                6
+ #endif
+ 
+ /**
+@@ -521,7 +521,7 @@
+  * (only needed if you use the sequential API, like api_lib.c)
+  */
+ #if !defined MEMP_NUM_NETBUF || defined __DOXYGEN__
+-#define MEMP_NUM_NETBUF                 4
++#define MEMP_NUM_NETBUF                 5
+ #endif
+ 
+ /**
+@@ -1243,14 +1243,14 @@
+  * TCP_MAXRTX: Maximum number of retransmissions of data segments.
+  */
+ #if !defined TCP_MAXRTX || defined __DOXYGEN__
+-#define TCP_MAXRTX                      12
++#define TCP_MAXRTX                      3
+ #endif
+ 
+ /**
+  * TCP_SYNMAXRTX: Maximum number of retransmissions of SYN segments.
+  */
+ #if !defined TCP_SYNMAXRTX || defined __DOXYGEN__
+-#define TCP_SYNMAXRTX                   6
++#define TCP_SYNMAXRTX                   3
+ #endif
+ 
+ /**
+@@ -1978,7 +1978,7 @@
+  * in seconds. (does not require sockets.c, and will affect tcp.c)
+  */
+ #if !defined LWIP_TCP_KEEPALIVE || defined __DOXYGEN__
+-#define LWIP_TCP_KEEPALIVE              0
++#define LWIP_TCP_KEEPALIVE              1
+ #endif
+ 
+ /**
+@@ -1994,7 +1994,7 @@
+  * SO_RCVTIMEO processing.
+  */
+ #if !defined LWIP_SO_RCVTIMEO || defined __DOXYGEN__
+-#define LWIP_SO_RCVTIMEO                0
++#define LWIP_SO_RCVTIMEO                1
+ #endif
+ 
+ /**
+-- 
+2.25.1
+

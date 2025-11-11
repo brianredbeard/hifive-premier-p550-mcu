@@ -1,0 +1,161 @@
+From 61c4d8f1fbeb3c2e4e6a0dddd7f120d2f897eeb8 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?=E2=80=9Chuangyifeng=E2=80=9D?=
+ <huangyifeng@eswincomputing.com>
+Date: Fri, 24 May 2024 09:58:10 +0800
+Subject: [PATCH 056/109] WIN2030-15099:fix(daemon):keep live timeout when lost
+ 5 times packet
+
+Changelogs: 1. Time out when lost 5 times packet
+               2. print date when daemon status change.
+               3. poweroff and reboot daemon timeout time set to 2s
+
+Change-Id: I8af7c6a14c76872a4e6c64d598c939b64674f4f4
+---
+ Core/Src/console.c             |  4 ++--
+ Core/Src/hf_protocol_process.c | 15 ++++++++++-----
+ Core/Src/web-server.c          | 18 +++++++++---------
+ 3 files changed, 21 insertions(+), 16 deletions(-)
+
+diff --git a/Core/Src/console.c b/Core/Src/console.c
+index 244596e..7bd7a84 100644
+--- a/Core/Src/console.c
++++ b/Core/Src/console.c
+@@ -1047,7 +1047,7 @@ static BaseType_t prvCommandSomPwrStatusSet(char *pcWriteBuffer, size_t xWriteBu
+     /* change som power */
+     if (0 == powerOnOff) {
+         if (SOM_POWER_ON == get_som_power_state()) {
+-            ret = web_cmd_handle(CMD_POWER_OFF, NULL, 0, 1000);
++            ret = web_cmd_handle(CMD_POWER_OFF, NULL, 0, 2000);
+             if (HAL_OK != ret) {
+                 change_som_power_state(SOM_POWER_OFF);
+                 printf("Poweroff SOM error(ret %d), force shutdown it!\n", ret);
+@@ -1098,7 +1098,7 @@ static BaseType_t prvCommandReboot(char *pcWriteBuffer, size_t xWriteBufferLen,
+     int ret = HAL_OK;
+ 
+     if (SOM_POWER_ON == get_som_power_state()) {
+-        ret = web_cmd_handle(CMD_RESET, NULL, 0, 1000);
++        ret = web_cmd_handle(CMD_RESET, NULL, 0, 2000);
+         if (HAL_OK != ret) {
+             som_reset_control(pdTRUE);
+             osDelay(10);
+diff --git a/Core/Src/hf_protocol_process.c b/Core/Src/hf_protocol_process.c
+index 7afc637..edbbc52 100644
+--- a/Core/Src/hf_protocol_process.c
++++ b/Core/Src/hf_protocol_process.c
+@@ -599,6 +599,8 @@ void deamon_keeplive_task(void *argument)
+ 	int ret = HAL_OK;
+ 	deamon_stats_t old_status;
+ 	static uint8_t count = 0;
++	struct rtc_date_t date = {0};
++	struct rtc_time_t time = {0};
+ 
+ 	for (;;) {
+ 		if (SOM_POWER_ON != get_som_power_state()) {
+@@ -616,7 +618,7 @@ void deamon_keeplive_task(void *argument)
+ 					printf("SOM keeplive request send failed!\n");
+ 			}
+ 			count++;
+-			if (5 >= count) {
++			if (count >= 5) {
+ 				change_som_daemon_state(SOM_DAEMON_OFF);
+ 			}
+ 		} else {
+@@ -624,11 +626,14 @@ void deamon_keeplive_task(void *argument)
+ 			count = 0;
+ 		}
+ 		if (old_status != get_som_daemon_state()) {
+-			printf("SOM Daemon status change to %s!\n",
+-				get_som_daemon_state() == SOM_DAEMON_ON ? "on" : "off");
++			es_get_rtc_date(&date);
++			es_get_rtc_time(&time);
++			printf("SOM Daemon status change to %s at %d-%d-%d %02d:%02d:%02d!\n",
++				get_som_daemon_state() == SOM_DAEMON_ON ? "on" : "off",
++				date.Year, date.Month, date.Date, time.Hours, time.Minutes, time.Seconds);
+ 		}
+-		/*check every 4 second*/
+-		osDelay(pdMS_TO_TICKS(4000));
++		/*check every 1 second*/
++		osDelay(pdMS_TO_TICKS(1000));
+ 	}
+ }
+ 
+diff --git a/Core/Src/web-server.c b/Core/Src/web-server.c
+index 30ad975..f7868cf 100644
+--- a/Core/Src/web-server.c
++++ b/Core/Src/web-server.c
+@@ -10204,7 +10204,7 @@ int delete_timeout_session() {//return del count;
+ 	uint32_t current_time_tick=HAL_GetTick();
+ 	int del_count=0;
+     Session *current = &head_session;
+-    while (current->next != NULL) {//handle node:current->next 
++    while (current->next != NULL) {//handle node:current->next
+         if (current_time_tick - current->next->tick_value > MAX_AGE*1000) {
+             Session *to_delete = current->next;
+             current->next = current->next->next;//delete current->next from node list
+@@ -10269,7 +10269,7 @@ int update_session(const char *id, const char *data) {
+ int delete_session(const char *id) {
+ 	int del_count=0;
+     Session *current = &head_session;
+-    while (current->next != NULL) {//handle node:current->next 
++    while (current->next != NULL) {//handle node:current->next
+         if (strcmp(current->next->session_id, id) == 0) {
+             Session *to_delete = current->next;
+             current->next = current->next->next;//delete current->next from node list
+@@ -10387,7 +10387,7 @@ static int change_power_status(int status)
+ 
+ 	if (0 == status) {
+ 		if (SOM_POWER_ON == get_som_power_state()) {
+-			ret = web_cmd_handle(CMD_POWER_OFF, NULL, 0, 1000);
++			ret = web_cmd_handle(CMD_POWER_OFF, NULL, 0, 2000);
+ 			if (HAL_OK != ret) {
+ 				change_som_power_state(SOM_POWER_OFF);
+ 				web_debug("Poweroff SOM error(ret %d), force shutdown it!\n", ret);
+@@ -10421,7 +10421,7 @@ int reset()
+ {
+ 	int ret = HAL_OK;
+ 
+-	ret = web_cmd_handle(CMD_RESET, NULL, 0, 1000);
++	ret = web_cmd_handle(CMD_RESET, NULL, 0, 2000);
+ 	if (HAL_OK != ret) {
+ 		som_reset_control(pdTRUE);
+ 		osDelay(10);
+@@ -10955,7 +10955,7 @@ int get_soc_status()
+                 char session_id[SESSION_ID_LENGTH + 1];
+                 generate_session_id(session_id, SESSION_ID_LENGTH);
+                 // web_debug("session add user,sessionId:%s \n",session_id);
+-			
++
+ 
+ 
+                 Session *session1 = create_session(session_id, randinfo);
+@@ -11220,9 +11220,9 @@ int get_soc_status()
+                     bool loginSuccess = validate_credentials(username,password)==0?TRUE:FALSE;
+ 					char *json_response=NULL;
+ 					char response_header[BUF_SIZE_256];
+-				
++
+                     if(loginSuccess){
+-						
++
+ // 						if(found_session_user_name!=NULL && strlen(found_session_user_name)>0 ){
+ // 							//clean exist login info
+ // 							if(sidValue!=NULL){
+@@ -11252,13 +11252,13 @@ int get_soc_status()
+ 							sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",session_id,MAX_AGE);
+ 							sprintf(response_header, json_header_withcookie,resp_cookies, strlen(json_response));
+ 
+-							
++
+ 						}else{
+ 							json_response="{\"status\":1,\"message\":\"User login exceeds limit!\",\"data\":{}}";
+ 							sprintf(response_header, json_header, strlen(json_response));
+ 
+ 						}
+-						
++
+                     }else{
+ 						json_response="{\"status\":1,\"message\":\"username or password not right!\",\"data\":{}}";
+ 
+-- 
+2.25.1
+

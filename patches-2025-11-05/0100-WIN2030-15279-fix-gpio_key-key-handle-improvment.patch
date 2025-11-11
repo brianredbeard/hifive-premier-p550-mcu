@@ -1,0 +1,279 @@
+From 68671a8790f54a18904707eca42312faa6fa2e8e Mon Sep 17 00:00:00 2001
+From: linmin <linmin@eswincomputing.com>
+Date: Wed, 17 Jul 2024 20:00:24 +0800
+Subject: [PATCH 100/109] WIN2030-15279:fix(gpio_key):key handle improvment
+
+Changelogs:
+1.Make the hf_gpio_task() be able to handle the key press
+  once the MCU led is on.
+
+Signed-off-by: linmin <linmin@eswincomputing.com>
+Change-Id: Ia30a460c95d664e89e862f98a3789f3eb7bd1e1f
+---
+ Core/Inc/hf_common.h           | 11 +++++-
+ Core/Src/hf_board_init.c       |  5 ++-
+ Core/Src/hf_common.c           |  8 +----
+ Core/Src/hf_gpio_process.c     | 63 ++++++++++++++++------------------
+ Core/Src/hf_protocol_process.c |  1 -
+ 5 files changed, 44 insertions(+), 44 deletions(-)
+
+diff --git a/Core/Inc/hf_common.h b/Core/Inc/hf_common.h
+index da48a85..692bfc0 100644
+--- a/Core/Inc/hf_common.h
++++ b/Core/Inc/hf_common.h
+@@ -241,9 +241,17 @@ extern UART_HandleTypeDef huart3;
+ #define SOM_MAC0_IDX	0
+ #define SOM_MAC1_IDX	1
+ #define MCU_MAC_IDX	2
++
++#if 1
++#define esENTER_CRITICAL(MUTEX, DELAY)	xSemaphoreTake(MUTEX, DELAY)
++#define esEXIT_CRITICAL(MUTEX)		xSemaphoreGive(MUTEX)
++#else
++#define esENTER_CRITICAL(MUTEX, DELAY)	taskENTER_CRITICAL()
++#define esEXIT_CRITICAL(MUTEX)		taskEXIT_CRITICAL()
++#endif
+ /* define ------------------------------------------------------------*/
+ #define BMC_SOFTWARE_VERSION_MAJOR                   2
+-#define BMC_SOFTWARE_VERSION_MINOR                   4
++#define BMC_SOFTWARE_VERSION_MINOR                   5
+ 
+ #define MAGIC_NUMBER	0x45505EF1
+ 
+@@ -384,6 +392,7 @@ power_info get_power_info(void);
+ int xSOMRestartHandle(void);
+ int xSOMRebootHandle(void);
+ 
++int get_mcu_led_status(void);
+ void set_mcu_led_status(led_status_t type);
+ int es_restore_userdata_to_factory(void);
+ 
+diff --git a/Core/Src/hf_board_init.c b/Core/Src/hf_board_init.c
+index d912512..a6575ba 100644
+--- a/Core/Src/hf_board_init.c
++++ b/Core/Src/hf_board_init.c
+@@ -830,5 +830,8 @@ static void MX_GPIO_Init(void)
+ 	HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+ 
+ 	HAL_NVIC_SetPriority(EXTI15_10_IRQn, 5, 0);
+-	HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
++	/* The interrupt of the som power button will be enabled later in the hf_gpio_task
++	 * when it is ready to handle the button key press
++	*/
++	// HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+ }
+diff --git a/Core/Src/hf_common.c b/Core/Src/hf_common.c
+index 2ec651f..3a4b056 100644
+--- a/Core/Src/hf_common.c
++++ b/Core/Src/hf_common.c
+@@ -51,13 +51,7 @@
+ #define EEPROM_TEST_DEBUG 0
+ #define SET_MAGIC_NUM_DEBUG 0
+ 
+-#if 1
+-#define esENTER_CRITICAL(MUTEX, DELAY)	xSemaphoreTake(MUTEX, DELAY)
+-#define esEXIT_CRITICAL(MUTEX)		xSemaphoreGive(MUTEX)
+-#else
+-#define esENTER_CRITICAL(MUTEX, DELAY)	taskENTER_CRITICAL()
+-#define esEXIT_CRITICAL(MUTEX)		taskEXIT_CRITICAL()
+-#endif
++
+ /* variables ---------------------------------------------------------*/
+ static CarrierBoardInfo gCarrier_Board_Info;
+ 
+diff --git a/Core/Src/hf_gpio_process.c b/Core/Src/hf_gpio_process.c
+index 6de6ae2..1cf187f 100644
+--- a/Core/Src/hf_gpio_process.c
++++ b/Core/Src/hf_gpio_process.c
+@@ -50,6 +50,8 @@
+ /* Private variables ---------------------------------------------------------*/
+ osEventFlagsId_t gpio_eventflags_id = NULL;
+ 
++TickType_t pressStartTime = 0;
++
+ /* Private function prototypes -----------------------------------------------*/
+ 
+ /**
+@@ -62,7 +64,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+ 	/* Prevent unused argument(s) compilation warning */
+ 	UNUSED(GPIO_Pin);
+ 	if (PWR_SW_P_Pin == GPIO_Pin) {
+-		// printf("PWR_SW_P_Pin it \n");
++		// printf("PWR_SW_P_Pin it ticks=%ld \n", xTaskGetTickCountFromISR());
+ 		osEventFlagsSet(gpio_eventflags_id, FLAGS_KEY);
+ 	} else if (SOM_RST_OUT_N_Pin == GPIO_Pin) {
+ 		// printf("SOM_RST_OUT_N_Pin it  som software reset\n");
+@@ -73,6 +75,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+ 	} else if (KEY_USER_RST_Pin == GPIO_Pin) {
+ 		osEventFlagsSet(gpio_eventflags_id, FLAGS_KEY_USER_RST);
+ 	}
++	pressStartTime = xTaskGetTickCountFromISR();
+ }
+ 
+ static uint8_t get_key_status(void)
+@@ -80,59 +83,53 @@ static uint8_t get_key_status(void)
+ 	return HAL_GPIO_ReadPin(PWR_SW_P_GPIO_Port, PWR_SW_P_Pin);
+ }
+ 
++#define currentTime()	xTaskGetTickCount()
+ static void key_process(void)
+ {
+ 	uint8_t key_status = KEY_PUSHDOWN;
+ 	button_state_t button_state = KEY_IDLE_STATE;
+-	TickType_t pressStartTime = 0;
+ 	TickType_t ReleaseTime = 0;
+-	TickType_t currentTime = 0;
+ 	int ret = 0;
+ 
+ 	while (key_status == KEY_PUSHDOWN) {
+-		currentTime = xTaskGetTickCount();
++		// printf("currentTime %ld\n", currentTime());
+ 		switch (button_state) {
+ 		case KEY_IDLE_STATE:
+ 			button_state = KEY_PRESS_DETECTED_STATE;
+-			pressStartTime = currentTime;
+-			// printf("pressStartTime %d\n",pressStartTime);
++			// printf("pressStartTime %ld, get_som_power_state()=0x%x\n",pressStartTime, get_som_power_state());
+ 			break;
+ 		case KEY_PRESS_DETECTED_STATE:
+ 			if (get_key_status() == KEY_RELEASE) {
+ 				// printf("KEY_PRESS_DETECTED_STATE\n");
+-				ReleaseTime = currentTime;
++				ReleaseTime = currentTime();
+ 				button_state = KEY_RELEASE_DETECTED_STATE;
+-			} else if (currentTime - pressStartTime > LONG_PRESS_THRESHOLD) {
++			} else if (currentTime() - pressStartTime > LONG_PRESS_THRESHOLD) {
+ 				button_state = KEY_LONG_PRESS_STATE;
+-			} else if ((get_som_power_state() == SOM_POWER_OFF) && (currentTime - pressStartTime >= PRESS_Time)) {
++			} else if ((get_som_power_state() == SOM_POWER_OFF) && (currentTime() - pressStartTime >= PRESS_Time)) {
+ 				button_state = KEY_SHORT_PRESS_STATE;
+ 			}
+ 			break;
+ 		case KEY_RELEASE_DETECTED_STATE:
+-			if ((get_key_status() == KEY_PUSHDOWN) && (currentTime - ReleaseTime <= PRESS_Time)) {
+-				// printf("double ReleaseTime - pressStartTime %ld\n", ReleaseTime - pressStartTime);
+-				// printf("double currentTime - pressStartTime %ld\n", currentTime - ReleaseTime);
++			if ((get_key_status() == KEY_PUSHDOWN) && (currentTime() - ReleaseTime <= PRESS_Time)) {
++				// printf("double currentTime - ReleaseTime %ld\n", currentTime() - ReleaseTime);
+ 				button_state = KEY_DOUBLE_PRESS_STATE;
+ 			} else if (ReleaseTime - pressStartTime <= PRESS_Time) {
+-				// printf("err ReleaseTime - pressStartTime %ld\n", ReleaseTime - pressStartTime);
+-				// printf("err currentTime - pressStartTime %ld\n", currentTime - ReleaseTime);
++				// printf("err ReleaseTime(%ld) - pressStartTime(%ld)=%ld\n", ReleaseTime, pressStartTime, (ReleaseTime - pressStartTime));
+ 				button_state = KEY_DOUBLE_PRESS_STATE;
+-			} else if ((currentTime - pressStartTime >= LONG_PRESS_THRESHOLD)) {
+-				// printf("long ReleaseTime - pressStartTime %ld\n", ReleaseTime - pressStartTime);
+-				// printf("long currentTime - pressStartTime %ld\n", currentTime - ReleaseTime);
++			} else if ((currentTime() - pressStartTime >= LONG_PRESS_THRESHOLD)) {
++				// printf("long currentTime - pressStartTime %ld\n", currentTime() - pressStartTime);
+ 				button_state = KEY_PRESS_STATE_END;
+-			} else if ((currentTime - pressStartTime >= SHORT_CLICK_THRESHOLD)) {
+-				// printf("short ReleaseTime - pressStartTime %ld\n",ReleaseTime - pressStartTime);
+-				// printf("short currentTime - pressStartTime %ld\n",currentTime - ReleaseTime);
++			} else if ((currentTime() - pressStartTime >= SHORT_CLICK_THRESHOLD)) {
++				// printf("short currentTime - pressStartTime %ld\n",currentTime() - pressStartTime);
+ 				button_state = KEY_SHORT_PRESS_STATE;
+ 			} else {
+-				bmc_debug("other ReleaseTime - pressStartTime %ld\n", ReleaseTime - pressStartTime);
+-				bmc_debug("other currentTime - ReleaseTime %ld\n", currentTime - ReleaseTime);
++				// bmc_debug("other ReleaseTime - pressStartTime %ld\n", ReleaseTime - pressStartTime);
++				// bmc_debug("other currentTime - ReleaseTime %ld\n", currentTime() - ReleaseTime);
+ 				button_state = KEY_DOUBLE_PRESS_STATE;
+ 			}
+ 			break;
+ 		case KEY_SHORT_PRESS_STATE:
+-			bmc_debug("KEY_SHORT_PRESS_STATE time %ld\n", currentTime - pressStartTime);
++			// bmc_debug("KEY_SHORT_PRESS_STATE time %ld\n", currentTime() - pressStartTime);
+ 			button_state = KEY_PRESS_STATE_END;
+ 			if (get_som_power_state() != SOM_POWER_ON) {
+ 				vStopSomPowerOffTimer();
+@@ -140,7 +137,7 @@ static void key_process(void)
+ 			}
+ 			break;
+ 		case KEY_LONG_PRESS_STATE:
+-			bmc_debug("KEY_LONG_PRESS_STATE time %ld\n", currentTime - pressStartTime);
++			// bmc_debug("KEY_LONG_PRESS_STATE time %ld\n", currentTime() - pressStartTime);
+ 			button_state = KEY_PRESS_STATE_END;
+ 			if (get_som_power_state() == SOM_POWER_ON) {
+ 				ret = web_cmd_handle(CMD_POWER_OFF, NULL, 0, 2000);
+@@ -159,13 +156,13 @@ static void key_process(void)
+ 		case KEY_PRESS_STATE_END:
+ 			if (get_key_status() == KEY_RELEASE) {
+ 				// printf("sw IDLE_STATE\n");
+-				ReleaseTime = currentTime;
++				ReleaseTime = currentTime();
+ 				key_status = KEY_RELEASE;
+ 				button_state = IDLE_STATE;
+ 			}
+ 			break;
+ 		}
+-		osDelay(1);
++		osDelay(10);
+ 	}
+ }
+ 
+@@ -194,27 +191,22 @@ static void key_user_rst_process(void)
+ {
+ 	uint8_t key_status = KEY_PUSHDOWN;
+ 	button_state_t button_state = KEY_IDLE_STATE;
+-	TickType_t pressStartTime = 0;
+-	TickType_t currentTime = 0;
+-	int ret = 0;
+ 	int led_type = 0;
+ 
+ 	while (key_status == KEY_PUSHDOWN) {
+-		currentTime = xTaskGetTickCount();
+ 		switch (button_state) {
+ 		case KEY_IDLE_STATE:
+ 			button_state = KEY_PRESS_DETECTED_STATE;
+-			pressStartTime = currentTime;
+ 			break;
+ 		case KEY_PRESS_DETECTED_STATE:
+-			if((currentTime - pressStartTime) > USER_RST_THRESHOLD) {
++			if((currentTime() - pressStartTime) > USER_RST_THRESHOLD) {
+ 				button_state = KEY_RELEASE_DETECTED_STATE;
+ 			} else if (get_user_key_status() == KEY_RELEASE) {
+ 				button_state = KEY_PRESS_STATE_END;
+ 			}
+ 			break;
+ 		case KEY_RELEASE_DETECTED_STATE:
+-			if((currentTime - pressStartTime) >= USER_RST_THRESHOLD)
++			if((currentTime() - pressStartTime) >= USER_RST_THRESHOLD)
+ 			{
+ 				printf("restore userdata to factory\n");
+ 				// TODO : user reset function
+@@ -232,6 +224,8 @@ static void key_user_rst_process(void)
+ 				button_state = IDLE_STATE;
+ 			}
+ 			break;
++		default:
++			break;
+ 		}
+ 		osDelay(1);
+ 	}
+@@ -240,8 +234,9 @@ static void key_user_rst_process(void)
+ void hf_gpio_task(void *parameter)
+ {
+ 	int flags = 0;
+-	printf("hf_gpio_task started!!!\r\n");
++	printf("hf_gpio_task started!!!\n");
+ 	gpio_eventflags_id = osEventFlagsNew(NULL);
++	HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+ 	while (1) {
+ 		flags = osEventFlagsWait(gpio_eventflags_id, FLAGS_ALL, osFlagsWaitAny, osWaitForever);
+ 		if (flags > 0) {
+diff --git a/Core/Src/hf_protocol_process.c b/Core/Src/hf_protocol_process.c
+index 36f9ec2..b3b2c60 100644
+--- a/Core/Src/hf_protocol_process.c
++++ b/Core/Src/hf_protocol_process.c
+@@ -634,7 +634,6 @@ void deamon_keeplive_task(void *argument)
+ 	static uint8_t count = 0;
+ 	struct rtc_date_t date = {0};
+ 	struct rtc_time_t time = {0};
+-
+ 	for (;;) {
+ 		old_status = get_som_daemon_state();
+ 		if (SOM_POWER_ON != get_som_power_state()) {
+-- 
+2.25.1
+

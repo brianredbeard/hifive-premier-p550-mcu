@@ -1,0 +1,82 @@
+From 61480f2056fcaf2e4226d2c74d59b5479a8dcafb Mon Sep 17 00:00:00 2001
+From: linmin <linmin@eswincomputing.com>
+Date: Mon, 2 Sep 2024 16:01:00 +0800
+Subject: [PATCH 104/109] WIN2030-15279:fix(bmc2.6):Bug fix for eeprom write
+
+Changelogs:
+1.Add tWR 5ms between each eeprom write, otherwise the write operation may
+  be failed. tWR is the time from a valid Stop condition of a write sequence
+  to the end of the internal clear/write cycle.
+2.Fix the mutex dead lock in es_set_carrier_borad_info()
+
+Signed-off-by: linmin <linmin@eswincomputing.com>
+Change-Id: I34be734596bf27bad0da18ed42143cf035f7691a
+---
+ Core/Src/hf_common.c | 5 ++++-
+ Core/Src/hf_i2c.c    | 6 ++++++
+ 2 files changed, 10 insertions(+), 1 deletion(-)
+
+diff --git a/Core/Src/hf_common.c b/Core/Src/hf_common.c
+index 6a7cc05..5a3e5f8 100644
+--- a/Core/Src/hf_common.c
++++ b/Core/Src/hf_common.c
+@@ -102,6 +102,9 @@ static void print_data(uint8_t *p_buf, int len)
+ 	#if EEPROM_DEBUG_EN
+ 	int i;
+ 	for (i = 0; i < len; i++) {
++		if (0 == (i%8))
++			printf("0x%02x:", i);
++
+ 		printf(" %02x", p_buf[i]);
+ 		if (0 == ((i+1)%8))
+ 			printf("\n");
+@@ -569,6 +572,7 @@ int es_set_carrier_borad_info(CarrierBoardInfo *pCarrier_Board_Info)
+ 		skip_update_eeprom = 0;
+ 		eeprom_debug("Updated CarrierBoardInfo in EEPROM!\n");
+ 	}
++	esEXIT_CRITICAL(gEEPROM_Mutex);
+ 
+ 	if (!skip_update_eeprom) {
+ 		/* write to main partition */
+@@ -577,7 +581,6 @@ int es_set_carrier_borad_info(CarrierBoardInfo *pCarrier_Board_Info)
+ 		/* write to backup partition */
+ 		write_cbinfo(pCarrier_Board_Info, cbinfo_backup);
+ 	}
+-	esEXIT_CRITICAL(gEEPROM_Mutex);
+ 
+ 	return 0;
+ }
+diff --git a/Core/Src/hf_i2c.c b/Core/Src/hf_i2c.c
+index 9b15b98..697068b 100644
+--- a/Core/Src/hf_i2c.c
++++ b/Core/Src/hf_i2c.c
+@@ -111,6 +111,9 @@ int hf_i2c_mem_write(I2C_HandleTypeDef *hi2c, uint8_t slave_addr,
+ 		// while (HAL_I2C_IsDeviceReady(hi2c, slave_addr, 0xff, 0xff) == HAL_TIMEOUT);
+ 		if (HAL_OK != status)
+ 			goto out;
++
++		/* tWR=5ms is the time from a valid Stop condition of a write sequence to the end of the internal clear/write cycle*/
++		osDelay(pdMS_TO_TICKS(5));
+ 	}
+ 	offset = i;
+ 	// 8 bytes page write
+@@ -134,6 +137,7 @@ int hf_i2c_mem_write(I2C_HandleTypeDef *hi2c, uint8_t slave_addr,
+ 			goto out;
+ 
+ 		i = i + 8;
++		osDelay(pdMS_TO_TICKS(5));
+ 	}
+ 	offset = offset + i;
+ 	// the left bytes
+@@ -155,6 +159,8 @@ int hf_i2c_mem_write(I2C_HandleTypeDef *hi2c, uint8_t slave_addr,
+ 		// while (HAL_I2C_IsDeviceReady(hi2c, slave_addr, 0xff, 0xff) == HAL_TIMEOUT);
+ 		if (HAL_OK != status)
+ 			goto out;
++
++		osDelay(pdMS_TO_TICKS(5));
+ 	}
+ out:
+ 	if (hi2c->Instance == I2C1)
+-- 
+2.25.1
+

@@ -1,0 +1,181 @@
+From 72316124478b236e4d4d223c94a8bbaf3a40dceb Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?=E2=80=9Chuangyifeng=E2=80=9D?=
+ <huangyifeng@eswincomputing.com>
+Date: Wed, 29 May 2024 09:55:04 +0800
+Subject: [PATCH 063/109] WIN2030-15099:fix(daemon):deamon msg
+
+Changelogs:
+       1.add debug info in HardFault_Handler.
+       2.deamon_keeplive_task continue to check the daemon status when
+power off.
+       3.increase the daemon_keeplive_task stack space to 2k
+
+Change-Id: Id7e5cd12494b6d83023f838a7b0dc3fa2799bdc4
+
+Change-Id: I76db2327a0cba3b1d436ade4f417f25c0dbb5edd
+---
+ Core/Src/hf_protocol_process.c | 18 +++----
+ Core/Src/main.c                |  2 +-
+ Core/Src/stm32f4xx_it.c        | 98 ++++++++++++++++++++++++++++++----
+ 3 files changed, 96 insertions(+), 22 deletions(-)
+
+diff --git a/Core/Src/hf_protocol_process.c b/Core/Src/hf_protocol_process.c
+index 561b4cf..07653de 100644
+--- a/Core/Src/hf_protocol_process.c
++++ b/Core/Src/hf_protocol_process.c
+@@ -603,20 +603,16 @@ void deamon_keeplive_task(void *argument)
+ 	struct rtc_time_t time = {0};
+ 
+ 	for (;;) {
++		old_status = get_som_daemon_state();
+ 		if (SOM_POWER_ON != get_som_power_state()) {
+-			osDelay(50);
+-			continue;
++			ret = HAL_ERROR;
++		} else {
++			ret = web_cmd_handle(CMD_BOARD_STATUS, NULL, 0, 1000);
+ 		}
+-		old_status = get_som_daemon_state();
+-		ret = web_cmd_handle(CMD_BOARD_STATUS, NULL, 0, 1000);
+ 		if (HAL_OK != ret) {
+-			if (HAL_TIMEOUT == ret) {
+-				if (count <= 5 && SOM_DAEMON_ON == get_som_daemon_state())
+-					printf("SOM keeplive request timeout!\n");
+-			} else {
+-				if (count <=5 && SOM_DAEMON_ON == get_som_daemon_state())
+-					printf("SOM keeplive request send failed!\n");
+-			}
++			if (count <= 5 && SOM_DAEMON_ON == get_som_daemon_state())
++				printf("SOM keeplive request failed(ret %d)!\n", ret);
++
+ 			count++;
+ 			if (count >= 5) {
+ 				change_som_daemon_state(SOM_DAEMON_OFF);
+diff --git a/Core/Src/main.c b/Core/Src/main.c
+index 5d397b9..fd6b0de 100644
+--- a/Core/Src/main.c
++++ b/Core/Src/main.c
+@@ -43,7 +43,7 @@ osThreadId_t daemon_keelive_task_handle;
+ 
+ const osThreadAttr_t daemon_keeplive_task_attributes = {
+   .name = "DaemonTask",
+-  .stack_size = 1024,
++  .stack_size = 1024 * 2,
+   .priority = (osPriority_t) osPriorityNormal,
+ };
+ 
+diff --git a/Core/Src/stm32f4xx_it.c b/Core/Src/stm32f4xx_it.c
+index b33103a..15bc781 100644
+--- a/Core/Src/stm32f4xx_it.c
++++ b/Core/Src/stm32f4xx_it.c
+@@ -96,19 +96,97 @@ void NMI_Handler(void)
+   /* USER CODE END NonMaskableInt_IRQn 1 */
+ }
+ 
+-/**
+-  * @brief This function handles Hard fault interrupt.
+-  */
++void HardFault_Handler(void) __attribute__((naked));
+ void HardFault_Handler(void)
+ {
+-  /* USER CODE BEGIN HardFault_IRQn 0 */
++	__asm volatile (
++		"TST lr, #4 \n" // Test EXC_RETURN bit 2
++		"ITE EQ \n"     // If-Then-Else (EQ)
++		"MRSEQ r0, MSP \n" // Main Stack Pointer to r0 if EQ
++		"MRSNE r0, PSP \n" // Process Stack Pointer to r0 if NE
++		"B HardFault_Handler_C \n" // Branch to C handler
++	);
++}
+ 
+-  /* USER CODE END HardFault_IRQn 0 */
+-  while (1)
+-  {
+-    /* USER CODE BEGIN W1_HardFault_IRQn 0 */
+-    /* USER CODE END W1_HardFault_IRQn 0 */
+-  }
++void HardFault_Handler_C(uint32_t *pulFaultStackAddress)
++{
++	// Extract values from the stack
++	uint32_t r0  = pulFaultStackAddress[0];
++	uint32_t r1  = pulFaultStackAddress[1];
++	uint32_t r2  = pulFaultStackAddress[2];
++	uint32_t r3  = pulFaultStackAddress[3];
++	uint32_t r12 = pulFaultStackAddress[4];
++	uint32_t lr  = pulFaultStackAddress[5];
++	uint32_t pc  = pulFaultStackAddress[6];
++	uint32_t psr = pulFaultStackAddress[7];
++
++	// Read fault status registers
++	uint32_t CFSR = SCB->CFSR;    // Configurable Fault Status Register
++	uint32_t HFSR = SCB->HFSR;    // Hard Fault Status Register
++	uint32_t DFSR = SCB->DFSR;    // Debug Fault Status Register
++	uint32_t AFSR = SCB->AFSR;    // Auxiliary Fault Status Register
++	uint32_t MMAR = SCB->MMFAR;   // MemManage Fault Address Register
++	uint32_t BFAR = SCB->BFAR;    // Bus Fault Address Register
++
++	// Print the fault information
++	printf("HardFault detected!\n");
++	printf("R0  = 0x%08lX\n", r0);
++	printf("R1  = 0x%08lX\n", r1);
++	printf("R2  = 0x%08lX\n", r2);
++	printf("R3  = 0x%08lX\n", r3);
++	printf("R12 = 0x%08lX\n", r12);
++	printf("LR  = 0x%08lX\n", lr);
++	printf("PC  = 0x%08lX\n", pc);
++	printf("PSR = 0x%08lX\n", psr);
++
++	printf("CFSR = 0x%08lX\n", CFSR);
++	printf("HFSR = 0x%08lX\n", HFSR);
++	printf("DFSR = 0x%08lX\n", DFSR);
++	printf("AFSR = 0x%08lX\n", AFSR);
++	printf("MMAR = 0x%08lX\n", MMAR);
++	printf("BFAR = 0x%08lX\n", BFAR);
++
++	// Decode CFSR to get specific fault details
++	if (CFSR & 0x00000001) printf("MemManage Fault: Instruction Access Violation\n");
++	if (CFSR & 0x00000002) printf("MemManage Fault: Data Access Violation\n");
++	if (CFSR & 0x00000008) printf("MemManage Fault: Unstacking Error\n");
++	if (CFSR & 0x00000010) printf("MemManage Fault: Stacking Error\n");
++	if (CFSR & 0x00000080) printf("MemManage Fault: MemManage Address Register Valid\n");
++	if (CFSR & 0x00000100) printf("Bus Fault: Instruction Access Violation\n");
++	if (CFSR & 0x00000200) printf("Bus Fault: Precise Data Access Violation\n");
++	if (CFSR & 0x00000400) printf("Bus Fault: Imprecise Data Access Violation\n");
++	if (CFSR & 0x00000800) printf("Bus Fault: Unstacking Error\n");
++	if (CFSR & 0x00001000) printf("Bus Fault: Stacking Error\n");
++	if (CFSR & 0x00008000) printf("Bus Fault: Bus Fault Address Register Valid\n");
++	if (CFSR & 0x01000000) printf("Usage Fault: Undefined Instruction\n");
++	if (CFSR & 0x02000000) printf("Usage Fault: Invalid State\n");
++	if (CFSR & 0x04000000) printf("Usage Fault: Invalid PC Load Usage Fault\n");
++	if (CFSR & 0x08000000) printf("Usage Fault: No Coprocessor\n");
++	if (CFSR & 0x10000000) printf("Usage Fault: Unaligned Access\n");
++	if (CFSR & 0x20000000) printf("Usage Fault: Divide By Zero\n");
++
++	// Decode HFSR to get specific fault details
++	if (HFSR & (1 << 0)) printf("Hard Fault: Reserved\n");
++	if (HFSR & (1 << 1)) printf("Hard Fault: Vector Table Read Fault\n");
++	if (HFSR & (1 << 30)) printf("Hard Fault: Forced Hard Fault\n");
++	if (HFSR & (1 << 31)) printf("Hard Fault: Debug Event\n");
++
++	// Decode DFSR to get specific fault details
++	if (DFSR & (1 << 0)) printf("Debug Fault: Halt requested by debugger\n");
++	if (DFSR & (1 << 1)) printf("Debug Fault: Breakpoint occurred\n");
++	if (DFSR & (1 << 2)) printf("Debug Fault: Data Watchpoint occurred\n");
++	if (DFSR & (1 << 3)) printf("Debug Fault: Vector catch occurred\n");
++	if (DFSR & (1 << 4)) printf("Debug Fault: External debug request\n");
++
++	// Decode AFSR to get specific fault details
++	if (AFSR != 0) printf("Auxiliary Fault Status: 0x%08lX\n", AFSR);
++
++	// Decode MMAR and BFAR to get specific fault details
++	if (CFSR & 0x00000080) printf("MemManage Fault Address: 0x%08lX\n", MMAR);
++	if (CFSR & 0x00008000) printf("Bus Fault Address: 0x%08lX\n", BFAR);
++
++	// Infinite loop to halt the system for debugging
++	while (1);
+ }
+ 
+ /**
+-- 
+2.25.1
+

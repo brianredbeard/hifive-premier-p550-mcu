@@ -1,0 +1,498 @@
+From 831b2e958f29f43eb62b4b13ed303176d97c9639 Mon Sep 17 00:00:00 2001
+From: yuan junhui <yuanjunhui@eswincomputing.com>
+Date: Fri, 10 May 2024 15:27:55 +0800
+Subject: [PATCH 017/109] WIN2030-15279:fix(bmc):add rtc,login manage
+
+Changelogs:
+01,add login manage and auto logout
+02,add modify-account page add info.html exit
+03,add rtc modify
+04,fixbug redio:OFF,ON ,rtc add datetime string
+
+Change-Id: Ib83b096640a1ac62ffeefbdde42effaa69951b07
+---
+ Core/Src/web-server.c | 307 ++++++++++++++++++++++++++++++++++++------
+ 1 file changed, 264 insertions(+), 43 deletions(-)
+
+diff --git a/Core/Src/web-server.c b/Core/Src/web-server.c
+index 3f2ffa5..948269a 100644
+--- a/Core/Src/web-server.c
++++ b/Core/Src/web-server.c
+@@ -16,6 +16,7 @@
+ #define BUF_SIZE_128 128
+ #define BUF_SIZE_256 256
+ #define BUF_SIZE_512 512
++#define MAX_AGE 60*3
+ 
+ #define STATIC_PATH "/tmp/static"
+ #define EEPROM_USERNAME_PASSWORD_ADDR 0x0100
+@@ -9764,6 +9765,71 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
+                                                                 console.error('Error refreshing board-info-cb-refresh:', error);\n \
+                                                             }\n \
+                                                         });\n \
++                                                    });\n \
++													$('#rtc-refresh').click(function() {\n \
++                                                        $.ajax({\n \
++															async: false,\n \
++                                                            url: '/rtc',\n \
++                                                            type: 'GET',\n \
++                                                            success: function(response) {\n \
++                                                                $('#rtc_year').val(response.data.year);\n \
++                                                                $('#rtc_month').val(response.data.month);\n \
++                                                                $('#rtc_date').val(response.data.date);\n \
++																$('#rtc_weekday').val(response.data.weekday);\n \
++																$('#rtc_hours').val(response.data.hours);\n \
++																$('#rtc_minutes').val(response.data.minutes);\n \
++																$('#rtc_seconds').val(response.data.seconds);\n \
++																var rtc_datetime = response.data.year + '-' + \
++																			response.data.month + '-' +  \
++																			response.data.date + ' ' +  \
++																			response.data.hours + ':' +  \
++																			response.data.minutes + ':' +  \
++																			response.data.seconds; \
++																$('#rtc_datetime').val(rtc_datetime); \
++                                                                console.log('rtc refreshed successfully.');\n \
++                                                            },\n \
++                                                            error: function(xhr, status, error) {\n \
++                                                                // 请求失败时的回调函数\n \
++                                                                console.error('Error refreshing rtc:', error);\n \
++                                                            }\n \
++                                                        });\n \
++                                                    });\n \
++													$('#rtc-update').click(function() { \n \
++                                                        var rtc_year = $('#rtc_year').val();\n \
++														var rtc_month = $('#rtc_month').val();\n \
++														var rtc_date = $('#rtc_date').val();\n \
++														var rtc_weekday = $('#rtc_weekday').val();\n \
++														var rtc_hours = $('#rtc_hours').val();\n \
++														var rtc_minutes = $('#rtc_minutes').val();\n \
++														var rtc_seconds = $('#rtc_seconds').val();\n \
++                                                        $.ajax({ \n\
++                                                            url: '/rtc',\n \
++                                                            type: 'POST',\n \
++                                                            contentType: 'application/x-www-form-urlencoded', // 设置Content-Type \n \
++                                                            data: {\n \
++                                                                year: rtc_year, \n \
++                                                                month: rtc_month, \n \
++                                                                date: rtc_date, \n \
++																weekday: rtc_weekday, \n \
++																hours: rtc_hours, \n \
++																minutes: rtc_minutes, \n \
++																seconds: rtc_seconds \n \
++                                                            },\
++                                                            success: function(response) {\n \
++                                                                if(response.status===0){\n \
++                                                                    alert(\"update success!\");\n \
++                                                                }else{\n \
++                                                                    alert(response.message);\n \
++                                                                }\n \
++                                                                // 请求成功时的回调函数\n \
++                                                                console.log('rtc settings updated successfully.');\n \
++                                                            },\n \
++                                                            error: function(xhr, status, error) {\n \
++                                                                alert(\"udpate failed!\");\n \
++                                                                // 请求失败时的回调函数\n \
++                                                                console.error('Error updating rtc settings:', error);\n \
++                                                            }\n \
++                                                        });\n \
+                                                     });\n \
+ 													// --------------------after load page ------------- \n \
+ 													$('#power-on-refresh').click(); \n \
+@@ -9774,6 +9840,7 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
+    													$('#net-work-refresh').click(); \n \
+ 													$('#board-info-som-refresh').click(); \n \
+ 													$('#board-info-cb-refresh').click(); \n \
++													$('#rtc-refresh').click(); \n \
+                                                 });\n\
+                                             </script>\n \
+                                             <style> \
+@@ -9895,23 +9962,23 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
+                                             <h3>DIP Switch</h3> \
+                                            <div  class=\"network-row\"> \
+ 												<label>dip01:</label> \
+-												<input type=\"radio\" name=\"dip01\" value=\"0\" id=\"dip01-false\"><label for=\"dip01-false\">close</label> \
+-												<input type=\"radio\" name=\"dip01\" value=\"1\" id=\"dip01-true\"><label for=\"dip01-true\">open</label> \
++												<input type=\"radio\" name=\"dip01\" value=\"0\" id=\"dip01-false\"><label for=\"dip01-false\">OFF</label> \
++												<input type=\"radio\" name=\"dip01\" value=\"1\" id=\"dip01-true\"><label for=\"dip01-true\">ON</label> \
+ 											</div> \
+ 											<div  class=\"network-row\"> \
+ 												<label>dip02:</label> \
+-												<input type=\"radio\" name=\"dip02\" value=\"0\" id=\"dip02-false\"><label for=\"dip02-false\">close</label> \
+-												<input type=\"radio\" name=\"dip02\" value=\"1\" id=\"dip02-true\"><label for=\"dip02-true\">open</label> \
++												<input type=\"radio\" name=\"dip02\" value=\"0\" id=\"dip02-false\"><label for=\"dip02-false\">OFF</label> \
++												<input type=\"radio\" name=\"dip02\" value=\"1\" id=\"dip02-true\"><label for=\"dip02-true\">ON</label> \
+ 											</div> \
+ 											<div  class=\"network-row\"> \
+ 												<label>dip03:</label> \
+-												<input type=\"radio\" name=\"dip03\" value=\"0\" id=\"dip03-false\"><label for=\"dip03-false\">close</label> \
+-												<input type=\"radio\" name=\"dip03\" value=\"1\" id=\"dip03-true\"><label for=\"dip03-true\">open</label> \
++												<input type=\"radio\" name=\"dip03\" value=\"0\" id=\"dip03-false\"><label for=\"dip03-false\">OFF</label> \
++												<input type=\"radio\" name=\"dip03\" value=\"1\" id=\"dip03-true\"><label for=\"dip03-true\">ON</label> \
+ 											</div> \
+ 											<div  class=\"network-row\"> \
+ 												<label>dip04:</label> \
+-												<input type=\"radio\" name=\"dip04\" value=\"0\" id=\"dip04-false\"><label for=\"dip04-false\">close</label> \
+-												<input type=\"radio\" name=\"dip04\" value=\"1\" id=\"dip04-true\"><label for=\"dip04-true\">open</label> \
++												<input type=\"radio\" name=\"dip04\" value=\"0\" id=\"dip04-false\"><label for=\"dip04-false\">OFF</label> \
++												<input type=\"radio\" name=\"dip04\" value=\"1\" id=\"dip04-true\"><label for=\"dip04-true\">ON</label> \
+ 											</div> \
+                                             <button id=\"dip-switch-refresh\">refresh</button> <button id=\"dip-switch-update\">update</button> \
+                                         </div> \
+@@ -9930,6 +9997,34 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
+                                             <label>Subnet Mask:</label> <input type=\"text\" id=\"subnetwork\" value=\"0\" style=\"width: 180px;\"> <br> \
+ 											 </div> \
+                                             <button id=\"net-work-refresh\">refresh</button> <button id=\"net-work-update\">update</button> \
++                                        </div> \
++										<div class=\"rtc\" > \
++                                            <h3>RTC System</h3> \
++											<div class=\"network-row\"> \
++												<label>Datetime:</label> <input type=\"text\" id=\"rtc_datetime\" value=\"0\" style=\"width: 180px;\" disabled> <br> \
++											</div>  \
++											<div class=\"network-row\"> \
++												<label>Year:</label> <input type=\"text\" id=\"rtc_year\" value=\"0\" style=\"width: 100px;\"> <br> \
++											</div>  \
++											<div class=\"network-row\"> \
++                                           		<label>Month:</label> <input type=\"text\" id=\"rtc_month\" value=\"0\" style=\"width: 100px;\"> <br> \
++											</div> \
++											<div class=\"network-row\"> \
++                                            	<label>Date:</label> <input type=\"text\" id=\"rtc_date\" value=\"0\" style=\"width: 100px;\"> <br> \
++											</div> \
++											<div class=\"network-row\"> \
++                                            	<label>WeekDay:</label> <input type=\"text\" id=\"rtc_weekday\" value=\"0\" style=\"width: 100px;\"> <br> \
++											</div> \
++											<div class=\"network-row\"> \
++                                            	<label>Hours:</label> <input type=\"text\" id=\"rtc_hours\" value=\"0\" style=\"width: 100px;\"> <br> \
++											</div> \
++											<div class=\"network-row\"> \
++                                            	<label>Minutes:</label> <input type=\"text\" id=\"rtc_minutes\" value=\"0\" style=\"width: 100px;\"> <br> \
++											</div> \
++											<div class=\"network-row\"> \
++                                            	<label>Seconds:</label> <input type=\"text\" id=\"rtc_seconds\" value=\"0\" style=\"width: 100px;\"> <br> \
++											</div> \
++                                            <button id=\"rtc-refresh\">refresh</button> <button id=\"rtc-update\">update</button> \
+                                         </div> \
+                                     </body> \
+                                     </html> ";
+@@ -9939,8 +10034,28 @@ const unsigned char modify_account_html[] ="<html lang=\"zh\"> \
+                                     <head> \
+                                         <meta charset=\"UTF-8\"> \
+                                         <title>Account modify</title> \
++										 <style> \
++                                            .logout-form-wrapper { \
++                                                position: absolute; \
++                                                top: 10px; \
++                                                right: 10px; \
++                                            } \
++											.info-form-wrapper { \
++                                                position: absolute; \
++                                                top: 10px; \
++                                                right: 50px; \
++                                            } \
++                                            </style> \
+                                     </head> \
+                                     <body> \
++										<div class=\"info-form-wrapper\"> \
++											<button><a href=\"/info.html\">Info</a></button> \
++                                        </div> \
++                                        <div class=\"logout-form-wrapper\"> \
++											<form class=\"logout-form\" action=\"/logout\" method=\"post\"> \
++												<button type=\"submit\">Exit</button> \
++											</form> \
++                                        </div> \
+                                         <h2>Account modify</h2> \
+                                         <form action=\"/modify_account\" method=\"POST\"> \
+                                             <div> \
+@@ -10020,12 +10135,13 @@ void send_response_content(struct netconn *conn,const char* cookies,const char*
+ 
+ 	sprintf(header_full, header,  strlen(html_content));
+ 
+-    printf("header: %d %s \n",strlen(header_full),header_full);
+-    printf("html_content: %d  \n",strlen(html_content));
+-
++    printf("send_response_content header: %d %s \n",strlen(header_full),header_full);
++    printf("send_response_content html_content: %d  \n",strlen(html_content));
++	
+ 	netconn_write(conn, header_full, strlen(header_full), NETCONN_COPY);
++	printf("send_response_content after header_full \n");
+     netconn_write(conn, html_content, strlen(html_content), NETCONN_COPY);
+-	printf("html_content:netconn_write end  \n");
++	printf("send_response_content after html_content \n");
+ 
+     free(header);
+ }
+@@ -10547,7 +10663,34 @@ CBSimpleInfo get_cb_info(){
+     };
+     return example;
+ }
++typedef struct {
++	int year;
++	int month;
++	int date;
++	int weekday;
++	int hours;
++	int minutes;
++	int seconds;
++} RTCInfo;
++
++RTCInfo get_rtcinfo(){
++	printf("TODO call get_rtcinfo\n");
++	RTCInfo example= {
++        2024,
++        5,
++        10,
++        13,
++		33,
++		59,
++		59
++    };
++    return example;
++}
+ 
++int set_rtcinfo(RTCInfo rtcInfo){
++	printf("TODO call set_rtcinfo\n");
++	return 0;
++}
+ 
+  /** Serve one HTTP connection accepted in the http thread */
+  static void
+@@ -10676,7 +10819,7 @@ CBSimpleInfo get_cb_info(){
+                 }else{
+                    // send_response_content(conn,NULL, login_html);
+                     printf("redirect to login.html \n");
+-					sprintf(resp_cookies, "Set-Cookie: sid=;  Path=/\r\n");
++					sprintf(resp_cookies, "Set-Cookie: sid=; Max-Age=0; Path=/\r\n");
+                     send_redirect(conn,"/login.html",resp_cookies);
+                     // send_redirect(conn,"/login.html",NULL);
+                 }
+@@ -10692,28 +10835,28 @@ CBSimpleInfo get_cb_info(){
+             }else if(strcmp(path, "/info.html")==0){
+                 printf("GET location: info.html \n");
+ 
+-				//todo tmp modify
+-				// if(found_session_user_name!=NULL && strlen(found_session_user_name)>0){
+-					// printf("response info.html%s \n",found_session_user_name);
+-               		send_response_content(conn,NULL, info_html);
+-				// }else{
+-				// 	printf("redirect to login.html \n");
+-				// 	sprintf(resp_cookies, "Set-Cookie: sid=;  Path=/\r\n");
+-                //     send_redirect(conn,"/login.html",resp_cookies);
+-                //     // send_redirect(conn,"/login.html",NULL);
+-				// }
++				if(found_session_user_name!=NULL && strlen(found_session_user_name)>0){
++					printf("response info.html%s \n",found_session_user_name);
++					sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",sidValue,MAX_AGE);
++               		send_response_content(conn,resp_cookies, info_html);
++				}else{
++					printf("redirect to login.html \n");
++					sprintf(resp_cookies, "Set-Cookie: sid=; Max-Age=0; Path=/\r\n");
++                    send_redirect(conn,"/login.html",resp_cookies);
++				}
+ 
+             }else if(strcmp(path,"/modify_account.html")==0){
+ 				printf("GET location: modify_account.html \n");
+ 				if(found_session_user_name!=NULL && strlen(found_session_user_name)>0){
+ 					printf("response modify_account_html.html%s \n",found_session_user_name);
+-					assert(strlen(found_session_user_name)<64);
+-					char modify_account_html_resp[strlen(modify_account_html)+64];
++					assert(strlen(found_session_user_name)<BUF_SIZE_64);
++					char modify_account_html_resp[strlen(modify_account_html)+BUF_SIZE_64];
+ 					sprintf(modify_account_html_resp, modify_account_html, found_session_user_name);
+-               		send_response_content(conn,NULL, modify_account_html_resp);
++					sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=%d; Path=/\r\n",sidValue,MAX_AGE);
++               		send_response_content(conn,resp_cookies, modify_account_html_resp);
+ 				}else{
+ 					printf("redirect to login.html \n");
+-					sprintf(resp_cookies, "Set-Cookie: sid=;  Path=/\r\n");
++					sprintf(resp_cookies, "Set-Cookie: sid=; Max-Age=0; Path=/\r\n");
+                     send_redirect(conn,"/login.html",resp_cookies);
+                     // send_redirect(conn,"/login.html",NULL);
+ 				}
+@@ -10880,7 +11023,7 @@ CBSimpleInfo get_cb_info(){
+                 Session *session1 = create_session(session_id, user_name);
+                 add_session(session1);
+ 
+-            }else if(strncmp(path, "/jquery.min.js",14)==0 ){	//static file,css, js
++            }else if(strcmp(path, "/jquery.min.js")==0 ){	//static file,css, js
+                 printf("get ,location: /jquery.min.js \n");
+ 
+                 static const char http_jquery_200_patt[] =  "HTTP/1.1 200 OK\r\n"\
+@@ -10897,14 +11040,10 @@ CBSimpleInfo get_cb_info(){
+                 netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
+                 netconn_write(conn, data_jquery_min_js, strlen(data_jquery_min_js)-90, NETCONN_COPY);
+ 
+-            }else if(strncmp(path, "/board_info_som",15)==0 ){
++            }else if(strcmp(path, "/board_info_som")==0 ){
+                 printf("get ,location: /board_info_som \n");
+ 				som_info simpleInfo= get_som_info();
+-// magicNumber
+-// formatVersionNumber
+-// productIdentifier
+-// pcbRevision
+-// boardSerialNumber
++
+ 				char json_response[BUF_SIZE_256]={0};
+ 				 // 创建JSON格式的字符串
+                 char *json_response_patt = "{\"status\":0,\"message\":\"success\",\"data\":{\"magicNumber\":\"%d\",\"formatVersionNumber\":\"%d\",\"productIdentifier\":\"%d\",\"pcbRevision\":\"%d\",\"boardSerialNumber\":\"%s\"}}";
+@@ -10924,7 +11063,7 @@ CBSimpleInfo get_cb_info(){
+                 netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
+                 netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
+ 
+-            }else if(strncmp(path, "/board_info_cb",14)==0 ){
++            }else if(strcmp(path, "/board_info_cb")==0 ){
+                 printf("get ,location: /board_info_cb \n");
+ 				CBSimpleInfo simpleInfo=get_cb_info();
+ 
+@@ -10947,6 +11086,29 @@ CBSimpleInfo get_cb_info(){
+                 netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
+                 netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
+ 
++            }else if(strcmp(path, "/rtc")==0 ){
++                printf("get ,location: /rtc \n");
++				RTCInfo rtcInfo=get_rtcinfo();
++
++               	char json_response[BUF_SIZE_256]={0};
++				 // 创建JSON格式的字符串
++                char *json_response_patt = "{\"status\":0,\"message\":\"success\",\"data\":{\"year\":\"%d\",\"month\":\"%d\",\"date\":\"%d\",\"weekday\":\"%d\",\"hours\":\"%d\",\"minutes\":\"%d\",\"seconds\":\"%d\"}}";
++                sprintf(json_response, json_response_patt,rtcInfo.year,rtcInfo.month,rtcInfo.date,rtcInfo.weekday,rtcInfo.hours,rtcInfo.minutes,rtcInfo.seconds);
++
++                // 发送HTTP头部
++                const char *header = "HTTP/1.1 200 OK\r\n"
++                                    "Content-Type: application/json\r\n"
++                                    "Connection: close\r\n"
++                                    "Content-Length: %d\r\n\r\n";
++
++                char response_header[BUF_SIZE_512];
++                sprintf(response_header, header, strlen(json_response));
++
++                printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
++
++                netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
++                netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
++
+             }else{
+                 printf("ERROR unsupport get path \n");
+                 send_response_200(conn);
+@@ -11076,9 +11238,6 @@ CBSimpleInfo get_cb_info(){
+ 
+                 }else if(strcmp(path, "/login")==0 ){		//login
+                     printf("POST ,location: login \n");
+-
+-
+-
+                     char* username=NULL;
+                     char* password=NULL;
+                     assert(p_params!=NULL);
+@@ -11122,11 +11281,11 @@ CBSimpleInfo get_cb_info(){
+                         add_session(session1);
+                         assert(find_session(session_id)!=NULL);
+ 
+-                        sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Path=/\r\n",session_id);
++                        sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=30; Path=/\r\n",session_id);
+ 
+                         send_redirect(conn,"/info.html",resp_cookies);
+                     }else{
+-						sprintf(resp_cookies, "Set-Cookie: sid=;  Path=/\r\n");
++						sprintf(resp_cookies, "Set-Cookie: sid=; Max-Age=0; Path=/\r\n");
+                         send_redirect(conn,"/login.html",resp_cookies);
+                         // send_redirect(conn,"/login.html",NULL);
+                     }
+@@ -11151,7 +11310,7 @@ CBSimpleInfo get_cb_info(){
+ 					int ret =save_sys_username_password(found_session_user_name,password);//save new username ,password to eeprom
+ 					if(ret==0){
+ 						printf("save_sys_username_password success,redirect to login.html \n");
+-						sprintf(resp_cookies, "Set-Cookie: sid=;  Path=/\r\n");
++						sprintf(resp_cookies, "Set-Cookie: sid=; Max-Age=0; Path=/\r\n");
+                         send_redirect(conn,"/login.html",resp_cookies);
+                         // send_redirect(conn,"/login.html",NULL);
+ 					}else{
+@@ -11171,7 +11330,7 @@ CBSimpleInfo get_cb_info(){
+                             assert(ret>0);//make sure delete ok
+                         }
+                     }
+-					sprintf(resp_cookies, "Set-Cookie: sid=;  Path=/\r\n");
++					sprintf(resp_cookies, "Set-Cookie: sid=; Max-Age=0; Path=/\r\n");
+                     send_redirect(conn,"/login.html",resp_cookies);
+ 
+                 }else if(strcmp(path, "/power_status")==0 ){
+@@ -11421,6 +11580,65 @@ CBSimpleInfo get_cb_info(){
+ 
+                     send_response_200(conn);
+ 
++                }else if(strcmp(path, "/rtc")==0 ){	//rtc
++                    printf("POST ,location: rtc \n");
++
++					RTCInfo rtcInfo;
++                    assert(p_params!=NULL);
++                    kv_pair *current = params.head;
++					char *endPtr;
++					long intValue =0;
++                    while (current) {
++                        if(strcmp(current->key,"year")==0){
++							intValue = strtol(current->value, &endPtr, 10);
++                            rtcInfo.year= intValue>0?1:0;
++                        }else if(strcmp(current->key,"month")==0){
++							intValue = strtol(current->value, &endPtr, 10);
++                            rtcInfo.month= intValue>0?1:0;
++                        }else if(strcmp(current->key,"date")==0){
++                            intValue = strtol(current->value, &endPtr, 10);
++                            rtcInfo.date= intValue>0?1:0;
++                        }else if(strcmp(current->key,"weekday")==0){
++                            intValue = strtol(current->value, &endPtr, 10);
++                            rtcInfo.weekday= intValue>0?1:0;
++                        }else if(strcmp(current->key,"hours")==0){
++                            intValue = strtol(current->value, &endPtr, 10);
++                            rtcInfo.hours= intValue>0?1:0;
++                        }else if(strcmp(current->key,"minutes")==0){
++                            intValue = strtol(current->value, &endPtr, 10);
++                            rtcInfo.minutes= intValue>0?1:0;
++                        }else if(strcmp(current->key,"seconds")==0){
++                            intValue = strtol(current->value, &endPtr, 10);
++                            rtcInfo.seconds= intValue>0?1:0;
++                        }
++                        current = current->next;
++                    }
++					int set_ret=set_rtcinfo(rtcInfo);
++
++					// 创建JSON格式的字符串
++                    char *json_response_patt =NULL;
++					char json_response[BUF_SIZE_64]={0};
++					if(set_ret==0){
++						json_response_patt="{\"status\":%d,\"message\":\"success!\",\"data\":{}}";//0 success, msg
++						sprintf(json_response, json_response_patt,  set_ret);
++					}else{
++						json_response_patt="{\"status\":%d,\"message\":\"error retcode %d\",\"data\":{}}";//0 success, msg
++						sprintf(json_response, json_response_patt, set_ret,set_ret);
++					}
++
++                    // 发送HTTP头部
++                    const char *header = "HTTP/1.1 200 OK\r\n"
++                                        "Content-Type: application/json\r\n"
++                                        "Connection: close\r\n"
++                                        "Content-Length: %d\r\n\r\n";
++                    char response_header[256];
++                    sprintf(response_header, header, strlen(json_response));
++
++                    printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
++
++                    netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
++                    netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
++
+                 }else if(strcmp(path, "/off")==0 ){	//off
+                     printf("POST ,location: off \n");
+ 
+@@ -11518,7 +11736,10 @@ CBSimpleInfo get_cb_info(){
+  void
+  httpserver_init(void)
+  {
+- sys_thread_new("http_server_netconn", http_server_netconn_thread, NULL, 1024*4, 4);
++ 	int ret=sys_thread_new("http_server_netconn", http_server_netconn_thread, NULL, 1024*4, 4);
++	if (ret<=0){
++		printf("ERROR:create thread http_server_netconn_thread failt \n");
++	}
+  }
+ 
+  #endif
+\ No newline at end of file
+-- 
+2.25.1
+

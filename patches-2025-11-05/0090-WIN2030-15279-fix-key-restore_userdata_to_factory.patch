@@ -1,0 +1,185 @@
+From 3dd29f7d7dfb1985f4d1b6918a12236de142ebfa Mon Sep 17 00:00:00 2001
+From: xuxiang <xuxiang@eswincomputing.com>
+Date: Thu, 13 Jun 2024 14:29:46 +0800
+Subject: [PATCH 090/109] WIN2030-15279:fix: key restore_userdata_to_factory
+
+Changelogs:
+1. push down user reset key 10S to restore userdata to ractory
+
+Change-Id: I2e61069d10938c578fb695a1af1da361bf0acc13
+---
+ Core/Inc/hf_common.h           |  4 +++-
+ Core/Src/hf_board_init.c       |  2 +-
+ Core/Src/hf_common.c           | 26 +++++++++++++++++---------
+ Core/Src/hf_gpio_process.c     | 19 ++++++++++++++-----
+ Core/Src/hf_protocol_process.c |  3 ++-
+ 5 files changed, 37 insertions(+), 17 deletions(-)
+
+diff --git a/Core/Inc/hf_common.h b/Core/Inc/hf_common.h
+index de1be56..9f63af3 100644
+--- a/Core/Inc/hf_common.h
++++ b/Core/Inc/hf_common.h
+@@ -44,7 +44,8 @@ typedef enum {
+ typedef enum {
+ 	LED_MCU_RUNING = 0x1u,
+ 	LED_SOM_BOOTING,
+-	LED_SOM_KERNEL_RUNING
++	LED_SOM_KERNEL_RUNING,
++	LED_USER_INFO_RESET
+ } led_status_t;
+ 
+ typedef enum {
+@@ -322,6 +323,7 @@ deamon_stats_t get_som_daemon_state(void);
+ void change_som_daemon_state(deamon_stats_t newState);
+ 
+ void TriggerSomPowerOffTimer(void);
++void vStopSomPowerOffTimer(void);
+ void TriggerSomRebootTimer(void);
+ void StopSomRebootTimer(void);
+ void TriggerSomRestartTimer(void);
+diff --git a/Core/Src/hf_board_init.c b/Core/Src/hf_board_init.c
+index cdbd51d..2e533c5 100644
+--- a/Core/Src/hf_board_init.c
++++ b/Core/Src/hf_board_init.c
+@@ -138,7 +138,7 @@ int board_init(void)
+ 	MX_RTC_Init();
+ 	MX_TIM4_Init();
+ 	// MX_SPI1_Init();
+-	// MX_CRC_Init();
++	MX_CRC_Init();
+ 	// MX_RNG_Init();
+ 	MX_TIM1_Init();
+ 	MX_TIM9_Init();
+diff --git a/Core/Src/hf_common.c b/Core/Src/hf_common.c
+index d3694fe..7b62243 100644
+--- a/Core/Src/hf_common.c
++++ b/Core/Src/hf_common.c
+@@ -1370,23 +1370,27 @@ uint32_t es_autoboot(void)
+ 	}
+ 	return 0;
+ }
++led_status_t led_status_type = LED_MCU_RUNING;
++int get_mcu_led_status(void)
++{
++	return led_status_type;
++}
+ 
+ void set_mcu_led_status(led_status_t type)
+ {
+-	if( LED_MCU_RUNING == type) {
++	led_status_type = type;
++	if( LED_MCU_RUNING == led_status_type) {
+ 		HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+ 		HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_2);
+ 		HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_3);
+-	}
+-	else if( LED_SOM_BOOTING == type) {
++	} else if( LED_SOM_BOOTING == type) {
++		HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_1);
+ 		HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
+ 		HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_3);
+-	}
+-	else if( LED_SOM_KERNEL_RUNING == type)
+-	{
+-		if(HAL_TIM_CHANNEL_STATE_BUSY == HAL_TIM_GetChannelState(&htim1, TIM_CHANNEL_2))
+-		{
+-			// HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_1);
++	} else if( LED_SOM_KERNEL_RUNING == led_status_type) {
++		if((HAL_TIM_CHANNEL_STATE_BUSY == HAL_TIM_GetChannelState(&htim1, TIM_CHANNEL_2)) || 
++			    HAL_TIM_CHANNEL_STATE_BUSY == HAL_TIM_GetChannelState(&htim1, TIM_CHANNEL_1)) {
++			HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_1);
+ 			HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_2);
+ 			HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
+ 		} else {
+@@ -1395,6 +1399,10 @@ void set_mcu_led_status(led_status_t type)
+ 			else
+ 				HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
+ 		}
++	} else if( LED_USER_INFO_RESET == led_status_type) {
++		HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
++		HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
++		HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
+ 	}
+ }
+ 
+diff --git a/Core/Src/hf_gpio_process.c b/Core/Src/hf_gpio_process.c
+index 270fd0f..0829638 100644
+--- a/Core/Src/hf_gpio_process.c
++++ b/Core/Src/hf_gpio_process.c
+@@ -18,7 +18,7 @@
+ #define FLAGS_SOM_RST_OUT	0x00000010U
+ #define FLAGS_MCU_RESET_SOM	0x00000100U
+ #define FLAGS_KEY_USER_RST	0x00001000U
+-#define FLAGS_ALL			0x00000FFFU
++#define FLAGS_ALL			0x0000FFFFU
+ 
+ #define KEY_PUSHDOWN GPIO_PIN_RESET
+ #define KEY_RELEASE GPIO_PIN_SET
+@@ -161,6 +161,10 @@ static void som_rst_feedback_process(void)
+ 	}
+ }
+ 
++static uint8_t get_user_key_status(void)
++{
++	return HAL_GPIO_ReadPin(KEY_USER_RST_GPIO_Port, KEY_USER_RST_Pin);
++}
+ #define USER_RST_THRESHOLD 10000
+ static void key_user_rst_process(void)
+ {
+@@ -169,6 +173,7 @@ static void key_user_rst_process(void)
+ 	TickType_t pressStartTime = 0;
+ 	TickType_t currentTime = 0;
+ 	int ret = 0;
++	int led_type = 0;
+ 
+ 	while (key_status == KEY_PUSHDOWN) {
+ 		currentTime = xTaskGetTickCount();
+@@ -178,23 +183,27 @@ static void key_user_rst_process(void)
+ 			pressStartTime = currentTime;
+ 			break;
+ 		case KEY_PRESS_DETECTED_STATE:
+-			if (get_key_status() == KEY_RELEASE) {
+-				button_state = KEY_RELEASE_DETECTED_STATE;
+-			} else if((currentTime - pressStartTime) > USER_RST_THRESHOLD) {
++			if((currentTime - pressStartTime) > USER_RST_THRESHOLD) {
+ 				button_state = KEY_RELEASE_DETECTED_STATE;
++			} else if (get_user_key_status() == KEY_RELEASE) {
++				button_state = KEY_PRESS_STATE_END;
+ 			}
+ 			break;
+ 		case KEY_RELEASE_DETECTED_STATE:
+ 			if((currentTime - pressStartTime) >= USER_RST_THRESHOLD)
+ 			{
++				printf("restore userdata to factory\n");
+ 				// TODO : user reset function
++				led_type = get_mcu_led_status();
++				set_mcu_led_status(LED_USER_INFO_RESET);
+ 				es_restore_userdata_to_factory();
+ 			}
+ 			button_state = KEY_PRESS_STATE_END;
+ 			break;
+ 		case KEY_PRESS_STATE_END:
+-			if (get_key_status() == KEY_RELEASE) {
++			if (get_user_key_status() == KEY_RELEASE) {
+ 				// printf("sw IDLE_STATE\n");
++				set_mcu_led_status(led_type);
+ 				key_status = KEY_RELEASE;
+ 				button_state = IDLE_STATE;
+ 			}
+diff --git a/Core/Src/hf_protocol_process.c b/Core/Src/hf_protocol_process.c
+index 95c5a5c..0d23383 100644
+--- a/Core/Src/hf_protocol_process.c
++++ b/Core/Src/hf_protocol_process.c
+@@ -625,7 +625,8 @@ void deamon_keeplive_task(void *argument)
+ 			}
+ 		} else {
+ 			change_som_daemon_state(SOM_DAEMON_ON);
+-			set_mcu_led_status(LED_SOM_KERNEL_RUNING);
++			if(LED_USER_INFO_RESET != get_mcu_led_status())
++				set_mcu_led_status(LED_SOM_KERNEL_RUNING);
+ 			count = 0;
+ 		}
+ 		if (old_status != get_som_daemon_state()) {
+-- 
+2.25.1
+

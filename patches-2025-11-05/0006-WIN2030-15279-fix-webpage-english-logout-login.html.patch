@@ -1,0 +1,1067 @@
+From 22e47f5fcf05138761d276f29d8116c3e93c2d04 Mon Sep 17 00:00:00 2001
+From: yuan junhui <yuanjunhui@eswincomputing.com>
+Date: Mon, 29 Apr 2024 10:15:50 +0800
+Subject: [PATCH 006/109] WIN2030-15279:fix:webpage english,logout,login.html
+
+Changelogs:
+01,webpage lanage english
+02,login,logout logic,logout del cookie,info.html verify cookie,etc
+03,http header add 413 error
+04,page load success,auto ajax get request
+05,add modify webpage,get,post,eeprom logic,fixbug redirect to login set sid null
+
+Change-Id: I8aaae03134da42d9a706b10abb9b2abedcfea494
+---
+ Core/Src/hf_power_process.c                   |   2 +-
+ Core/Src/web-server.c                         | 699 +++++++++++-------
+ .../Third_Party/LwIP/src/include/lwip/opt.h   |   2 +-
+ 3 files changed, 437 insertions(+), 266 deletions(-)
+
+diff --git a/Core/Src/hf_power_process.c b/Core/Src/hf_power_process.c
+index 0903dab..c7741ce 100644
+--- a/Core/Src/hf_power_process.c
++++ b/Core/Src/hf_power_process.c
+@@ -8,7 +8,7 @@
+ #include "hf_common.h"
+ #include "hf_i2c.h"
+ /* Private typedef -----------------------------------------------------------*/
+-// #define AUTO_BOOT
++#define AUTO_BOOT
+ /* Private define ------------------------------------------------------------*/
+ #define ATX_POWER_GOOD GPIO_PIN_RESET
+ #define ATX_POWER_FAIL GPIO_PIN_SET
+diff --git a/Core/Src/web-server.c b/Core/Src/web-server.c
+index dec2219..58abd61 100644
+--- a/Core/Src/web-server.c
++++ b/Core/Src/web-server.c
+@@ -12,6 +12,9 @@
+ #define SESSION_ID_LENGTH 32
+ #define BUF_SIZE 1024
+ #define STATIC_PATH "/tmp/static"
++#define EEPROM_USERNAME_PASSWORD_ADDR 0x0100
++#define EEPROM_USERNAME_PASSWORD_BUFFER_SIZE 64 
++#define AT24C_ADDR (0x50<<1) //todoooooooooooooooooo
+ 
+ #if LWIP_NETCONN
+ 
+@@ -9421,21 +9424,21 @@ static const char http_index_html[] = "<html><head><title>Congrats!</title></hea
+ const unsigned char login_html[] ="<html lang=\"zh\"> \
+                                     <head> \
+                                         <meta charset=\"UTF-8\"> \
+-                                        <title>用户登录</title> \
++                                        <title>User Login</title> \
+                                     </head> \
+                                     <body> \
+-                                        <h2>用户登录</h2> \
++                                        <h2>User Login</h2> \
+                                         <form action=\"/login\" method=\"POST\"> \
+                                             <div> \
+-                                                <label for=\"username\">用户名:</label> \
++                                                <label for=\"username\">Username:</label> \
+                                                 <input type=\"text\" id=\"username\" name=\"username\" required> \
+                                             </div> \
+                                             <div> \
+-                                                <label for=\"password\">密码:</label> \
++                                                <label for=\"password\">Password:</label> \
+                                                 <input type=\"password\" id=\"password\" name=\"password\" required> \
+                                             </div> \
+                                             <div> \
+-                                                <button type=\"submit\">登录</button> \
++                                                <button type=\"submit\">Login</button> \
+                                             </div> \
+                                         </form> \
+                                     </body> \
+@@ -9446,35 +9449,43 @@ const unsigned char login_html[] ="<html lang=\"zh\"> \
+ const unsigned char info_html[] ="<html lang=\"en\"> \
+                                     <head> \
+                                         <meta charset=\"UTF-8\"> \
+-                                        <title>机器状态</title> \
++                                        <title>Machine Status</title> \
+                                             <style> \
+                                             .logout-form-wrapper { \
+                                                 position: absolute; \
+                                                 top: 10px; \
+                                                 right: 10px; \
++                                            } \
++											.modify-account-form-wrapper { \
++                                                position: absolute; \
++                                                top: 10px; \
++                                                right: 50px; \
+                                             } \
+                                             </style> \
+                                     </head> \
+                                     <body> \
++										<div class=\"modify-account-form-wrapper\"> \
++											<button><a href=\"/modify_account.html\">ModifyAccont</a></button> \
++                                        </div> \
+                                         <div class=\"logout-form-wrapper\"> \
+-                                            <form class=\"logout-form\" action=\"/logout\" method=\"post\"> \
+-                                                        <button type=\"submit\">退出</button> \
+-                                                    </form> \
+-                                             </div> \
+-                                        <h2>机器状态</h2> \
++											<form class=\"logout-form\" action=\"/logout\" method=\"post\"> \
++												<button type=\"submit\">Exit</button> \
++											</form> \
++                                        </div> \
++                                        <h2>Machine Status</h2> \
+                                         <div class=\"basic-static\" > \
+-                                            <h3>基本状态</h3> \
+-                                            cpu温度:<input type=\"text\" id=\"cpu_temp\" value=\"0\" style=\"width: 60px;\" disabled><br> \
+-                                            npu温度:<input type=\"text\" id=\"npu_temp\" value=\"0\" style=\"width: 60px;\" disabled><br> \
+-                                            风扇转速:<input type=\"text\" id=\"fan_speed\" value=\"0\" style=\"width: 60px;\" disabled><br> \
+-                                            <button id=\"basic-static-update\">修改</button> <button id=\"basic-static-refresh\">刷新</button> \
++                                            <h3>Basic Status</h3> \
++                                            CPU Temperature:<input type=\"text\" id=\"cpu_temp\" value=\"0\" style=\"width: 60px;\" disabled><br> \
++                                            NPU Temperature:<input type=\"text\" id=\"npu_temp\" value=\"0\" style=\"width: 60px;\" disabled><br> \
++                                            Fan Speed      :<input type=\"text\" id=\"fan_speed\" value=\"0\" style=\"width: 60px;\" disabled><br> \
++                                            <button id=\"basic-static-update\">update</button> <button id=\"basic-static-refresh\">refresh</button> \
+                                         </div> \
+                                         <div class=\"net-work\" > \
+-                                            <h3>网络系统</h3> \
+-                                            ip地址:<input type=\"text\" id=\"ipaddr\" value=\"0\" style=\"width: 60px;\"> <br> \
+-                                            网关:<input type=\"text\" id=\"gateway\" value=\"0\" style=\"width: 60px;\"> <br> \
+-                                            子网掩码:<input type=\"text\" id=\"subnetwork\" value=\"0\" style=\"width: 60px;\"> <br> \
+-                                            <button id=\"net-work-update\">修改</button> <button id=\"net-work-refresh\">刷新</button> \
++                                            <h3>Network System</h3> \
++                                            IP Address :<input type=\"text\" id=\"ipaddr\" value=\"0\" style=\"width: 60px;\"> <br> \
++                                            Gateway :<input type=\"text\" id=\"gateway\" value=\"0\" style=\"width: 60px;\"> <br> \
++                                            Subnet Mask:<input type=\"text\" id=\"subnetwork\" value=\"0\" style=\"width: 60px;\"> <br> \
++                                            <button id=\"net-work-update\">update</button> <button id=\"net-work-refresh\">refresh</button> \
+                                         </div> \
+                                          <script src=\"/jquery.min.js\"></script> \
+                                             <script> \n \
+@@ -9495,7 +9506,7 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
+                                                             },\
+                                                             success: function(response) {\n \
+                                                                 if(response.status===0){\n \
+-                                                                    alert(\"修改成功\");\n \
++                                                                    alert(\"update success!\");\n \
+                                                                 }else{\n \
+                                                                     alert(response.msg);\n \
+                                                                 }\n \
+@@ -9503,7 +9514,7 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
+                                                                 console.log('Network settings updated successfully.');\n \
+                                                             },\n \
+                                                             error: function(xhr, status, error) {\n \
+-                                                                 alert(\"修改失败\");\n \
++                                                                alert(\"udpate failed!\");\n \
+                                                                 // 请求失败时的回调函数\n \
+                                                                 console.error('Error updating network settings:', error);\n \
+                                                             }\n \
+@@ -9525,12 +9536,37 @@ const unsigned char info_html[] ="<html lang=\"en\"> \
+                                                             }\n \
+                                                         });\n\
+                                                     });\n\
++   													$('#net-work-refresh').click(); \n\
+                                                 });\n\
+                                             </script>\n \
+                                     </body> \
+                                     </html> ";       
+ 
+ 
++const unsigned char modify_account_html[] ="<html lang=\"zh\"> \
++                                    <head> \
++                                        <meta charset=\"UTF-8\"> \
++                                        <title>Account modify</title> \
++                                    </head> \
++                                    <body> \
++                                        <h2>Account modify</h2> \
++                                        <form action=\"/modify_account\" method=\"POST\"> \
++                                            <div> \
++                                                <label for=\"username\">Username:</label> \
++                                                <input type=\"text\" id=\"username\" name=\"username\" value=\"%s\" required disabled> \
++                                            </div> \
++                                            <div> \
++                                                <label for=\"password\">Password:</label> \
++                                                <input type=\"password\" id=\"password\" name=\"password\" required> \
++                                            </div> \
++                                            <div> \
++                                                <button type=\"submit\">Update</button> \
++                                            </div> \
++                                        </form> \
++                                    </body> \
++                                    </html> ";            
++
++
+ // 函数定义
+ char* concatenate_strings(const char* str1, const char* str2) {
+     // 计算新字符串需要的总长度
+@@ -9552,7 +9588,8 @@ char* concatenate_strings(const char* str1, const char* str2) {
+ 
+ void send_redirect(struct netconn *conn, const char *location,const char* cookies) {
+     char header[BUF_SIZE];
+-
++	assert(strlen(cookies)<80);//location max length is 30,cookie maxlength 80
++	assert(strlen(location)<30);
+     if(cookies!=NULL && strlen(cookies)>0){
+         // 构造一个HTTP 302 Found响应
+         sprintf(header, 
+@@ -9561,14 +9598,14 @@ void send_redirect(struct netconn *conn, const char *location,const char* cookie
+                 "Content-Length: 0\r\n"
+                 "%.80s"
+                 "Connection: close\r\n\r\n",
+-                location,cookies);//todo location max length is 30,cookie maxlength 80
++                location,cookies);
+     }else{
+      sprintf(header, 
+                 "HTTP/1.1 302 Found\r\n"
+                 "Location: %.30s\r\n"
+                 "Content-Length: 0\r\n"
+                 "Connection: close\r\n\r\n",
+-                location);//todo location max length is 30,cookie maxlength 80
++                location);
+ 
+     }
+     printf("header: %d  %s \n",strlen(header),header);
+@@ -9581,16 +9618,17 @@ void send_response_content(struct netconn *conn,const char* cookies,const char*
+     if(cookies!=NULL && strlen(cookies)>0){
+         header_tmp = concatenate_strings(http_html_hdr,cookies);
+         header = concatenate_strings(header_tmp,"\r\n");
+-        free(header_tmp); 
++        free(header_tmp);
+     }else{
+         header = concatenate_strings(http_html_hdr,"\r\n");
+     }
+     printf("header: %d %s \n",strlen(header),header);
+-    printf("html_content: %d %s \n",strlen(html_content),html_content);
++    printf("html_content: %d  \n",strlen(html_content));
+ 
+     netconn_write(conn, header, strlen(header), NETCONN_COPY);
+     netconn_write(conn, html_content, strlen(html_content), NETCONN_COPY);
+-    free(header);       
++	printf("html_content:netconn_write end   \n");
++    free(header);
+ }
+ void send_response_200(struct netconn *conn) {
+    netconn_write(conn, http_html_200, sizeof(http_html_200), NETCONN_COPY);
+@@ -9789,10 +9827,87 @@ void clear_sessions() {
+ 
+ // ------------------------ session end ---------------------
+ 
++// ------------------------ eeprom username password --------------
++
++void parseCredentials(const char *readBuffer, char *username, char *password) {
++    char buffer[EEPROM_USERNAME_PASSWORD_BUFFER_SIZE];
++    strncpy(buffer, readBuffer, EEPROM_USERNAME_PASSWORD_BUFFER_SIZE); // 拷贝到临时变量以避免更改原字符串
++    buffer[EEPROM_USERNAME_PASSWORD_BUFFER_SIZE - 1] = '\0'; // 确保字符串以空字符结尾
++
++    // 使用strtok分割字符串
++    char *token = strtok(buffer, ",");
++    if (token != NULL) {
++        strncpy(username, token, EEPROM_USERNAME_PASSWORD_BUFFER_SIZE); // 拷贝用户名
++        token = strtok(NULL, ",");
++        if (token != NULL) {
++            strncpy(password, token, EEPROM_USERNAME_PASSWORD_BUFFER_SIZE); // 拷贝密码
++        }
++    }
++}
++
++
+ int validate_credentials(const char *username, const char *password) {
+-    return strcmp(username, "admin") == 0 && strcmp(password, "123456") == 0;
++	//todo read username ,password from eeprom
++	// hf_i2c_mem_read(&hi2c1, AT24C_ADDR, EEPROM_ADDR_USERNAME_PASSWORD, ReadBuffer, BufferSize);
++	//todo verify checksum
++
++
++	assert(username!=NULL&&password!=NULL);
++	char sys_username[EEPROM_USERNAME_PASSWORD_BUFFER_SIZE]="admin";
++	char sys_password[EEPROM_USERNAME_PASSWORD_BUFFER_SIZE]="123456";
++
++    char ReadBuffer[EEPROM_USERNAME_PASSWORD_BUFFER_SIZE];
++    // uint16_t i;
++    // for(i=0; i<BufferSize; i++)
++    //   WriteBuffer[i]=i+0xf0;    /* WriteBuffer init */
++    // hf_i2c_mem_write(&hi2c1, AT24C_ADDR,
++	// 				  0, WriteBuffer, BufferSize);
++	printf("111111111111111111 \n");
++    int ret=hf_i2c_mem_read(&hi2c1, AT24C_ADDR,
++					EEPROM_USERNAME_PASSWORD_ADDR, ReadBuffer, EEPROM_USERNAME_PASSWORD_BUFFER_SIZE);
++	printf("222222222222222222 \n");
++	if(ret!=0){
++		printf("error:hf_i2c_mem_read %d\n",ret);
++		return ret;
++	}
++	//todo checksum
++	bool checksum=TRUE;//todo need function to check
++	if(checksum){
++		for(int i=0; i<EEPROM_USERNAME_PASSWORD_BUFFER_SIZE; i++)
++			printf("0x%02x %c  ",ReadBuffer[i]);
++
++		// parseCredentials(ReadBuffer, sys_username, sys_password); //todo after open checksum 
++
++		printf("sys_username: %s\n", sys_username);
++		printf("sys_password: %s\n", sys_password);
++	}
++	assert(sys_username!=NULL&&sys_password!=NULL);
++
++    return (strcmp(username, sys_username) == 0 && strcmp(password, sys_password) == 0)?0:1;
++}
++
++//0 succ,1 fail
++int write_new_username_password(const char *username, const char *password){
++	assert(username!=NULL&&password!=NULL);
++    int total_length = strlen(username) + strlen(password) + 2; // +2 是为了逗号和字符串结束符
++	printf("##############!!!!!!!!!!!!!########### %d",total_length);
++	if(total_length>EEPROM_USERNAME_PASSWORD_BUFFER_SIZE){
++		return 1;
++	}
++
++    char combined[EEPROM_USERNAME_PASSWORD_BUFFER_SIZE];
++    sprintf(combined, "%s,%s", username, password);
++	assert(total_length<=EEPROM_USERNAME_PASSWORD_BUFFER_SIZE);
++	printf("3333333333333333333333333333333333333 \n ");
++	printf("combined:%d  %s \n",strlen(combined),combined);
++	int ret=hf_i2c_mem_write(&hi2c1, AT24C_ADDR, EEPROM_USERNAME_PASSWORD_ADDR, &combined, total_length);
++	printf("44444444444444444444444444444444444 \n");
++	return ret;
+ }
+ 
++
++// ------------------------ eeprom username password end --------------
++
+ const char* process_header(const char *header) {
+     const char *pos = header;
+     const char *end;
+@@ -9806,17 +9921,17 @@ const char* process_header(const char *header) {
+         line[len] = '\0'; // 确保字符串以null字符终止
+ 
+         // 处理这一行
+-        // printf("Header line :pos:%d line:%s\n",pos-header, line);
++        printf("Header line :pos:%d strlen:%d line:%c%c%c%c%c\n",pos-header,strlen(line), line[0],line[1],line[2],line[3],line[4]);
+ 
+         pos = end + 2; // 跳过"\r\n"
+ 
+         // 检测头部结束（即"\r\n\r\n"）
+         if (*pos == '\r' && *(pos + 1) == '\n') {
+-            // printf("End of header.\n");
++            printf("End of header.\n");
+             return pos + 2; // 返回指向响应体开始的指针
+         }
+     }
+-
++	printf("can't find rnrn pos-header:%d .\n",pos-header);
+     return NULL; // 如果没有找到"\r\n\r\n"，返回NULL
+ }
+ 
+@@ -9873,32 +9988,31 @@ static bool led_on = FALSE;
+         char *buf_copy;
+         buf_copy = strdup(buf);
+ 
+-        //解析GET请求
++        // 解析GET请求,cookies
+         char *method = strtok(buf_copy, " ");
+         char *url = strtok(NULL, " ");
+         char *version = strtok(NULL, "\r\n");
+ 
+         char cookies[256] = {0};
+         parse_cookies(buf, cookies);
+-        printf("header cookies: %s \n",cookies);
++        printf("parse header cookies: %s \n",cookies);
+ 
+-        // session sid
++        // 从cookie中获取session信息,session sid
+         char *found_session_user_name=NULL;
+         char *sidValue = NULL;
+         if (cookies != NULL) {
+ 
+-            printf("##### sessions #### \n");
++            printf("\t session \n");
+             Session *current = session_list;
+             while (current != NULL) {
+                 printf("%s %s\n",current->session_id,current->session_data);
+                 current = current->next;
+             }
+-            printf("##### sessions  end #### \n");
+ 
+             
+             char *cookies_copy=strdup(cookies);
+             // 使用分号和空格作为分隔符逐个检查Cookie
+-            char *token = strtok(cookies_copy, "; ");//todo ; or ;kongge
++            char *token = strtok(cookies_copy, "; ");
+             while (token != NULL) {
+                 // 检查当前片段是否包含sid字段
+                 if (strncmp(token, "sid=",4) == 0) {
+@@ -9915,20 +10029,18 @@ static bool led_on = FALSE;
+                 printf("sidValue : %s\n", sidValue);
+                 Session *found_session = find_session(sidValue);
+                 if (found_session) {
+-                    printf("Found session: ID=%s, Data=%s\n", found_session->session_id, found_session->session_data);
++                    printf("\t Found session: ID=%s, Data=%s\n", found_session->session_id, found_session->session_data);
+                     found_session_user_name=strdup(found_session->session_data);
+                 }
+             } 
+         }
+ 
+-        //todo 从文件中解析出用户列表
+-        //todo 判断是否合法用户，合法用户的的话，islogin=true
+-        //todo login.html
++  
+ 
+         char resp_cookies[256] = {0};
+ 
+         if (method && url && version && strcmp(method, "GET") == 0) {
+-            printf("GET \n");//  todo param get
++            printf("GET \n");
+             // 提取请求路径和查询字符串
+             char *path = strtok(url, "?");
+             char *query = strtok(NULL, "?");
+@@ -9939,26 +10051,20 @@ static bool led_on = FALSE;
+             kv_map params={NULL,0};
+             kv_map* p_params=NULL;
+             if(query!=NULL && strlen(query)>0){
+-                printf("GET query:%s \n",query);
+-                // printf("################1111111111######### \n");
+                 printf("query: %d %s \n",strlen(query),query);
+-                // printf("################22222222222######### \n");
+ 
+-            //  osDelay(6000);
+-            //  send_response_200(conn);
+-            //  return ;
+                 params = parse_get_params(query);
+                 p_params= &params;
+ 
+                 // 打印参数列表
+                 kv_pair *current = params.head;
+                 while (current) {
+-                    printf("%s = %s\n", current->key, current->value);
++                    printf("\t %s = %s\n", current->key, current->value);
+                     current = current->next;
+                 }
+             }else{
+                 //  printf("333333333 \n");
+-                printf("query is empty ;\n");
++                printf("\t query is empty ;\n");
+                 // send_response_200(conn);
+                 // return ;
+             }
+@@ -9973,17 +10079,15 @@ static bool led_on = FALSE;
+                 //已登录->info.html
+                 
+                 if(found_session_user_name!=NULL && strlen(found_session_user_name)>0){//todo verify user_name in txt config(valid)
+-                  //todo verify user_name in txt config(valid)
+-                    //todo firefox test if need below
+-                    // sprintf(resp_cookies, "Set-Cookie: %.10s; Max-Age=3600; Path=/\r\n", found_session_user_name);//todo username max length is 10
+-                    // send_response_content(conn,NULL, info_html);
+                     printf("redirect to info.html (%s)\n",found_session_user_name);
+                     send_redirect(conn,"/info.html",NULL);
+ 
+                 }else{
+                    // send_response_content(conn,NULL, login_html);
+                     printf("redirect to login.html \n");
+-                    send_redirect(conn,"/login.html",NULL);
++					sprintf(resp_cookies, "Set-Cookie: sid=;  Path=/\r\n");
++                    send_redirect(conn,"/login.html",resp_cookies);
++                    // send_redirect(conn,"/login.html",NULL);
+                 }
+                 
+ 
+@@ -10010,9 +10114,31 @@ static bool led_on = FALSE;
+                 // printf("param b: %s \n",b);
+                 // strcpy(resp_cookies,"");
+                 // strcpy(resp_cookies,"Set-Cookie: user=lisi; Max-Age=3600; Path=/\r\n");
+-                send_response_content(conn,NULL, info_html);
+-
+-            }else if(strcmp(path, "/network")==0 ){
++				if(found_session_user_name!=NULL && strlen(found_session_user_name)>0){
++					printf("response info.html%s \n",found_session_user_name);
++               		send_response_content(conn,NULL, info_html);
++				}else{
++					printf("redirect to login.html \n");
++					sprintf(resp_cookies, "Set-Cookie: sid=;  Path=/\r\n");
++                    send_redirect(conn,"/login.html",resp_cookies);
++                    // send_redirect(conn,"/login.html",NULL);
++				}
++
++            }else if(strcmp(path,"/modify_account.html")==0){
++				if(found_session_user_name!=NULL && strlen(found_session_user_name)>0){	
++					printf("response modify_account_html.html%s \n",found_session_user_name);
++					assert(strlen(found_session_user_name)<64);
++					char modify_account_html_resp[strlen(modify_account_html)+64];
++					sprintf(modify_account_html_resp, modify_account_html, found_session_user_name);
++               		send_response_content(conn,NULL, modify_account_html_resp);
++				}else{
++					printf("redirect to login.html \n");
++					sprintf(resp_cookies, "Set-Cookie: sid=;  Path=/\r\n");
++                    send_redirect(conn,"/login.html",resp_cookies);
++                    // send_redirect(conn,"/login.html",NULL);
++				}
++
++			}else if(strcmp(path, "/network")==0 ){
+              
+                 // 创建JSON格式的字符串
+                 char *json_response = "{\"status\":0,\"message\":\"success\",\"data\":{\"ipaddr\":\"1.1.10.10\",\"gateway\":\"1.2.3.4\",\"subnetwork\":\"5.5.5.5\"}}";//0 success, msg
+@@ -10088,8 +10214,7 @@ static bool led_on = FALSE;
+                 netconn_write(conn, data_jquery_min_js, strlen(data_jquery_min_js)-15-10-12-17-9, NETCONN_COPY);
+ 
+             }else{
+-                //todo
+-                printf("ERROR :22222222222222222222 \n");
++                printf("ERROR unsupport get path \n");
+                 send_response_200(conn);
+             }
+ 
+@@ -10103,248 +10228,302 @@ static bool led_on = FALSE;
+         {
+             printf("func:httpserver_serve method:POST  enter \n");
+             printf("buf length:%d \n",strlen(buf));
++            if(strlen(buf)>TCP_MSS){
++				char response_413[256] = {0};
++				sprintf(response_413, "HTTP/1.1 413 Request Entity Too Large %d,%d  \r\nContent-Length: 0\r\n\r\n",strlen(buf),TCP_MSS);
+ 
+-            char *path = strtok(url, "?");
+-            // ---------------- query info ---------------
+-            // 获取 Content-Length
+-            char *content_length_str = strstr(buf, "Content-Length: ");
+-            int content_length = 0;
+-            if (content_length_str) {
+-                content_length_str += strlen("Content-Length: ");
+-                char *end_of_content_length = strstr(content_length_str, "\r\n");
+-                if (end_of_content_length) {
+-                    char len_str[16] = {0};
+-                    strncpy(len_str, content_length_str, end_of_content_length - content_length_str);
+-                    content_length = atoi(len_str);
++                // const char *response = "HTTP/1.1 413 Request Entity Too Large\r\nContent-Length: 0\r\n\r\n";
++                netconn_write(conn, response_413, strlen(response_413), NETCONN_COPY);
++            }else{
++                char *path = strtok(url, "?");
++                // ---------------- query info ---------------
++                // 获取 Content-Length
++                char *content_length_str = strstr(buf, "Content-Length: ");
++                int content_length = 0;
++                if (content_length_str) {
++                    content_length_str += strlen("Content-Length: ");
++                    char *end_of_content_length = strstr(content_length_str, "\r\n");
++                    if (end_of_content_length) {
++                        char len_str[16] = {0};
++                        strncpy(len_str, content_length_str, end_of_content_length - content_length_str);
++                        content_length = atoi(len_str);
++                    }
+                 }
+-            }
+-            printf("content_length:%d \n",content_length);
+-            
+-
+-            // 查找请求体的起始位置（空行后面）
+-            // char *body_start = strstr(buf, "\r\n\r\n");
+-
+-            const char *body_start = process_header(buf);
+-
++                printf("content_length:%d \n",content_length);
++
++                printf("########### buf hex##############\n");
++                // 以十六进制格式打印字符串
++                for (int i = 0; i < strlen(buf); i++) {
++                    printf("%02X ", buf[i]);
++                    if(i%16==15){
++                        printf("\n");
++                    }
++                }
++                printf("\n");
+ 
+-            if (body_start) {
+-                // body_start += 4; // 跳过空行，指向请求体的起始位置
+-                printf("find the body of the POST request. \n body_start strlen():%d \n",strlen(body_start));
+-            } else {
+-                // printf("Could not find the body of the POST request. \n");
+-                printf("Could not find the body of the POST request. \n body_start strlen() %d \n",strlen(body_start));
+-            }
+-            assert(content_length==0||(content_length>0)&&body_start);
+ 
+-            char* query=malloc(sizeof(char)*(content_length+1));
+ 
+-            // 使用 strncpy 函数截取子字符串
+-            strncpy(query, body_start , content_length);
+-            query[content_length] = '\0'; 
++                // 查找请求体的起始位置（空行后面）
++                char *body_start = strstr(buf, "\r\n\r\n");
++                // const char *body_start = process_header(buf);
+ 
+-            // printf("query %d %s.\n",strlen(query),query);
+-            // ------- end query info ---------------
+ 
+-            
+-            printf("POST path:%s query:%s \n",path,query);
+-            printf("start parse post query \n");
+-            kv_map params={NULL,0};
+-            kv_map* p_params=NULL;
+-            if(strlen(query)>0){
+-                 params = parse_get_params(query);
+-                 p_params = &params;
+-                
+-                // 打印参数列表
+-                kv_pair *current = params.head;
+-                while (current) {
+-                    printf("%s = %s\n", current->key, current->value);
+-                    current = current->next;
++                if (body_start) {
++                    body_start += 4; // 跳过空行，指向请求体的起始位置
++                    printf("find the body of the POST request. \n body_start posabs:%d strlen():%d \n",body_start-buf,strlen(body_start));
++                } else {
++                    // printf("Could not find the body of the POST request. \n");
++                    printf("Could not find the body of the POST request. \n body_start strlen() %d \n",strlen(body_start));
+                 }
+-            }
+-            printf("end parse post query \n");
++                assert(content_length==0||(content_length>0)&&body_start);
++
++                char* query=malloc(sizeof(char)*(content_length+1));
++
++                // 使用 strncpy 函数截取子字符串
++                strncpy(query, body_start , content_length);
++                query[content_length] = '\0';
++
++                // printf("query %d %s.\n",strlen(query),query);
++                // ------- end query info ---------------
++
++               printf("########### query hex##############\n");
++    			// 以十六进制格式打印字符串
++    			for (int i = 0; i < strlen(query); i++) {
++    				printf("%02X,%c ", query[i],query[i]);
++    				if(i%16==15){
++    					printf("\n");
++    				}
++    			}
++    			printf("\n");
++                printf("POST path:%s query:%s \n",path,query);
++                printf("start parse post query \n");
++                kv_map params={NULL,0};
++                kv_map* p_params=NULL;
++                if(strlen(query)>0){
++                     params = parse_get_params(query);
++                     p_params = &params;
++
++                    // 打印参数列表
++                    kv_pair *current = params.head;
++                    while (current) {
++                        printf("%s = %s\n", current->key, current->value);
++                        current = current->next;
++                    }
++                }
++                printf("end parse post query \n");
++				free(query);
+ 
+ 
+-            // printf("############ path: %s compare  %d ########### \n",path,strcmp(path, "/testpost"));
++                // printf("############ path: %s compare  %d ########### \n",path,strcmp(path, "/testpost"));
+ 
+-            if(strcmp(path, "/testpost")==0 ){		//testpost
+-                printf("POST ,location: testpost \n");//  todo param get
++                if(strcmp(path, "/testpost")==0 ){		//testpost
++                    printf("POST ,location: testpost \n");
+ 
+-                char* a=NULL;
+-                kv_pair *current = params.head;
+-                while (current) {
+-                    // printf("%s = %s\n", current->key, current->value);
+-                    if(strcmp(current->key,"a")==0){
+-                        a= current->value;
+-                        break;
++                    char* a=NULL;
++                    kv_pair *current = params.head;
++                    while (current) {
++                        // printf("%s = %s\n", current->key, current->value);
++                        if(strcmp(current->key,"a")==0){
++                            a= current->value;
++                            break;
++                        }
++                        current = current->next;
+                     }
+-                    current = current->next;
+-                }
+-                printf("param a: %s \n",a);
++                    printf("param a: %s \n",a);
+ 
+ 
+-                led_on = TRUE;
+-                LED1_ON;
+-                
+-                printf("LED ON!\n");
++                    led_on = TRUE;
++                    LED1_ON;
+ 
+-            }else if(strcmp(path, "/login")==0 ){		//login
+-                printf("POST ,location: login \n");
++                    printf("LED ON!\n");
+ 
+-          
++                }else if(strcmp(path, "/login")==0 ){		//login
++                    printf("POST ,location: login \n");
+ 
+-                char* username=NULL;
+-                char* password=NULL;
+-                assert(p_params!=NULL);
+-                kv_pair *current = params.head;
+-                while (current) {
+-                    // printf("%s = %s\n", current->key, current->value);
+-                    if(strcmp(current->key,"username")==0){
+-                        username= current->value;
+-                        if(password!=NULL){//two param is found
+-                            break;
++
++
++                    char* username=NULL;
++                    char* password=NULL;
++                    assert(p_params!=NULL);
++                    kv_pair *current = params.head;
++                    while (current) {
++                        // printf("%s = %s\n", current->key, current->value);
++                        if(strcmp(current->key,"username")==0){
++                            username= current->value;
++                            if(password!=NULL){//two param is found
++                                break;
++                            }
+                         }
+-                    }
+-                    if(strcmp(current->key,"password")==0){
+-                        password= current->value;
+-                        if(username!=NULL){//two param is found
+-                            break;
++                        if(strcmp(current->key,"password")==0){
++                            password= current->value;
++                            if(username!=NULL){//two param is found
++                                break;
++                            }
+                         }
++                        current = current->next;
+                     }
+-                    current = current->next;
+-                }
+-                assert(username!=NULL && password!=NULL);
+-                printf("param username: %s \n",username);
+-                printf("param password: %s \n",password);
++                    assert(username!=NULL && password!=NULL);
++                    printf("param username: %s \n",username);
++                    printf("param password: %s \n",password);
+ 
+-        
+ 
+-                led_on = TRUE;
+-                LED1_ON;
+ 
+-                bool loginSuccess = validate_credentials(username,password);
++                    led_on = TRUE;
++                    LED1_ON;
+ 
+-                if(loginSuccess){
+-                    printf("login success!\n");//todo judge succes
++                    bool loginSuccess = validate_credentials(username,password)==0?TRUE:FALSE;
+ 
+-                    //add sessions
+-                    char session_id[SESSION_ID_LENGTH + 1]; 
+-                    generate_session_id(session_id, SESSION_ID_LENGTH);
+-                    printf("session add user,sessionId:%s \n",session_id);
++                    if(loginSuccess){
++                        printf("login success!\n");
+ 
+-                    Session *session1 = create_session(session_id, username);
+-                    add_session(session1);
+-                    assert(find_session(session_id)!=NULL);
++                        //add sessions
++                        char session_id[SESSION_ID_LENGTH + 1];
++                        generate_session_id(session_id, SESSION_ID_LENGTH);
++                        printf("session add user,sessionId:%s \n",session_id);
+ 
+-                    sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Max-Age=3600; Path=/\r\n",session_id);
++                        Session *session1 = create_session(session_id, username);
++                        add_session(session1);
++                        assert(find_session(session_id)!=NULL);
+ 
+-                    send_redirect(conn,"/info.html",resp_cookies);
+-                }else{
+-                    send_redirect(conn,"/login.html",NULL);
+-                }
++                        sprintf(resp_cookies, "Set-Cookie: sid=%.31s; Path=/\r\n",session_id);
+ 
+-            }else if(strcmp(path, "/logout")==0 ){		//login_out
+-                printf("POST ,location: logout \n");
+-                 //todo:verify current user is username
+-                 if(found_session_user_name!=NULL && strlen(found_session_user_name)>0){//todo verify user_name in txt config(valid)
+-                    // send_response_content(conn,NULL, login_html);
+-                    printf("redirect to login.html \n");
+-                    if(sidValue!=NULL){
+-                        int ret=delete_session(sidValue);
+-                        assert(ret>0);//make sure delete ok
++                        send_redirect(conn,"/info.html",resp_cookies);
++                    }else{
++						sprintf(resp_cookies, "Set-Cookie: sid=;  Path=/\r\n");
++                        send_redirect(conn,"/login.html",resp_cookies);
++                        // send_redirect(conn,"/login.html",NULL);
+                     }
+-                    send_redirect(conn,"/login.html",NULL);
+-                }else{
+-                    //todo error msg
+-                    send_response_200(conn);
+-                }
+-               
+ 
+-            }else if(strcmp(path, "/network")==0 ){		//post network
+-                printf("POST ,location: network \n");
++                }else if(strcmp(path,"/modify_account")==0){
++					printf("POST ,location: modify_account \n");
++
++       
++                    char* password=NULL;
++                    assert(p_params!=NULL);
++                    kv_pair *current = params.head;
++                    while (current) {
++                        if(strcmp(current->key,"password")==0){
++                            password= current->value;
++                                break;
++                        }
++                        current = current->next;
++                    }
++                    assert( password!=NULL);
++                    printf("param password: %s \n",password);
++
++					int ret =write_new_username_password(found_session_user_name,password);//save new username ,password to eeprom
++					if(ret==0){
++						printf("write_new_username_password success,redirect to login.html \n");
++						sprintf(resp_cookies, "Set-Cookie: sid=;  Path=/\r\n");
++                        send_redirect(conn,"/login.html",resp_cookies);
++                        // send_redirect(conn,"/login.html",NULL);
++					}else{
++						printf("write_new_username_password fail,redirect to modify_account.html \n");
++						send_redirect(conn,"/modify_account.html",NULL);
++					}
++
++				}else if(strcmp(path, "/logout")==0 ){		//login_out
++                    printf("POST ,location: logout \n");
++                    //todo:verify current user is username
++                    if(found_session_user_name!=NULL && strlen(found_session_user_name)>0){//todo verify user_name in txt config(valid)
++                        // send_response_content(conn,NULL, login_html);
++                        printf("redirect to login.html \n");
++                        if(sidValue!=NULL){
++                            int ret=delete_session(sidValue);
++                            printf("delete sidValue:%s\n",sidValue);
++                            assert(ret>0);//make sure delete ok
++                        }
++                    }
++					sprintf(resp_cookies, "Set-Cookie: sid=;  Path=/\r\n");
++                    send_redirect(conn,"/login.html",resp_cookies);
++
++                }else if(strcmp(path, "/network")==0 ){		//post network
++                    printf("POST ,location: network \n");
++
++                    char* ipaddr=NULL;
++                    char* gateway=NULL;
++                    char* subnetwork=NULL;
++
++                    kv_pair *current = params.head;
++                    while (current) {
++                        // printf("%s = %s\n", current->key, current->value);
++                        if(strcmp(current->key,"ipaddr")==0){
++                            ipaddr= current->value;
++                        }else if(strcmp(current->key,"gateway")==0){
++                            gateway= current->value;
++                        }else if(strcmp(current->key,"subnetwork")==0){
++                            subnetwork= current->value;
++                        }
++                        current = current->next;
++                    }
++                    assert(ipaddr!=NULL&&gateway!=NULL&&subnetwork!=NULL);
+ 
+-                char* ipaddr=NULL;
+-                char* gateway=NULL;
+-                char* subnetwork=NULL;
++                    printf("param ipaddr: %s \n",ipaddr);
++                    printf("param gateway: %s \n",gateway);
++                    printf("param subnetwork: %s \n",subnetwork);
+ 
+-                kv_pair *current = params.head;
+-                while (current) {
+-                    // printf("%s = %s\n", current->key, current->value);
+-                    if(strcmp(current->key,"ipaddr")==0){
+-                        ipaddr= current->value;
+-                    }else if(strcmp(current->key,"gateway")==0){
+-                        gateway= current->value;
+-                    }else if(strcmp(current->key,"subnetwork")==0){
+-                        subnetwork= current->value;
+-                    }
+-                    current = current->next;
+-                }
+-                assert(ipaddr!=NULL&&gateway!=NULL&&subnetwork!=NULL);
+-                
+-                printf("param ipaddr: %s \n",ipaddr);
+-                printf("param gateway: %s \n",gateway); 
+-                printf("param subnetwork: %s \n",subnetwork);
+ 
+ 
++                    led_on = TRUE;
++                    LED1_ON;
++                    printf("#### FAKE modify network! #####\n");
+ 
+-                led_on = TRUE;
+-                LED1_ON;
+-                printf("#### FAKE modify network! #####\n");
++                     // 创建JSON格式的字符串
++                    char *json_response = "{\"status\":0,\"message\":\"success\",\"data\":{}}";//0 success, msg
+ 
+-				 // 创建JSON格式的字符串
+-                char *json_response = "{\"status\":0,\"message\":\"success\",\"data\":{}}";//0 success, msg
+-               
+ 
+-                // 发送HTTP头部
+-                const char *header = "HTTP/1.1 200 OK\r\n"
+-                                    "Content-Type: application/json\r\n"
+-                                    "Connection: close\r\n"
+-                                    "Content-Length: %d\r\n\r\n";
+-                char response_header[256];
+-                sprintf(response_header, header, strlen(json_response));
++                    // 发送HTTP头部
++                    const char *header = "HTTP/1.1 200 OK\r\n"
++                                        "Content-Type: application/json\r\n"
++                                        "Connection: close\r\n"
++                                        "Content-Length: %d\r\n\r\n";
++                    char response_header[256];
++                    sprintf(response_header, header, strlen(json_response));
+ 
+-                printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
++                    printf("strlen(response_header):%d,strlen(json_response):%d \n",strlen(response_header),strlen(json_response));
+ 
+-                netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
+-                netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
++                    netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
++                    netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
+ 
+-                // 释放JSON字符串的内存
+-                free(response_header);
+-                free(json_response);
++                    // 释放JSON字符串的内存
++                    free(response_header);
++                    free(json_response);
+ 
+-                send_response_200(conn);//todo :response {code:0;msg:success}
++                    send_response_200(conn);
+ 
+-            }else if(strcmp(path, "/off")==0 ){	//off
+-                printf("POST ,location: off \n");
++                }else if(strcmp(path, "/off")==0 ){	//off
++                    printf("POST ,location: off \n");
+ 
+-                char* c=NULL;
+-                kv_pair *current = params.head;
+-                while (current) {
+-                    // printf("%s = %s\n", current->key, current->value);
+-                    if(strcmp(current->key,"c")==0){
+-                        c= current->value;
+-                        break;
++                    char* c=NULL;
++                    kv_pair *current = params.head;
++                    while (current) {
++                        // printf("%s = %s\n", current->key, current->value);
++                        if(strcmp(current->key,"c")==0){
++                            c= current->value;
++                            break;
++                        }
++                        current = current->next;
+                     }
+-                    current = current->next;
+-                }
+-                printf("param c: %s \n",c);
++                    printf("param c: %s \n",c);
+ 
+-                led_on = FALSE;
+-                LED1_OFF;
+-                printf("LED OFF!\n");
+-                send_response_200(conn);
++                    led_on = FALSE;
++                    LED1_OFF;
++                    printf("LED OFF!\n");
++                    send_response_200(conn);
+ 
+-            }else{
+-                printf("func:httpserver_serve else 111111111111111 \n");
+-                send_response_200(conn);
+-            }
+-            
+-            if(p_params!=NULL){
+-                free_kv_map(&params);
+-                p_params=NULL;
++                }else{
++                    printf("func:httpserver_serve else 111111111111111 \n");
++                    send_response_200(conn);
++                }
++
++                if(p_params!=NULL){
++                    free_kv_map(&params);
++                    p_params=NULL;
++                }
++                printf("func:httpserver_serve method:POST  exit \n");
+             }
+-            printf("func:httpserver_serve method:POST  exit \n");
+         }else{
+-            printf("ERROR :3333333333333333333333 \n");
++            printf("ERROR unsupport methoc(only support GET,POST) \n");
+             send_response_200(conn);
+         }
+         free(buf_copy);
+@@ -10353,8 +10532,6 @@ static bool led_on = FALSE;
+         printf("http_server_netconn_serve after else 33333333333333\n");
+      }
+      netconn_close(conn); /* 关闭连接 */
+-     printf("http_server_netconn_serve after:netconn_close \n");
+-
+      /* 释放inbuf */
+      netbuf_delete(inbuf);
+      printf("http_server_netconn_serve after:netbuf_delete \n");
+@@ -10372,13 +10549,11 @@ static bool led_on = FALSE;
+      /* 绑定端口号与IP地址，端口号默认是80 */
+      conn = netconn_new(NETCONN_TCP);
+      
+-
+      LWIP_ERROR("http_server: invalid conn", (conn != NULL), return;);
+      netconn_bind(conn, NULL, LOCAL_PORT);
+ 
+      /* 监听 */
+      netconn_listen(conn);
+-     printf("http_server_netconn_thread after netconn_listen \n");
+ 
+     led_on = TRUE;
+     LED1_ON;
+@@ -10387,26 +10562,22 @@ static bool led_on = FALSE;
+      {
+          //处理连接请求/jquery.min.js
+          err = netconn_accept(conn, &newconn);
+-         printf("http_server_netconn_thread after netconn_accept \n");
+          if (err == ERR_OK)
+          {
+              //发送网页数据
+              http_server_netconn_serve(newconn);
+-             printf("http_server_netconn_thread after http_server_netconn_serve \n");
+ 
+              //删除连接结构
+              netconn_delete(newconn);
+-             printf("http_server_netconn_thread after netconn_delete \n");
+          }else{
+-            printf("http_server_netconn_thread after netconn_acce/jquery.min.jspt err != ERR_OK \n");
++            printf("http_server_netconn_thread else 1111111111111 \n");
+          }
+      }
+      while (err == ERR_OK);
+      //关闭
+-     printf("http_server_netconn_thread before netconn_close \n");
+      netconn_close(conn);
+-     printf("http_server_netconn_thread after conn \n");
+      netconn_delete(conn);
++	 printf("http_server_netconn_thread after netconn_delete \n");
+  }
+ 
+  /** Initialize the HTTP server (start its thread) */
+diff --git a/Middlewares/Third_Party/LwIP/src/include/lwip/opt.h b/Middlewares/Third_Party/LwIP/src/include/lwip/opt.h
+index 1b4e39d..05ef5e8 100644
+--- a/Middlewares/Third_Party/LwIP/src/include/lwip/opt.h
++++ b/Middlewares/Third_Party/LwIP/src/include/lwip/opt.h
+@@ -1290,7 +1290,7 @@
+  * an upper limit on the MSS advertised by the remote host.
+  */
+ #if !defined TCP_MSS || defined __DOXYGEN__
+-#define TCP_MSS                         536
++#define TCP_MSS                         704
+ #endif
+ 
+ /**
+-- 
+2.25.1
+
