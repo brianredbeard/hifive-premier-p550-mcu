@@ -1,7 +1,7 @@
 # Patch Convergence Strategy
 
-**Status:** In Progress - Infrastructure Setup Complete
-**Current Position:** Patch 0001 applied, checkpoint created
+**Status:** In Progress - Phase 2 Complete
+**Current Position:** Patch 0010 applied, checkpoint created
 **Target:** Patch 0109 with validated convergence
 
 ---
@@ -32,7 +32,7 @@ This document tracks the application of 109 patches from `patches-2025-11-05/` t
 | Patch | Status | Theme | Key Features |
 |-------|--------|-------|--------------|
 | 0001 | ✅ Complete | Baseline | Power mgmt, protocol lib, GPIO control |
-| 0010 | ⏳ Pending | Foundation | Complete basic debugging |
+| 0010 | ✅ Complete | Foundation | Production test, web server, DIP switch |
 | 0030 | ⏳ Pending | INA226 Integration | Web server + power monitoring |
 | 0060 | ⏳ Pending | I2C Reliability | Error recovery, EEPROM handling |
 | 0090 | ⏳ Pending | Robustness | Factory reset, CRC32, boot modes |
@@ -73,6 +73,43 @@ Each checkpoint preserves:
 - Build path issues (GCC toolchain hardcoded to `/home/xxbringup/...`)
 
 **Checkpoint:** `checkpoint-0001` created at `checkpoints/checkpoint-0001/`
+
+### Patches 0002-0010: ✅ Applied
+
+**Commits:** 254e5dd through 09e6bf9
+**Date Range:** Apr 22 - May 6, 2024
+
+**Patch Summary:**
+- 0002: Production test commands and protocol processing (19 files, +918/-414)
+- 0003: Debug cleanup (3 files, +7/-10)
+- 0004: Dynamic IP/netmask/gateway, RTC format fixes (10 files, +196/-68)
+- 0005: Web server implementation (4 files, +10,435/-1)
+- 0006: English UI, login/logout, HTTP 413 support (3 files, +437/-266)
+- 0007: Power ON/OFF backend integration (1 file, +139/-28)
+- 0008: Reset, power consumption, PVT info features (1 file, +183/-14)
+- 0009: UART DMA for MCU-U84 communication (11 files, +326/-23)
+- 0010: DIP switch support (1 file, +192/-3)
+
+**Total Changes:** ~52 files modified, ~12,000 insertions, ~800 deletions
+
+**Rejections Resolved:**
+- 0002: 3 rejection files (hf_power_process.c, main.c, Makefile)
+- 0003: 1 rejection file (hf_power_process.c - debug printf removal)
+- 0004: 2 rejection files (main.c - whitespace and RTC format)
+- 0005: 1 rejection file (Makefile - web-server.c addition)
+- 0006: 1 rejection file (hf_power_process.c - AUTO_BOOT enable)
+- 0007-0008: Applied cleanly
+- 0009: 2 rejection files (whitespace fixes)
+- 0010: Applied cleanly
+
+**Key Findings:**
+- Rejection rate: 8/9 patches (89%) had at least one rejection
+- Most common: whitespace/context mismatches, not semantic conflicts
+- AUTO_BOOT toggled: commented → uncommented → kept uncommented
+- Build still fails (expected GCC path issue)
+- All conflicts resolved through manual application
+
+**Checkpoint:** `checkpoint-0010` created at `checkpoints/checkpoint-0010/`
 
 ---
 
@@ -264,9 +301,9 @@ GCC_PATH = /home/xxbringup/dvb/gcc-arm-none-eabi-10.3-2021.10/bin
 
 1. ✅ Create infrastructure scripts
 2. ✅ Create checkpoint-0001
-3. ⏳ Apply patches 0002-0010
-4. ⏳ Create checkpoint-0010
-5. ⏳ Validate Foundation complete
+3. ✅ Apply patches 0002-0010
+4. ✅ Create checkpoint-0010
+5. ⏳ Validate Foundation complete (awaiting build toolchain)
 
 ### Short Term (Phases 3-5)
 
@@ -293,5 +330,5 @@ GCC_PATH = /home/xxbringup/dvb/gcc-arm-none-eabi-10.3-2021.10/bin
 ---
 
 **Last Updated:** 2025-11-25
-**Current Patch:** 0001
-**Next Milestone:** 0010
+**Current Patch:** 0010
+**Next Milestone:** 0030
