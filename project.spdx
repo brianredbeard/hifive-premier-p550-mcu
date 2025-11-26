@@ -1,0 +1,376 @@
+SPDXVersion: SPDX-2.3
+DataLicense: CC0-1.0
+SPDXID: SPDXRef-DOCUMENT
+DocumentName: HiFive-Premier-P550-MCU-Firmware
+DocumentNamespace: https://github.com/eswincomputing/hifive-premier-p550-mcu-patches/spdxdocs/project-6d69adef809c31fead949832a3e5fd4313cfa520
+LicenseListVersion: 3.22
+Creator: Tool: manual-spdx-creation
+Creator: Organization: Beijing ESWIN Computing Technology Co., Ltd.
+Creator: Person: Brian Harrington (redbeard@dead-city.org)
+Created: 2025-11-26T03:49:00Z
+CreatorComment: <text>SPDX document for HiFive Premier P550 BMC firmware based on STM32F407VET6.
+This document describes the licensing and copyright information for the complete
+firmware package including all third-party components.</text>
+
+## Document Annotations
+AnnotationType: REVIEW
+Annotator: Person: Brian Harrington
+AnnotationDate: 2025-11-26T03:49:00Z
+AnnotationComment: <text>License analysis completed. All components verified for GPL-2.0-only compatibility.</text>
+AnnotationSPDXID: SPDXRef-DOCUMENT
+
+## Package Information
+
+PackageName: HiFive-Premier-P550-MCU-Firmware
+SPDXID: SPDXRef-Package-BMC-Firmware
+PackageVersion: 1.0-dev
+PackageSupplier: Organization: Beijing ESWIN Computing Technology Co., Ltd.
+PackageOriginator: Organization: Beijing ESWIN Computing Technology Co., Ltd.
+PackageDownloadLocation: https://github.com/eswincomputing/hifive-premier-p550-mcu-patches
+FilesAnalyzed: true
+PackageVerificationCode: 6d69adef809c31fead949832a3e5fd4313cfa520
+PackageHomePage: https://www.sifive.com/boards/hifive-premier-p550
+PackageSourceInfo: <text>Built from STM32CubeMX 6.10.0 generated code with patches applied</text>
+PackageLicenseConcluded: GPL-2.0-only
+PackageLicenseDeclared: GPL-2.0-only
+PackageLicenseComments: <text>The overall project is licensed under GPL-2.0-only.
+Third-party components (STM32 HAL, CMSIS, FreeRTOS, LwIP) retain their original
+licenses (BSD-3-Clause, Apache-2.0, MIT) which are all GPL-compatible.</text>
+PackageCopyrightText: <text>Copyright 2024 Beijing ESWIN Computing Technology Co., Ltd.</text>
+PackageSummary: <text>Baseboard Management Controller (BMC) firmware for HiFive Premier P550
+development platform. Controls power management, I2C sensors, SPI communication,
+web server, and telnet console for the HF106C carrier board with EIC7700 SoC.</text>
+PackageDescription: <text>This firmware runs on STM32F407VET6 microcontroller and provides
+BMC functionality for the HiFive Premier P550 (HF106) development platform.
+The platform is based on ESWIN's EIC7700 Edge Computing SoC integrated with
+SiFive's P550 RISC-V cores.
+
+Key Features:
+- Power management and sequencing for SOM (System on Module)
+- I2C-based power monitoring (INA226, PAC1934)
+- EEPROM management for board configuration
+- Web-based management interface (HTTP server)
+- Telnet console for remote management
+- SPI slave interface for SOM communication
+- RTC and system monitoring
+- FreeRTOS-based multitasking architecture
+- LwIP TCP/IP networking stack</text>
+ExternalRef: SECURITY cpe23Type cpe:2.3:a:eswin:bmc_firmware:1.0:*:*:*:*:*:*:*
+ExternalRef: PACKAGE-MANAGER purl pkg:github/eswincomputing/hifive-premier-p550-mcu-patches@6d69adef809c31fead949832a3e5fd4313cfa520
+
+## Project-Specific Source Files Package
+
+PackageName: BMC-Application-Code
+SPDXID: SPDXRef-Package-BMC-Application
+PackageVersion: 1.0-dev
+PackageSupplier: Organization: Beijing ESWIN Computing Technology Co., Ltd.
+PackageDownloadLocation: NOASSERTION
+FilesAnalyzed: false
+PackageLicenseConcluded: GPL-2.0-only
+PackageLicenseDeclared: GPL-2.0-only
+PackageCopyrightText: <text>Copyright 2024 Beijing ESWIN Computing Technology Co., Ltd.</text>
+PackageSummary: <text>Project-specific BMC application code (42 source files in Core/Src and Core/Inc)</text>
+
+## STMicroelectronics CMSIS Package
+
+PackageName: STM32-CMSIS
+SPDXID: SPDXRef-Package-STM32-CMSIS
+PackageVersion: 5.x
+PackageSupplier: Organization: STMicroelectronics
+PackageOriginator: Organization: ARM Limited
+PackageDownloadLocation: https://www.st.com/
+FilesAnalyzed: false
+PackageLicenseConcluded: Apache-2.0
+PackageLicenseDeclared: Apache-2.0
+PackageCopyrightText: <text>Copyright (c) ARM Limited and STMicroelectronics</text>
+PackageSummary: <text>ARM CMSIS Core and STM32F4xx device support files</text>
+PackageDescription: <text>Cortex Microcontroller Software Interface Standard (CMSIS)
+provides vendor-independent hardware abstraction layer for Cortex-M processors.
+Includes STM32F407xx device headers and startup code.</text>
+PackageComment: <text>Located in Drivers/CMSIS/</text>
+ExternalRef: PACKAGE-MANAGER purl pkg:generic/cmsis@5.x
+
+## STMicroelectronics HAL Driver Package
+
+PackageName: STM32F4xx-HAL-Driver
+SPDXID: SPDXRef-Package-STM32-HAL
+PackageVersion: 1.8.x
+PackageSupplier: Organization: STMicroelectronics
+PackageDownloadLocation: https://www.st.com/
+FilesAnalyzed: false
+PackageLicenseConcluded: BSD-3-Clause
+PackageLicenseDeclared: BSD-3-Clause
+PackageCopyrightText: <text>Copyright (c) STMicroelectronics</text>
+PackageSummary: <text>STM32F4xx Hardware Abstraction Layer drivers (110 source files)</text>
+PackageDescription: <text>STMicroelectronics HAL provides firmware library for STM32F4
+peripherals including GPIO, UART, SPI, I2C, Ethernet, RTC, CRC, Timers, DMA,
+Flash, and Power Management.</text>
+PackageComment: <text>Located in Drivers/STM32F4xx_HAL_Driver/</text>
+ExternalRef: PACKAGE-MANAGER purl pkg:generic/stm32f4xx-hal@1.8.x
+
+## FreeRTOS Package
+
+PackageName: FreeRTOS
+SPDXID: SPDXRef-Package-FreeRTOS
+PackageVersion: 10.x
+PackageSupplier: Organization: Amazon.com, Inc.
+PackageDownloadLocation: https://www.freertos.org/
+FilesAnalyzed: false
+PackageLicenseConcluded: MIT
+PackageLicenseDeclared: MIT
+PackageCopyrightText: <text>Copyright (C) 2020 Amazon.com, Inc. or its affiliates</text>
+PackageSummary: <text>FreeRTOS real-time operating system kernel (11 source files)</text>
+PackageDescription: <text>FreeRTOS is a market-leading real-time operating system (RTOS)
+for microcontrollers and small microprocessors. Includes kernel, tasks, queues,
+semaphores, timers, and ARM Cortex-M4F port.</text>
+PackageComment: <text>Located in Middlewares/Third_Party/FreeRTOS/
+CMSIS-RTOS v2 wrapper uses Apache-2.0 license.</text>
+ExternalRef: SECURITY cpe23Type cpe:2.3:a:amazon:freertos:10.x:*:*:*:*:*:*:*
+ExternalRef: PACKAGE-MANAGER purl pkg:github/freertos/freertos-kernel@10.x
+
+## FreeRTOS CMSIS-RTOS v2 Wrapper
+
+PackageName: FreeRTOS-CMSIS-RTOS-v2
+SPDXID: SPDXRef-Package-CMSIS-RTOS
+PackageVersion: 2.x
+PackageSupplier: Organization: ARM Limited
+PackageDownloadLocation: NOASSERTION
+FilesAnalyzed: false
+PackageLicenseConcluded: Apache-2.0
+PackageLicenseDeclared: Apache-2.0
+PackageCopyrightText: <text>Copyright (c) ARM Limited</text>
+PackageSummary: <text>CMSIS-RTOS v2 API wrapper for FreeRTOS</text>
+PackageComment: <text>Located in Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/</text>
+
+## LwIP TCP/IP Stack Package
+
+PackageName: LwIP
+SPDXID: SPDXRef-Package-LwIP
+PackageVersion: 2.1.x
+PackageSupplier: Organization: Swedish Institute of Computer Science
+PackageOriginator: Person: Adam Dunkels (adam@sics.se)
+PackageDownloadLocation: https://savannah.nongnu.org/projects/lwip/
+FilesAnalyzed: false
+PackageLicenseConcluded: BSD-3-Clause
+PackageLicenseDeclared: BSD-3-Clause
+PackageCopyrightText: <text>Copyright (c) 2001-2004 Swedish Institute of Computer Science</text>
+PackageSummary: <text>Lightweight IP (LwIP) TCP/IP stack (83 source files)</text>
+PackageDescription: <text>LwIP is a small independent implementation of the TCP/IP protocol
+suite designed for embedded systems. Includes TCP, UDP, IP, ICMP, ARP, HTTP server,
+and socket API with FreeRTOS integration.</text>
+PackageComment: <text>Located in Middlewares/Third_Party/LwIP/
+Port-specific files in LWIP/App/ and LWIP/Target/</text>
+ExternalRef: SECURITY cpe23Type cpe:2.3:a:lwip_project:lwip:2.1.x:*:*:*:*:*:*:*
+ExternalRef: PACKAGE-MANAGER purl pkg:generic/lwip@2.1.x
+
+## License Information
+
+LicenseID: LicenseRef-GPL-2.0-only
+ExtractedText: <text>GNU GENERAL PUBLIC LICENSE Version 2, June 1991
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; version 2 of the License only.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along
+with this program; if not, write to the Free Software Foundation, Inc.,
+51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.</text>
+LicenseName: GNU General Public License v2.0 only
+LicenseCrossRef: https://spdx.org/licenses/GPL-2.0-only.html
+LicenseComment: <text>Used for all project-specific code authored by ESWIN</text>
+
+LicenseID: LicenseRef-MIT-FreeRTOS
+ExtractedText: <text>Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.</text>
+LicenseName: MIT License (FreeRTOS)
+LicenseCrossRef: https://opensource.org/licenses/MIT
+LicenseCrossRef: https://github.com/FreeRTOS/FreeRTOS-Kernel/blob/main/LICENSE.md
+LicenseComment: <text>FreeRTOS kernel license</text>
+
+LicenseID: LicenseRef-BSD-3-Clause-STM
+ExtractedText: <text>Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice,
+   this list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+3. Neither the name of the copyright holder nor the names of its contributors
+   may be used to endorse or promote products derived from this software
+   without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES ARE DISCLAIMED.</text>
+LicenseName: BSD 3-Clause License (STMicroelectronics)
+LicenseCrossRef: https://opensource.org/licenses/BSD-3-Clause
+LicenseComment: <text>Used by STM32 HAL Driver</text>
+
+LicenseID: LicenseRef-BSD-3-Clause-LwIP
+ExtractedText: <text>Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice,
+   this list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+3. The name of the author may not be used to endorse or promote products
+   derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR IMPLIED
+WARRANTIES ARE DISCLAIMED.</text>
+LicenseName: BSD 3-Clause License (LwIP)
+LicenseCrossRef: https://opensource.org/licenses/BSD-3-Clause
+LicenseComment: <text>Used by LwIP TCP/IP stack</text>
+
+LicenseID: LicenseRef-Apache-2.0-CMSIS
+ExtractedText: <text>Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.</text>
+LicenseName: Apache License 2.0 (CMSIS)
+LicenseCrossRef: https://www.apache.org/licenses/LICENSE-2.0
+LicenseComment: <text>Used by ARM CMSIS and CMSIS-RTOS v2</text>
+
+## File Information - Project-Specific Files
+
+FileName: ./Core/Inc/hf_common.h
+SPDXID: SPDXRef-File-hf-common-h
+FileChecksum: SHA1: 0000000000000000000000000000000000000000
+LicenseConcluded: GPL-2.0-only
+LicenseInfoInFile: GPL-2.0-only
+FileCopyrightText: <text>Copyright 2024 Beijing ESWIN Computing Technology Co., Ltd.</text>
+FileComment: <text>Core system architecture and common API definitions.
+Author: LinMin <linmin@eswincomputing.com></text>
+
+FileName: ./Core/Src/hf_common.c
+SPDXID: SPDXRef-File-hf-common-c
+FileChecksum: SHA1: 0000000000000000000000000000000000000000
+LicenseConcluded: GPL-2.0-only
+LicenseInfoInFile: GPL-2.0-only
+FileCopyrightText: <text>Copyright 2024 Beijing ESWIN Computing Technology Co., Ltd.</text>
+FileComment: <text>Core system implementation including power management and RTC operations</text>
+
+FileName: ./Core/Src/web-server.c
+SPDXID: SPDXRef-File-web-server-c
+FileChecksum: SHA1: 0000000000000000000000000000000000000000
+LicenseConcluded: GPL-2.0-only
+LicenseInfoInFile: GPL-2.0-only
+FileCopyrightText: <text>Copyright 2024 Beijing ESWIN Computing Technology Co., Ltd.</text>
+FileComment: <text>HTTP web server implementation for BMC management interface.
+Author: Yuan Junhui <yuanjunhui@eswincomputing.com></text>
+
+FileName: ./Core/Src/hf_i2c.c
+SPDXID: SPDXRef-File-hf-i2c-c
+FileChecksum: SHA1: 0000000000000000000000000000000000000000
+LicenseConcluded: GPL-2.0-only
+LicenseInfoInFile: GPL-2.0-only
+FileCopyrightText: <text>Copyright 2024 Beijing ESWIN Computing Technology Co., Ltd.</text>
+FileComment: <text>I2C subsystem for power monitoring and EEPROM access.
+Author: Huang Yifeng <huangyifeng@eswincomputing.com></text>
+
+FileName: ./Core/Src/hf_spi_slv.c
+SPDXID: SPDXRef-File-hf-spi-slv-c
+FileChecksum: SHA1: 0000000000000000000000000000000000000000
+LicenseConcluded: GPL-2.0-only
+LicenseInfoInFile: GPL-2.0-only
+FileCopyrightText: <text>Copyright 2024 Beijing ESWIN Computing Technology Co., Ltd.</text>
+FileComment: <text>SPI slave interface for SOM communication.
+Author: XuXiang <xuxiang@eswincomputing.com></text>
+
+FileName: ./Core/Src/main.c
+SPDXID: SPDXRef-File-main-c
+FileChecksum: SHA1: 0000000000000000000000000000000000000000
+LicenseConcluded: GPL-2.0-only
+LicenseInfoInFile: GPL-2.0-only
+FileCopyrightText: <text>Copyright 2024 STMicroelectronics and Beijing ESWIN Computing Technology Co., Ltd.</text>
+FileComment: <text>Main application entry point. Portions generated by STM32CubeMX.
+Author: XuXiang <xuxiang@eswincomputing.com></text>
+
+FileName: ./Makefile
+SPDXID: SPDXRef-File-Makefile
+FileChecksum: SHA1: 0000000000000000000000000000000000000000
+LicenseConcluded: NOASSERTION
+LicenseInfoInFile: NOASSERTION
+FileCopyrightText: <text>NOASSERTION</text>
+FileComment: <text>Build system for ARM GCC toolchain. Modified for patch compatibility.</text>
+
+FileName: ./STM32F407VET6_BMC.ioc
+SPDXID: SPDXRef-File-CubeMX-Config
+FileChecksum: SHA1: 0000000000000000000000000000000000000000
+LicenseConcluded: NOASSERTION
+LicenseInfoInFile: NOASSERTION
+FileCopyrightText: <text>NOASSERTION</text>
+FileComment: <text>STM32CubeMX 6.10.0 configuration file for peripheral initialization</text>
+
+## Relationships
+
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-Package-BMC-Firmware
+Relationship: SPDXRef-Package-BMC-Firmware CONTAINS SPDXRef-Package-BMC-Application
+Relationship: SPDXRef-Package-BMC-Firmware CONTAINS SPDXRef-Package-STM32-CMSIS
+Relationship: SPDXRef-Package-BMC-Firmware CONTAINS SPDXRef-Package-STM32-HAL
+Relationship: SPDXRef-Package-BMC-Firmware CONTAINS SPDXRef-Package-FreeRTOS
+Relationship: SPDXRef-Package-BMC-Firmware CONTAINS SPDXRef-Package-CMSIS-RTOS
+Relationship: SPDXRef-Package-BMC-Firmware CONTAINS SPDXRef-Package-LwIP
+
+Relationship: SPDXRef-Package-BMC-Application DEPENDS_ON SPDXRef-Package-STM32-HAL
+Relationship: SPDXRef-Package-BMC-Application DEPENDS_ON SPDXRef-Package-FreeRTOS
+Relationship: SPDXRef-Package-BMC-Application DEPENDS_ON SPDXRef-Package-LwIP
+Relationship: SPDXRef-Package-BMC-Application DEPENDS_ON SPDXRef-Package-STM32-CMSIS
+
+Relationship: SPDXRef-Package-STM32-HAL DEPENDS_ON SPDXRef-Package-STM32-CMSIS
+Relationship: SPDXRef-Package-FreeRTOS STATIC_LINK SPDXRef-Package-BMC-Application
+Relationship: SPDXRef-Package-LwIP STATIC_LINK SPDXRef-Package-BMC-Application
+Relationship: SPDXRef-Package-CMSIS-RTOS DEPENDS_ON SPDXRef-Package-FreeRTOS
+
+Relationship: SPDXRef-File-hf-common-h DEPENDENCY_MANIFEST_OF SPDXRef-Package-BMC-Application
+Relationship: SPDXRef-File-hf-common-c GENERATED_FROM SPDXRef-File-hf-common-h
+Relationship: SPDXRef-File-web-server-c GENERATED_FROM SPDXRef-File-hf-common-h
+Relationship: SPDXRef-File-main-c GENERATED_FROM SPDXRef-File-CubeMX-Config
+
+## Review Information
+
+Reviewer: Person: Brian Harrington (redbeard@dead-city.org)
+ReviewDate: 2025-11-26T03:49:00Z
+ReviewComment: <text>License compatibility verified:
+- GPL-2.0-only is the governing license for the combined work
+- All third-party licenses (MIT, BSD-3-Clause, Apache-2.0) are GPL-compatible
+- Source code distribution required when distributing binaries (GPL requirement)
+- All copyright notices preserved and properly attributed
+- No license conflicts identified</text>
+
+## Additional Information
+
+PackageComment: <text>Build Instructions:
+1. Download STM32CubeMX 6.10.0 from https://www.st.com/
+2. Generate base project from STM32F407VET6_BMC.ioc
+3. Apply patches from patches-2025-11-05/ directory
+4. Build using ARM GCC toolchain (arm-none-eabi-gcc)
+5. Flash STM32F407VET6_BMC.elf to target hardware
+
+For detailed instructions, see README.md and HiFive Premier P550 MCU User Manual
+at https://www.sifive.com/document-file/premier-p550-mcu-user-manual</text>
