@@ -1100,7 +1100,7 @@ static BaseType_t prvCommandReboot(char *pcWriteBuffer, size_t xWriteBufferLen, 
     int ret = HAL_OK;
 
     if (SOM_POWER_ON == get_som_power_state()) {
-        ret = web_cmd_handle(CMD_RESET, NULL, 0, 2000);
+        ret = web_cmd_handle(CMD_REBOOT, NULL, 0, 2000);
         if (HAL_OK != ret) {
             som_reset_control(pdTRUE);
             osDelay(10);

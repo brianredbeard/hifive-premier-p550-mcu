@@ -51,12 +51,13 @@ typedef enum {
 // Define command types
 typedef enum {
 	CMD_POWER_OFF = 0x01,
-	CMD_RESET,
+	CMD_REBOOT,
 	CMD_READ_BOARD_INFO,
 	CMD_CONTROL_LED,
 	CMD_PVT_INFO,
 	CMD_BOARD_STATUS,
 	CMD_POWER_INFO,
+	CMD_RESTART,    //cold reboot with power off/on
 	// You can continue adding other command types
 } CommandType;
 
@@ -284,6 +285,7 @@ int es_set_som_dip_switch_soft_state_all(int som_dip_switch_soft_ctl_attr, uint8
 int es_eeprom_info_test(void);
 power_switch_t get_som_power_state(void);
 void change_som_power_state(power_switch_t newState);
+void vRestartSOM(void);
 deamon_stats_t get_som_daemon_state(void);
 void change_som_daemon_state(deamon_stats_t newState);
 
@@ -305,6 +307,7 @@ int32_t es_set_rtc_time(struct rtc_time_t *stime);
 int32_t es_get_rtc_date(struct rtc_date_t *sdate);
 int32_t es_get_rtc_time(struct rtc_time_t *stime);
 power_info get_power_info(void);
+int xSOMRestartHandle(void);
 
 #ifdef __cplusplus
 }

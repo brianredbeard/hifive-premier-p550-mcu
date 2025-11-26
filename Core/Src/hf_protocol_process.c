@@ -422,6 +422,7 @@ void dump_message(Message data)
 SemaphoreHandle_t xMutex = NULL;
 TimerHandle_t xSomPowerOffTimer;
 TimerHandle_t xSomRebootTimer;
+TimerHandle_t xSomRestartTimer;
 
 // Function to initialize the mutex
 void init_transmit_mutex(void) {
@@ -638,8 +639,13 @@ void handle_notify_mesage(Message *msg)
 {
 	if (CMD_POWER_OFF == msg->cmd_type) {
 		// Here the SOM should at shutdown state in opensbi, we can turn off its power safely
+		vStopSomPowerOffTimer();
+		printf("Poweroff SOM normaly!\n");
 		change_som_power_state(SOM_POWER_OFF);
-		printf("Poweroff SOM normaly, shutdown it now!\n");
+	} else if (CMD_RESTART == msg->cmd_type) {
+		StopSomRestartTimer();
+		printf("Restart SOM normaly!\n");
+		vRestartSOM();
 	}
 }
 
@@ -675,7 +681,7 @@ void handle_som_mesage(Message *msg)
 	}
 }
 
-void vSomPowerOffTimerCallback(TimerHandle_t xSomPowerOffTimer)
+void vSomPowerOffTimerCallback(TimerHandle_t Timer)
 {
 	if (SOM_POWER_OFF != get_som_power_state()) {
 		change_som_power_state(SOM_POWER_OFF);
@@ -686,28 +692,55 @@ void vSomPowerOffTimerCallback(TimerHandle_t xSomPowerOffTimer)
 void TriggerSomPowerOffTimer(void)
 {
 	if (xTimerStart(xSomPowerOffTimer, 0) != pdPASS) {
-		printf("Failed to trigger Som timer!\n");
+		printf("Failed to trigger poweroff Som timer!\n");
 	}
 }
 
-void vSomRebootTimerCallback(TimerHandle_t xSomRebootTimer)
+void vStopSomPowerOffTimer(void)
+{
+	if (xTimerStop(xSomPowerOffTimer, 0) != pdPASS) {
+		printf("Failed to trigger poweroff Som timer!\n");
+	}
+}
+
+void vSomRebootTimerCallback(TimerHandle_t Timer)
 {
 	som_reset_control(pdTRUE);
 	osDelay(10);
 	som_reset_control(pdFALSE);
-	printf("reboot SOM timeout, force reset SOM!\n");
+	printf("Reboot SOM timeout, force reboot SOM!\n");
 }
 
 void TriggerSomRebootTimer(void)
 {
 	if (xTimerStart(xSomRebootTimer, 0) != pdPASS) {
-		printf("Failed to trigger Som timer!\n");
+		printf("Failed to trigger Som reboot timer!\n");
 	}
 }
 void StopSomRebootTimer(void)
 {
 	if (xTimerStop(xSomRebootTimer, 0) != pdPASS) {
-		printf("Failed to trigger Som timer!\n");
+		printf("Failed to trigger Som reboot timer!\n");
+	}
+}
+
+void vSomRestartTimerCallback(TimerHandle_t Timer)
+{
+	printf("Restart SOM timeout, force restart SOM!\n");
+	vRestartSOM();
+}
+
+void TriggerSomRestartTimer(void)
+{
+	if (xTimerStart(xSomRestartTimer, 0) != pdPASS) {
+		printf("Failed to trigger Som restart timer!\n");
+	}
+}
+
+void StopSomRestartTimer(void)
+{
+	if (xTimerStop(xSomRestartTimer, 0) != pdPASS) {
+		printf("Failed to trigger Som restart timer!\n");
 	}
 }
 
@@ -728,8 +761,8 @@ void uart4_protocol_task(void *argument)
 	//Init web server cmd list
 	vListInitialise(&WebCmdList);
 
-	/* Create a timer with a timeout set to 5 seconds */
-	xSomPowerOffTimer = xTimerCreate( "SomPowerOffTimer", pdMS_TO_TICKS(5000),
+	/* Create a timer with a timeout set to 6 seconds */
+	xSomPowerOffTimer = xTimerCreate( "SomPowerOffTimer", pdMS_TO_TICKS(6000),
 			pdFALSE, (void *)0, vSomPowerOffTimerCallback);
 
 	if (xSomPowerOffTimer == NULL) {
@@ -743,6 +776,15 @@ void uart4_protocol_task(void *argument)
 
 	if (xSomRebootTimer == NULL) {
 		printf("[%s %d]:Failed to create SOM reboot timer!\n",__func__,__LINE__);
+		return;
+	}
+
+	/* Create a timer with a timeout set to 5 seconds */
+	xSomRestartTimer = xTimerCreate( "SomRestartTimer", pdMS_TO_TICKS(5000),
+			pdFALSE, (void *)0, vSomRestartTimerCallback);
+
+	if (xSomRestartTimer == NULL) {
+		printf("[%s %d]:Failed to create SOM restart timer!\n",__func__,__LINE__);
 		return;
 	}
 	for (;;) {

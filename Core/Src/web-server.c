@@ -10443,7 +10443,7 @@ static int change_power_status(int status)
 				ret = HAL_OK;
 				return ret;
 			}
-			// Trigger the Som timer to enusre SOM could poweroff in 5 senconds
+			// Trigger the Som timer to enusre SOM could poweroff anyway
 			TriggerSomPowerOffTimer();
 		} else {
 			web_debug("SOM already power off!\n");
@@ -10466,21 +10466,39 @@ int change_power_lost_resume_attr(int status){//status 0:power off,1:power on
 	return es_set_som_pwr_lost_resume_attr(status);
 }
 
-int reset()
+int xSOMRebootHandle()
 {
 	int ret = HAL_OK;
 
-	ret = web_cmd_handle(CMD_RESET, NULL, 0, 2000);
+	ret = web_cmd_handle(CMD_REBOOT, NULL, 0, 2000);
 	if (HAL_OK != ret) {
 		som_reset_control(pdTRUE);
 		osDelay(10);
 		som_reset_control(pdFALSE);
 		web_debug("Faild to reboot SOM(ret %d), force reset SOM!\n", ret);
 		ret = HAL_OK;
+		return ret;
 	}
-	// Trigger the Som timer to enusre SOM could reboot in 5 senconds
+	// Trigger the Som timer to enusre SOM could reboot anyway
 	TriggerSomRebootTimer();
 	web_debug("web call reset, ret %d\n", ret);
+	return ret;
+}
+
+int xSOMRestartHandle(void)
+{
+	int ret = HAL_OK;
+
+	ret = web_cmd_handle(CMD_RESTART, NULL, 0, 2000);
+	if (HAL_OK != ret) {
+		web_debug("Faild to restart SOM(ret %d), force restart SOM!\n", ret);
+		vRestartSOM();
+		ret = HAL_OK;
+		return ret;
+	}
+	// Trigger the Som timer to enusre SOM could restart anyway
+	TriggerSomRestartTimer();
+	web_debug("call restart, ret %d\n", ret);
 	return ret;
 }
 
@@ -11346,7 +11364,7 @@ int get_soc_status()
 
 				}else if(strcmp(path, "/reset")==0 ){
 					web_debug("POST location: reset \n");
-					int reset_ret=reset();
+					int reset_ret=xSOMRebootHandle();
                     char *json_response_patt =NULL;
 					char json_response[BUF_SIZE_64]={0};
 					if(reset_ret==0){
