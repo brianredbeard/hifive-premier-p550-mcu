@@ -13,7 +13,10 @@
 #####################################
 # stm32 toolchain
 #####################################
-GCC_PATH = /IBU_8T/IBU_SOFTWARE/bringup/tools/gcc-arm-none-eabi-10.3-2021.10/bin
+# GCC_PATH can be set via environment variable or make command line argument
+# Example: make GCC_PATH=/path/to/gcc-arm-none-eabi/bin
+# If not set, tools will be resolved from PATH
+# GCC_PATH = /IBU_8T/IBU_SOFTWARE/bringup/tools/gcc-arm-none-eabi-10.3-2021.10/bin
 
 
 ######################################
