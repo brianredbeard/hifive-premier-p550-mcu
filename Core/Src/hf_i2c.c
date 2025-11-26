@@ -100,21 +100,3 @@ int hf_i2c_mem_write(I2C_HandleTypeDef *hi2c, uint8_t slave_addr,
 		HAL_GPIO_WritePin(EEPROM_WP_GPIO_Port, EEPROM_WP_Pin, GPIO_PIN_SET);
 	return status;
 }
-
-void AT24C_eeprom_rw(void)
-{
-	#define AT24C_ADDR (0x50<<1)
-
-    #define BufferSize 256
-    uint8_t WriteBuffer[BufferSize],ReadBuffer[BufferSize];
-    uint16_t i;
-    for(i=0; i<BufferSize; i++)
-      WriteBuffer[i]=i+0xf0;    /* WriteBuffer init */
-    hf_i2c_mem_write(&hi2c1, AT24C_ADDR,
-					  0, WriteBuffer, BufferSize);
-    hf_i2c_mem_read(&hi2c1, AT24C_ADDR,
-					0, ReadBuffer, BufferSize);
-    for(i=0; i<BufferSize; i++)
-      printf("0x%02X  ",ReadBuffer[i]);
-	printf("read_finash\n");
-}

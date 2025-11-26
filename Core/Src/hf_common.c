@@ -130,11 +130,9 @@ int _write(int fd, char *ch, int len)
 void es_eeprom_wp(uint8_t flag)
 {
 	if(flag) {
-		// printf("eeprom wp enable \n");
 		HAL_GPIO_WritePin(EEPROM_WP_GPIO_Port, EEPROM_WP_Pin, GPIO_PIN_SET);
 	}
 	else {
-		// printf("eeprom wp disgenable \n");
 		HAL_GPIO_WritePin(EEPROM_WP_GPIO_Port, EEPROM_WP_Pin, GPIO_PIN_RESET);
 	}
 }

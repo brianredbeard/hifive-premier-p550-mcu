@@ -20,7 +20,7 @@
 /* Private macro -------------------------------------------------------------*/
 #define PCA9450_ADDR (0x25u << 1)
 /* Private variables ---------------------------------------------------------*/
-power_switch_t som_power_state = SOM_POWER_OFF;
+volatile power_switch_t som_power_state = SOM_POWER_OFF;
 
 static uint8_t get_dc_power_status(void);
 static void pmic_status_led_on(uint8_t turnon);
@@ -30,6 +30,27 @@ static void atx_power_on(uint8_t turnon);
 static void power_led_on(uint8_t turnon);
 static int pmic_b6out_105v(void);
 
+#define MAXTRYCOUNT		10
+int try_count = 0;
+
+power_switch_t get_som_power_state(void)
+{
+	power_switch_t state;
+
+	taskENTER_CRITICAL();
+	state = som_power_state;
+	taskEXIT_CRITICAL();
+	return state;
+}
+
+void change_som_power_state(power_switch_t newState)
+{
+	// Enter critical section to ensure thread safety when traversing and deleting
+	taskENTER_CRITICAL();
+	som_power_state = newState;
+	taskEXIT_CRITICAL();
+}
+
 void hf_power_task(void *parameter)
 {
 	HAL_StatusTypeDef status = HAL_OK;
@@ -37,12 +58,15 @@ void hf_power_task(void *parameter)
 	GPIO_PinState pin_state = GPIO_PIN_RESET;
 	printf("hf_power_task started!!!\r\n");
 
-	#ifdef AUTO_BOOT
+#ifdef AUTO_BOOT
 	power_state = ATX_PS_ON_STATE;
-	som_power_state = SOM_POWER_ON;
-	#endif
+	change_som_power_state(SOM_POWER_ON);
+#endif
+
 	power_led_on(pdFALSE);
+
 	while (1) {
+		taskENTER_CRITICAL();
 		switch (power_state) {
 		case ATX_PS_ON_STATE:
 			printf("ATX_PS_ON_STATE\r\n");
@@ -57,8 +81,18 @@ void hf_power_task(void *parameter)
 			break;
 		case DC_PWR_GOOD_STATE:
 			printf("DC_PWR_GOOD_STATE\r\n");
-			pin_state = get_dc_power_status();
-			osDelay(500);
+			try_count = MAXTRYCOUNT;
+			do
+			{
+				pin_state = get_dc_power_status();
+				osDelay(100);
+			} while (pin_state != pdTRUE && try_count--);
+
+			if(try_count <= 0)
+			{
+				printf("DC_PWR_STATE fail\r\n");
+				power_state = STOP_POWER;
+			}
 			if (pin_state == pdTRUE) {
 				i2c_init(I2C3);
 				i2c_init(I2C1);
@@ -68,24 +102,19 @@ void hf_power_task(void *parameter)
 		case SOM_STATUS_CHECK_STATE:
 			printf("SOM_STATUS_CHECK_STATE\r\n");
 			pmic_power_on(pdTRUE);
-			osDelay(1000);
-			// while (1)
+			try_count = MAXTRYCOUNT;
+			do
 			{
+				osDelay(200);
 				status = pmic_b6out_105v();
-				// reg_dat = 0x0;
-				// hf_i2c_reg_read(&hi2c3, PCA9450_ADDR, reg_add, &reg_dat);
-				// printf("reg_add %x reg_dat %x\n", reg_add, reg_dat);
-				// reg_add = 0x4;
-				// reg_dat = 0x0;
-				// hf_i2c_reg_read(&hi2c3, PCA9450_ADDR, reg_add, &reg_dat);
-				// printf("reg_add %x reg_dat %x\n", reg_add, reg_dat);
-				// osDelay(1000);
-				// printf("status %d\n", status);
+				osDelay(50);
+			}while(pin_state != pdTRUE && try_count--);
+			if(try_count <= 0)
+			{
+				printf("SOM_STATUS_CHECK_STATE fail\r\n");
+				power_state = STOP_POWER;
+				break;
 			}
-			// if (status != HAL_OK) {
-			// 	power_state = STOP_POWER;
-			// 	break;
-			// }
 			som_reset_control(pdFALSE);
 			SPI2_FLASH_CS_HIGH();
 			pmic_status_led_on(pdTRUE);
@@ -117,6 +146,7 @@ void hf_power_task(void *parameter)
 			}
 			break;
 		}
+		taskEXIT_CRITICAL();
 		osDelay(100);
 	}
 }
