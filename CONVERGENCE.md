@@ -1,7 +1,7 @@
 # Patch Convergence Strategy
 
-**Status:** In Progress - Phase 2 Complete
-**Current Position:** Patch 0010 applied, checkpoint created
+**Status:** In Progress - Phase 3 Complete
+**Current Position:** Patch 0030 applied, checkpoint created
 **Target:** Patch 0109 with validated convergence
 
 ---
@@ -33,7 +33,7 @@ This document tracks the application of 109 patches from `patches-2025-11-05/` t
 |-------|--------|-------|--------------|
 | 0001 | ✅ Complete | Baseline | Power mgmt, protocol lib, GPIO control |
 | 0010 | ✅ Complete | Foundation | Production test, web server, DIP switch |
-| 0030 | ⏳ Pending | INA226 Integration | Web server + power monitoring |
+| 0030 | ✅ Complete | INA226 Integration | Power monitoring, SoC status, EEPROM |
 | 0060 | ⏳ Pending | I2C Reliability | Error recovery, EEPROM handling |
 | 0090 | ⏳ Pending | Robustness | Factory reset, CRC32, boot modes |
 | 0109 | ⏳ Pending | Production Ready | Telnet, URL decode, input validation |
@@ -110,6 +110,50 @@ Each checkpoint preserves:
 - All conflicts resolved through manual application
 
 **Checkpoint:** `checkpoint-0010` created at `checkpoints/checkpoint-0010/`
+
+### Patches 0011-0030: ✅ Applied
+
+**Commits:** 6118561 through 12e9ac2
+**Date Range:** May 8-14, 2024
+
+**Patch Summary:**
+- 0011: System username/password, power retention, MAC config, HTML formatting
+- 0012: SPI slave 32-bit ops, UART protocol fixes, UART init/deinit in reset control
+- 0013: SOM card detect info, power consumption display, web interface updates
+- 0014: Web command support (PVT info, SOM reset, status), FreeRTOS queue migration
+- 0015: EEPROM API for persistent info storage
+- 0016: UART4 mutex, power status integration
+- 0017: RTC configuration, session-based authentication
+- 0018: UART4 initialization refactoring
+- 0019: **Power sequence optimization** - retry logic, thread-safe state management
+- 0020: Power-off command, thread-safe power state accessor functions
+- 0021: SoC status (uptime/version), power consumption, connection management
+- 0022: EEPROM callback integration for web server
+- 0023: Auto-refresh AJAX, bug fixes
+- 0024: _write function fix (printf re-enabled)
+- 0025: Power units (mW/mV/mA), DIP switch control
+- 0026: Power refactoring, web callback cleanup
+- 0027: Power process bug fixes
+- 0028: SOM power last-state preservation
+- 0029: **SoC status refactoring** - separate timers for power-off and reboot
+- 0030: **INA226 power monitoring** - system power info via INA226/PAC1934
+
+**Total Changes:** ~65 files modified, ~15,000+ insertions, ~3,000+ deletions
+
+**Rejections Resolved:**
+- ~40 rejection files across 20 patches
+- Common patterns: whitespace, function visibility changes, AUTO_BOOT toggling
+- All resolved through manual application
+- Patch 0029 had 12 rejections (timer refactoring) - all resolved
+
+**Key Findings:**
+- Rejection rate remained consistent (~70% of patches had rejections)
+- FreeRTOS queue migration from ring buffers (major refactor in 0014)
+- Thread-safe power state management introduced (critical sections)
+- INA226 integration milestone reached (real power monitoring)
+- SoC status reporting with timer-based fallback mechanisms
+
+**Checkpoint:** `checkpoint-0030` created at `checkpoints/checkpoint-0030/`
 
 ---
 
@@ -305,11 +349,19 @@ GCC_PATH = /home/xxbringup/dvb/gcc-arm-none-eabi-10.3-2021.10/bin
 4. ✅ Create checkpoint-0010
 5. ⏳ Validate Foundation complete (awaiting build toolchain)
 
-### Short Term (Phases 3-5)
+### Short Term (Phase 3)
 
-- Apply patches through checkpoint 0060
+1. ✅ Apply patches 0011-0030
+2. ✅ Create checkpoint-0013 (intermediate)
+3. ✅ Create checkpoint-0030
+4. ⏳ Validate INA226 Integration (awaiting build toolchain)
+
+### Medium Term (Phases 4-5)
+
+- Apply patches 0031-0060 → checkpoint-0060
 - Validate I2C reliability milestone
-- Refine rejection resolution automation
+- Apply patches 0061-0090 → checkpoint-0090
+- Validate robustness milestone
 
 ### Long Term (Phases 6-7)
 
@@ -330,5 +382,5 @@ GCC_PATH = /home/xxbringup/dvb/gcc-arm-none-eabi-10.3-2021.10/bin
 ---
 
 **Last Updated:** 2025-11-25
-**Current Patch:** 0010
-**Next Milestone:** 0030
+**Current Patch:** 0030
+**Next Milestone:** 0060
