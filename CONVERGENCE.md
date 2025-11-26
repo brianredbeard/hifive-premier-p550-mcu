@@ -1,7 +1,7 @@
 # Patch Convergence Strategy
 
-**Status:** In Progress - Phase 4 Complete
-**Current Position:** Patch 0060 applied, checkpoint created
+**Status:** In Progress - Phase 5 Complete
+**Current Position:** Patch 0090 applied, checkpoint created
 **Target:** Patch 0109 with validated convergence
 
 ---
@@ -35,7 +35,7 @@ This document tracks the application of 109 patches from `patches-2025-11-05/` t
 | 0010 | ✅ Complete | Foundation | Production test, web server, DIP switch |
 | 0030 | ✅ Complete | INA226 Integration | Power monitoring, SoC status, EEPROM |
 | 0060 | ✅ Complete | I2C Reliability | Error recovery, EEPROM handling |
-| 0090 | ⏳ Pending | Robustness | Factory reset, CRC32, boot modes |
+| 0090 | ✅ Complete | Robustness | Factory reset, CRC32, boot modes |
 | 0109 | ⏳ Pending | Production Ready | Telnet, URL decode, input validation |
 
 ### Checkpoint Contents
@@ -211,6 +211,67 @@ Each checkpoint preserves:
 - Console interface provides comprehensive BMC management via serial port
 
 **Checkpoint:** `checkpoint-0060` created at `checkpoints/checkpoint-0060/`
+
+### Patches 0061-0090: ✅ Applied
+
+**Commits:** e969c51 through b235818
+**Date Range:** May 24 - Jun 12, 2024
+
+**Patch Summary:**
+- 0061: **HardFault fix** - power-off crash prevention in hf_common.c
+- 0062: Session ID truncation fix
+- 0063: Daemon message improvements
+- 0064: I2C critical section protection (obsolete - refactored in 0089)
+- 0065: **Hardware bootsel status** - read physical DIP switch state
+- 0066: Build warning cleanup in protocol library
+- 0067: DIP switch UI refinements
+- 0068: Power info from SOM daemon
+- 0069: **Restart command support** - clean reboot functionality
+- 0070: **Major merge** - win2030-dev merged into hf106-dev (1140+ insertions/deletions)
+- 0071: **cbinfo A/B support** - dual carrier board info, restart command in CLI
+- 0072: Restart functionality in web interface
+- 0073: UART RX fix after Type-C hotplug
+- 0074: Power on/off bug fixes in console
+- 0075: **DVB2 board support** - hardware variant support (478 insertions)
+- 0076: PWM LED control strategy adjustment
+- 0077: **MAC configuration disabled** - prevent web-based MAC changes (security)
+- 0078: Merge hf106-pre into win2030-dev
+- 0079: **SiFive CRC32 algorithm** - new CRC implementation (302 insertions)
+- 0080: **EEPROM write protect command** - CLI write protection control
+- 0081: CRC32 length correction
+- 0082: I2C1 bus error fix after MCU key reset
+- 0083: **Checksum for MCU server info** - data integrity validation
+- 0084: SOM reset feedback process bug fix
+- 0085: **BMC version 2.0** - major version bump
+- 0086: Power LED control (obsolete - chass_led_ctl removed)
+- 0087: Power on/off logic exception repair
+- 0088: MCU HSE clock ready bit check fix
+- 0089: **Power monitoring refactored** - get power info from MCU (not I2C/SOM)
+- 0090: **Factory reset via key** - restore user data to factory defaults
+
+**Total Changes:** ~50 files modified, ~3,000+ insertions, ~2,000+ deletions
+
+**Milestone Achievements:**
+- **Robustness Complete:** Factory reset, CRC32 checksums, bootsel detection
+- **Hardware Variants:** DVB2 board support, dual carrier board info (A/B)
+- **Power Monitoring Refactored:** Moved from I2C-based (INA226/PAC1934) to MCU-based
+- **Security Hardening:** MAC config disabled, EEPROM write protect, checksum validation
+- **BMC Version 2.0:** Major milestone with comprehensive feature set
+- **Build Quality:** Warnings cleaned, protocol library optimized
+
+**Commit Resolution Issues:**
+- Patches 0064, 0086: Obsolete due to refactoring (power monitoring, LED control)
+- Resolution: Created placeholder commits with notes explaining obsolescence
+- Patch 0063, 0068, 0069: Metadata extraction issues (UTF-8), committed with default author
+
+**Key Findings:**
+- Two major merges integrated divergent development branches (0070, 0078)
+- Power monitoring architecture changed fundamentally (I2C → MCU-based)
+- CRC32 implementation switched to SiFive algorithm for better performance
+- Factory reset functionality critical for field deployment
+- BMC reached production-ready versioning (2.0)
+
+**Checkpoint:** `checkpoint-0090` created at `checkpoints/checkpoint-0090/`
 
 ---
 
