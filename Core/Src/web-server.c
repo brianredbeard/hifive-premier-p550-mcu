@@ -10484,25 +10484,19 @@ int reset()
 	return ret;
 }
 
+power_info get_power_info(void)
+{
+	power_info power_info = {0};
+	int ret = HAL_OK;
 
-typedef struct  {
-    uint32_t consumption;
-    uint32_t current;
-    uint32_t voltage;
-} POWERInfo;
-
-POWERInfo get_power_info(void){
-
-
-	POWERInfo example = {0};
-
-	if (get_power_status())
-		get_board_power(&example.voltage,&example.current,&example.consumption);
-
-	return example;
+	ret = web_cmd_handle(CMD_POWER_INFO, &power_info, sizeof(power_info), 1000);
+	if (HAL_OK != ret) {
+		web_debug("Failed to get power info %d\n", ret);
+	}
+	web_debug("web call get_power_info, consumption %d, current %d, voltage %d, ret %d\n",
+		power_info->consumption, power_info->current, power_info->voltage, ret);
+	return power_info;
 }
-
-
 
 NETInfo get_net_info(void) {
 	NETInfo example;
@@ -10567,7 +10561,7 @@ int get_pvt_info(PVTInfo *ppvtInfo)
 	int ret = HAL_OK;
 	ret = web_cmd_handle(CMD_PVT_INFO, ppvtInfo, sizeof(PVTInfo), 1000);
 	if (HAL_OK != ret) {
-		web_debug("Faild to get PVT info %d\n", ret);
+		web_debug("Failed to get PVT info %d\n", ret);
 	}
 	web_debug("web call get_pvt_info, cpu_temp %d, npu_temp %d, fan_speed %d, ret %d\n",
 		ppvtInfo->cpu_temp, ppvtInfo->npu_temp,ppvtInfo->fan_speed, ret);
@@ -10727,7 +10721,7 @@ int get_soc_status()
                     found_session_user_name=strdup(found_session->session_data);
                 }
             }
-			
+
         }
 
         char resp_cookies[BUF_SIZE_256] = {0};
@@ -10842,7 +10836,7 @@ int get_soc_status()
                 netconn_write(conn, response_header, strlen(response_header), NETCONN_COPY);
                 netconn_write(conn, json_response, strlen(json_response), NETCONN_COPY);
 			}else if(strcmp(path, "/power_consum")==0 ){
-				POWERInfo power_info=get_power_info();
+				power_info power_info=get_power_info();
 				char json_response[BUF_SIZE_256]={0};
                 char *json_response_patt = "{\"status\":0,\"message\":\"success\",\"data\":{\"consumption\":\"%d\",\"voltage\":\"%d\",\"current\":\"%d\"}}";//0 success, msg
                 sprintf(json_response, json_response_patt,power_info.consumption,power_info.voltage,power_info.current);

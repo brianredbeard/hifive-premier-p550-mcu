@@ -56,6 +56,7 @@ typedef enum {
 	CMD_CONTROL_LED,
 	CMD_PVT_INFO,
 	CMD_BOARD_STATUS,
+	CMD_POWER_INFO,
 	// You can continue adding other command types
 } CommandType;
 
@@ -82,6 +83,12 @@ typedef struct {
 
 extern QueueHandle_t xUart4MsgQueue;
 extern Message UART4_RxMsg;
+
+typedef struct {
+	uint32_t consumption;
+	uint32_t current;
+	uint32_t voltage;
+} __attribute__((packed)) power_info;
 
 /* The datas(structures) below need to be stored or updated in eeprom */
 // The board info that was initialized(burned) in the eeprom at the factory
@@ -116,8 +123,6 @@ typedef struct {
 	uint8_t som_dip_switch_soft_ctl_attr;	// determin whether the bootsel of the SOM is controlled by software(0xE) via GPIO or by hardware switch(0xD)
 	uint8_t som_dip_switch_soft_state;	// record the DIP Switch software state of the SOM, it is used for SOM bootsel, bit0---bit3 stand for the DIP0---DIP3
 } SomPwrMgtDIPInfo;
-
-
 
 struct gpio_cmd {
 	uint16_t group;
@@ -299,6 +304,7 @@ int32_t es_set_rtc_date(struct rtc_date_t *sdate);
 int32_t es_set_rtc_time(struct rtc_time_t *stime);
 int32_t es_get_rtc_date(struct rtc_date_t *sdate);
 int32_t es_get_rtc_time(struct rtc_time_t *stime);
+power_info get_power_info(void);
 
 #ifdef __cplusplus
 }
