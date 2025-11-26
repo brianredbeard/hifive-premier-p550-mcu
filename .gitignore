@@ -1,0 +1,29 @@
+# Build artifacts
+build/
+*.o
+*.d
+*.lst
+*.map
+*.elf
+*.bin
+*.hex
+
+# Build logs
+build.log
+
+# Editor/IDE files
+*~
+*.swp
+*.swo
+.vscode/
+.idea/
+*.code-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Backup files
+*.bak
+*.old
+*.tmp
