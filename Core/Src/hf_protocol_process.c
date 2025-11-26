@@ -9,6 +9,7 @@
 #include "task.h"
 #include "queue.h"
 #include "semphr.h"
+#include "timers.h"
 
 #define head_meg "\xA5\x5A\xAA\x55"
 #define end_msg "\x0D\x0A\x0D\x0A"
@@ -467,15 +468,17 @@ QueueHandle_t xUart4MsgQueue;
 typedef enum {
 	MSG_REQUEST = 0x01,
 	MSG_REPLY,
+	MSG_NOTIFLY,
 } MsgType;
 
 void dump_message(Message data)
 {
-	printf("Header: 0x%lX, Cmd Type: 0x%x, Data Len: %d, Checksum: 0x%X, Tail: 0x%lx\n",
-		data.header, data.cmd_type, data.data_len, data.checksum, data.tail);
+	printf("Header: 0x%lX, Msg_type %d, Cmd Type: 0x%x, Data Len: %d, Checksum: 0x%X, Tail: 0x%lx\n",
+		data.header, data.msg_type, data.cmd_type, data.data_len, data.checksum, data.tail);
 }
 // Define a mutex handle
 SemaphoreHandle_t xMutex = NULL;
+TimerHandle_t xSomTimer;
 
 // Function to initialize the mutex
 void init_transmit_mutex(void) {
@@ -618,7 +621,29 @@ static void buf_dump(uint8_t *data, uint32_t len)
 	printf("\n");
 }
 
-deamon_stats_t som_daemon_state = SOM_DAEMON_OFF;
+volatile deamon_stats_t som_daemon_state = SOM_DAEMON_OFF;
+deamon_stats_t get_som_daemon_state(void)
+{
+	deamon_stats_t state;
+
+	// Enter critical section to ensure thread safety when traversing and deleting
+	taskENTER_CRITICAL();
+	state = som_daemon_state;
+	taskEXIT_CRITICAL();
+
+	return state;
+}
+
+void change_som_daemon_state(deamon_stats_t newState)
+{
+
+	// Enter critical section to ensure thread safety when traversing and deleting
+	taskENTER_CRITICAL();
+	som_daemon_state = newState;
+	taskEXIT_CRITICAL();
+	return ;
+}
+
 void deamon_keeplive_task(void *argument)
 {
 	int ret = HAL_OK;
@@ -626,11 +651,11 @@ void deamon_keeplive_task(void *argument)
 	static uint8_t count = 0;
 
 	for (;;) {
-		if (SOM_POWER_ON != som_power_state) {
+		if (SOM_POWER_ON != get_som_power_state()) {
 			osDelay(50);
 			continue;
 		}
-		old_status = som_daemon_state;
+		old_status = get_som_daemon_state();
 		ret = web_cmd_handle(CMD_BOARD_STATUS, NULL, 0, 1000);
 		if (HAL_OK != ret) {
 			if (HAL_TIMEOUT == ret) {
@@ -642,22 +667,31 @@ void deamon_keeplive_task(void *argument)
 			}
 			count++;
 			if (5 >= count) {
-				som_daemon_state = SOM_DAEMON_OFF;
+				change_som_daemon_state(SOM_DAEMON_OFF);
 			}
 		} else {
-			som_daemon_state = SOM_DAEMON_ON;
+			change_som_daemon_state(SOM_DAEMON_ON);;
 			count = 0;
 		}
-		if (old_status != som_daemon_state) {
+		if (old_status != get_som_daemon_state()) {
 			printf("SOM Daemon status change to %s!\n",
-				som_daemon_state == SOM_DAEMON_ON ? "on" : "off");
+				get_som_daemon_state() == SOM_DAEMON_ON ? "on" : "off");
 		}
-		/*check every 1 second*/
+		/*check every 4 second*/
 		osDelay(pdMS_TO_TICKS(4000));
 	}
 }
 
-void handle_deamon_mesage(Message *msg)
+void handle_notify_mesage(Message *msg)
+{
+	if (CMD_POWER_OFF == msg->cmd_type) {
+		// Here the SOM should at shutdown state in opensbi, we can turn off its power safely
+		change_som_power_state(SOM_POWER_OFF);
+		printf("Poweroff SOM normaly, shutdown it now!\n");
+	}
+}
+
+void handle_som_mesage(Message *msg)
 {
 	if (MSG_REPLY == msg->msg_type) {
 		if (!listLIST_IS_EMPTY(&WebCmdList)) {
@@ -680,13 +714,32 @@ void handle_deamon_mesage(Message *msg)
 			}
 			taskEXIT_CRITICAL();
 		}
+	} else if (MSG_NOTIFLY == msg->msg_type) {
+		handle_notify_mesage(msg);
 	} else {
-		printf("Unsupport msg type: 0x%x\n", msg->cmd_type);
-		buf_dump((uint8_t *)&msg, sizeof(msg));
+		printf("Unsupport msg type: 0x%x\n", msg->msg_type);
+		buf_dump((uint8_t *)msg, sizeof(*msg));
 		dump_message(*msg);
 	}
 }
+
+void vSomTimerCallback(TimerHandle_t xSomTimer)
+{
+	if (SOM_POWER_OFF != get_som_power_state()) {
+		change_som_power_state(SOM_POWER_OFF);
+		printf("Poweroff SOM timeout, shutdown it now!\n");
+	}
+}
+
+void TriggerSomTimer(void)
+{
+	if (xTimerStart(xSomTimer, 0) != pdPASS) {
+		printf("Failed to trigger Som timer!\n");
+	}
+}
+
 #define QUEUE_LENGTH 8
+
 void uart4_protocol_task(void *argument)
 {
 	Message msg;
@@ -695,26 +748,36 @@ void uart4_protocol_task(void *argument)
 
 	xUart4MsgQueue = xQueueCreate(QUEUE_LENGTH, sizeof(Message));
 	if (xUart4MsgQueue == NULL) {
-		printf("Failed to create msg queue!\n");
+		printf("[%s %d]:Failed to create SOM msg queue!\n",__func__,__LINE__);
 		return;
 	}
 
 	//Init web server cmd list
 	vListInitialise(&WebCmdList);
+
+	/* Create a timer with a timeout set to 5 seconds */
+	xSomTimer = xTimerCreate( "SomTimer", (5000 / portTICK_PERIOD_MS),
+			pdFALSE, (void *)0, vSomTimerCallback);
+
+	if (xSomTimer == NULL) {
+		printf("[%s %d]:Failed to create SOM Timer!\n",__func__,__LINE__);
+		return;
+	}
+
 	for (;;) {
 		if (xQueueReceive(xUart4MsgQueue, &(msg), portMAX_DELAY)) {
 			if (msg.header == FRAME_HEADER && msg.tail == FRAME_TAIL) {
 				// Check checksum
 				if (check_checksum(&msg)) {
 					// handle command
-					handle_deamon_mesage(&msg);
+					handle_som_mesage(&msg);
 				} else {
-					printf("[%s %d]:Checksum error!\n",__func__,__LINE__);
+					printf("[%s %d]:SOM msg checksum error!\n",__func__,__LINE__);
 					buf_dump((uint8_t *)&msg, sizeof(msg));
 					dump_message(msg);
 				}
 			} else {
-				printf("[%s %d]:Invalid message format!\n",__func__,__LINE__);
+				printf("[%s %d]:Invalid SOM message format!\n",__func__,__LINE__);
 				buf_dump((uint8_t *)&msg, sizeof(msg));
 				dump_message(msg);
 			}

@@ -48,8 +48,6 @@ typedef enum {
 
 #define FRAME_DATA_MAX 250
 
-extern power_switch_t som_power_state;
-
 // Define command types
 typedef enum {
 	CMD_POWER_OFF = 0x01,
@@ -192,6 +190,12 @@ int es_get_som_dip_switch_soft_state(uint8_t *p_som_dip_switch_soft_state);
 int es_set_som_dip_switch_soft_state(uint8_t som_dip_switch_soft_state);
 
 int es_eeprom_info_test(void);
+power_switch_t get_som_power_state(void);
+void change_som_power_state(power_switch_t newState);
+deamon_stats_t get_som_daemon_state(void);
+void change_som_daemon_state(deamon_stats_t newState);
+
+void TriggerSomTimer(void);
 
 #ifdef __cplusplus
 }

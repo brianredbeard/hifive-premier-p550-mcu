@@ -10449,30 +10449,33 @@ void unescape_colon(char *str) {
 }
 
 //1:powerON,0:powerOFF
-int get_power_status()
+static int get_power_status()
 {
-	return som_power_state == SOM_POWER_ON ? 1 : 0;
+	return get_som_power_state() == SOM_POWER_ON ? 1 : 0;
 }
 
 //status 0:power off,1:power on
-int change_power_status(int status)
+static int change_power_status(int status)
 {
 	int ret = 0;
 
 	if (0 == status) {
-		if (SOM_POWER_ON == som_power_state) {
+		if (SOM_POWER_ON == get_som_power_state()) {
 			ret = web_cmd_handle(CMD_POWER_OFF, NULL, 0, 1000);
 			if (HAL_OK != ret) {
-				som_power_state = SOM_POWER_OFF;
+				change_som_power_state(SOM_POWER_OFF);
+				printf("Poweroff SOM error(ret %d), force shutdown it!\n", ret);
 				ret = HAL_OK;
-				printf("Faild to power SOM, force shutdown SOM!\n");
+				return ret;
 			}
+			// Trigger the Som timer to enusre SOM could poweroff in 5 senconds
+			TriggerSomTimer();
 		} else {
 			printf("SOM already power off!\n");
 		}
 	} else {
-		if (SOM_POWER_OFF == som_power_state) {
-			som_power_state = SOM_POWER_ON;
+		if (SOM_POWER_OFF == get_som_power_state()) {
+			change_som_power_state(SOM_POWER_ON);
 		} else {
 			printf("SOM already power on!\n");
 		}

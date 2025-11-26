@@ -76,7 +76,7 @@ static void key_process(void)
 				button_state = KEY_RELEASE_DETECTED_STATE;
 			} else if (currentTime - pressStartTime > LONG_PRESS_THRESHOLD) {
 				button_state = KEY_LONG_PRESS_STATE;
-			} else if ((som_power_state == SOM_POWER_OFF) && (currentTime - pressStartTime >= PRESS_Time)) {
+			} else if ((get_som_power_state() == SOM_POWER_OFF) && (currentTime - pressStartTime >= PRESS_Time)) {
 				button_state = KEY_SHORT_PRESS_STATE;
 			}
 			break;
@@ -106,15 +106,15 @@ static void key_process(void)
 		case KEY_SHORT_PRESS_STATE:
 			printf("KEY_SHORT_PRESS_STATE time %ld\n", currentTime - pressStartTime);
 			button_state = KEY_PRESS_STATE_END;
-			if (som_power_state != SOM_POWER_ON) {
-				som_power_state = SOM_POWER_ON;
+			if (get_som_power_state() != SOM_POWER_ON) {
+				change_som_power_state(SOM_POWER_ON);
 			}
 			break;
 		case KEY_LONG_PRESS_STATE:
 			printf("KEY_LONG_PRESS_STATE time %ld\n", currentTime - pressStartTime);
 			button_state = KEY_PRESS_STATE_END;
-			if (som_power_state == SOM_POWER_ON) {
-				som_power_state = SOM_POWER_OFF;
+			if (get_som_power_state() == SOM_POWER_ON) {
+				change_som_power_state(SOM_POWER_OFF);
 			}
 			break;
 		case KEY_DOUBLE_PRESS_STATE:
