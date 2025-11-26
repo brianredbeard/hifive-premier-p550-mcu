@@ -603,20 +603,16 @@ void deamon_keeplive_task(void *argument)
 	struct rtc_time_t time = {0};
 
 	for (;;) {
-		if (SOM_POWER_ON != get_som_power_state()) {
-			osDelay(50);
-			continue;
-		}
 		old_status = get_som_daemon_state();
-		ret = web_cmd_handle(CMD_BOARD_STATUS, NULL, 0, 1000);
+		if (SOM_POWER_ON != get_som_power_state()) {
+			ret = HAL_ERROR;
+		} else {
+			ret = web_cmd_handle(CMD_BOARD_STATUS, NULL, 0, 1000);
+		}
 		if (HAL_OK != ret) {
-			if (HAL_TIMEOUT == ret) {
-				if (count <= 5 && SOM_DAEMON_ON == get_som_daemon_state())
-					printf("SOM keeplive request timeout!\n");
-			} else {
-				if (count <=5 && SOM_DAEMON_ON == get_som_daemon_state())
-					printf("SOM keeplive request send failed!\n");
-			}
+			if (count <= 5 && SOM_DAEMON_ON == get_som_daemon_state())
+				printf("SOM keeplive request failed(ret %d)!\n", ret);
+
 			count++;
 			if (count >= 5) {
 				change_som_daemon_state(SOM_DAEMON_OFF);

@@ -43,7 +43,7 @@ osThreadId_t daemon_keelive_task_handle;
 
 const osThreadAttr_t daemon_keeplive_task_attributes = {
   .name = "DaemonTask",
-  .stack_size = 1024,
+  .stack_size = 1024 * 2,
   .priority = (osPriority_t) osPriorityNormal,
 };
 
