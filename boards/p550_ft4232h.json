@@ -1,0 +1,31 @@
+{
+  "build": {
+    "core": "stm32",
+    "cpu": "cortex-m4",
+    "extra_flags": "-DSTM32F407xx",
+    "f_cpu": "168000000L",
+    "mcu": "stm32f407vet6",
+    "product_line": "STM32F407xx",
+    "variant": "STM32F4xx/F407V(E-G)T",
+    "hwids": [
+      ["0x0403", "0x6011"]
+    ]
+  },
+  "debug": {
+    "default_tools": ["custom"],
+    "openocd_target": "stm32f4x",
+    "jlink_device": "STM32F407VE",
+    "svd_path": "STM32F40x.svd"
+  },
+  "frameworks": ["stm32cube"],
+  "name": "Premier P550 MCU (FT4232H Debug)",
+  "platform": "ststm32",
+  "upload": {
+    "maximum_ram_size": 131072,
+    "maximum_size": 524288,
+    "protocol": "custom",
+    "protocols": ["custom", "stlink", "jlink"]
+  },
+  "url": "https://www.eswincomputing.com/p550",
+  "vendor": "ESWIN"
+}

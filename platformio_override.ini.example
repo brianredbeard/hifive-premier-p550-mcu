@@ -1,0 +1,83 @@
+# ============================================================
+# PlatformIO Local Configuration Override
+# ============================================================
+# Copy this file to platformio_override.ini and uncomment
+# the section for your platform.
+#
+# IMPORTANT: platformio_override.ini is in .gitignore and
+# should NEVER be committed to version control.
+#
+# Why this file exists:
+# - The P550 board uses an FT4232H quad FTDI chip (VID:PID 0x0403:0x6011)
+# - All 4 interfaces share the same VID:PID but enumerate as separate devices
+# - Interface 1: MCU JTAG (used by OpenOCD, no path needed)
+# - Interface 3: MCU UART Console (requires platform-specific path)
+# - Each user's system will have different serial numbers/COM ports
+#
+# How to find your device path:
+# - Linux:   ls -l /dev/serial/by-id/ | grep FTDI
+# - Windows: pio device list
+# - macOS:   ls /dev/tty.usbserial-*
+# ============================================================
+
+# ============================================================
+# Linux (Recommended - Most Stable)
+# ============================================================
+# Use /dev/serial/by-id/ for stable device naming
+# Find your device: ls -l /dev/serial/by-id/ | grep FTDI
+#
+# Look for the interface with "if03" in the name (Interface 3)
+# Example: usb-FTDI_Quad_RS232-HS-ABC123-if03-port0
+#
+[env:debug-ftdi]
+monitor_port = /dev/serial/by-id/usb-FTDI_Quad_RS232-HS-XXXXXXXX-if03-port0
+
+# ============================================================
+# Windows
+# ============================================================
+# Find COM port using: pio device list
+# Interface 3 will appear as "USB Serial Converter D" in Device Manager
+#
+# Example output from Device Manager:
+# COM3: USB Serial Converter A (Interface 0 - SoC JTAG)
+# COM4: USB Serial Converter B (Interface 1 - MCU JTAG)
+# COM5: USB Serial Converter C (Interface 2 - SoC UART)
+# COM6: USB Serial Converter D (Interface 3 - MCU UART) ← Use this one
+#
+# [env:debug-ftdi]
+# monitor_port = COM6
+
+# ============================================================
+# macOS
+# ============================================================
+# Find device using: ls /dev/tty.usbserial-*
+# Interface 3 will have "-3" or "D" suffix in the device name
+#
+# Example: /dev/tty.usbserial-ABC1233
+#
+# [env:debug-ftdi]
+# monitor_port = /dev/tty.usbserial-XXXXXXXX3
+
+# ============================================================
+# Advanced Configuration
+# ============================================================
+
+# Customize OpenOCD adapter speed (default: 2000 kHz)
+# Reduce if experiencing connection issues
+# [env:debug-ftdi]
+# debug_server =
+#     $PLATFORMIO_CORE_DIR/packages/tool-openocd/bin/openocd
+#     -s $PLATFORMIO_CORE_DIR/packages/tool-openocd/share/openocd/scripts
+#     -f $PROJECT_DIR/boards/ft4232h-mcu-jtag.cfg
+#     -c "adapter speed 1000"
+#     -f target/stm32f4x.cfg
+
+# Enable remote debugging (OpenOCD listens on all interfaces)
+# WARNING: Only use on trusted networks
+# [env:debug-ftdi]
+# debug_server =
+#     $PLATFORMIO_CORE_DIR/packages/tool-openocd/bin/openocd
+#     -s $PLATFORMIO_CORE_DIR/packages/tool-openocd/share/openocd/scripts
+#     -f $PROJECT_DIR/boards/ft4232h-mcu-jtag.cfg
+#     -c "bindto 0.0.0.0"
+#     -f target/stm32f4x.cfg
