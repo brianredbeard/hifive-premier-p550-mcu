@@ -28,20 +28,23 @@ The BMC provides power management, monitoring, remote console access, and system
 
 ## Project Status
 
-✅ **Ready for use** - All 109 patches have been successfully integrated and the firmware builds cleanly.
+✅ **Ready for use** - PlatformIO-based build system with all patches integrated and firmware building cleanly.
 
-Current version: **BMC v2.8** (based on patch series through 0109)
+Current version: **BMC v2.8.2**
 
 ## Quick Start
 
 ### Prerequisites
 
-- **STM32CubeMX 6.10.0** - For regenerating initialization code (if needed)
-- **ARM GCC Toolchain** - Cross-compiler for ARM Cortex-M4
-  - Tested with: ARM GNU Toolchain 14.3.Rel1 or later
-  - Download from: https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads
-- **Make** - Build automation
+- **PlatformIO** - Modern embedded development platform
+  - Install via: https://platformio.org/install
+  - Or use PlatformIO IDE (VS Code extension)
 - **Git** - Version control
+
+PlatformIO automatically handles:
+- ARM GCC toolchain installation
+- STM32 HAL/CMSIS drivers
+- FreeRTOS and LwIP middleware dependencies
 
 ### Build Instructions
 
@@ -51,135 +54,125 @@ Current version: **BMC v2.8** (based on patch series through 0109)
    cd hifive-premier-p550-mcu-patches
    ```
 
-2. **Set up ARM GCC toolchain:**
-
-   **Option A** - Toolchain in PATH (recommended):
+2. **Build the firmware:**
    ```bash
-   # Ensure arm-none-eabi-gcc is in your PATH
-   which arm-none-eabi-gcc
+   pio run -e debug-ftdi
    ```
 
-   **Option B** - Specify toolchain path:
-   ```bash
-   # Edit Makefile and set GCC_PATH variable
-   # Example: GCC_PATH = /opt/gcc-arm-none-eabi-14.3/bin
-   ```
+   Available environments:
+   - `debug-ftdi` - Onboard FT4232H JTAG debugging (recommended)
+   - `debug-stlink` - External ST-Link/V2 debugger
+   - `debug-jlink` - J-Link via JTAG header
 
-3. **Build the firmware:**
-   ```bash
-   make
-   ```
+3. **Build artifacts** will be generated in `.pio/build/debug-ftdi/`:
+   - `firmware.elf` - ELF format for debugging
+   - `firmware.bin` - Raw binary for flashing (273 KB)
+   - `firmware.hex` - Intel HEX format
 
-4. **Build artifacts** will be generated in `build/`:
-   - `STM32F407VET6_BMC.elf` - ELF format for debugging (404 KB)
-   - `STM32F407VET6_BMC.bin` - Raw binary for flashing (301 KB)
-   - `STM32F407VET6_BMC.hex` - Intel HEX format (846 KB)
+4. **Flash the firmware:**
+   ```bash
+   pio run -e debug-ftdi -t upload
+   ```
 
 5. **Clean build artifacts:**
    ```bash
-   make clean
+   pio run -t clean
    ```
 
-### Flashing the Firmware
+### Serial Console Access
 
-Refer to the [HiFive Premier P550 MCU User Manual](https://www.sifive.com/document-file/premier-p550-mcu-user-manual) for detailed instructions on:
-- Connecting to the STM32 debug interface (SWD)
-- Flashing firmware using OpenOCD or STM32CubeProgrammer
-- Initial configuration and setup
+The BMC provides console access via UART3 (115200 baud):
+
+```bash
+pio device monitor -e debug-ftdi
+```
+
+Or use your preferred serial terminal (screen, minicom, etc.).
 
 ## Development Workflow
 
-### Regenerating from STM32CubeMX (Optional)
+### Debugging
 
-If you need to modify peripheral configurations:
+PlatformIO provides integrated debugging support:
 
-1. **Install STM32CubeMX 6.10.0** from https://www.st.com/stm32cubemx
+```bash
+# Start GDB debug session
+pio debug -e debug-ftdi
+```
 
-   ⚠️ **Important**: Use version 6.10.0 specifically - patches were generated against this version.
+Debug configurations are pre-configured for:
+- **FT4232H** - Onboard JTAG (Interface 1)
+- **ST-Link/V2** - External debugger
+- **J-Link** - Via JTAG header (J18)
 
-2. **Open the project:**
-   ```bash
-   # Launch STM32CubeMX and open:
-   STM32F407VET6_BMC.ioc
-   ```
+### Testing
 
-3. **Make configuration changes** in CubeMX GUI
+Run static analysis:
+```bash
+pio check -e debug-ftdi
+```
 
-4. **Generate code** from CubeMX
+### Advanced: STM32CubeMX Integration (Optional)
 
-5. **Restore the Makefile:**
-   ```bash
-   git checkout Makefile
-   ```
+The project includes `STM32F407VET6_BMC.ioc` for hardware configuration changes.
 
-   Note: The Makefile must be restored because CubeMX may reorder source files, which would conflict with the patch structure.
+⚠️ **Important**: This is a PlatformIO project. CubeMX is only needed for regenerating pin configurations or peripheral settings. The build system is PlatformIO, not CubeMX-generated Makefiles.
 
-6. **Rebuild:**
-   ```bash
-   make clean
-   make
-   ```
+If modifying hardware configuration:
+1. Open `STM32F407VET6_BMC.ioc` in STM32CubeMX 6.10.0
+2. Make configuration changes
+3. Generate code (PlatformIO structure is preserved)
+4. Rebuild with `pio run`
 
-### Working with Patches
+### Historical Context: Patch Series
 
-This repository includes 109 patches in `patches-2025-11-05/` that document the complete development history from baseline CubeMX-generated code to the final BMC firmware.
+This repository evolved from a patch-based workflow (109 patches in `patches-2025-11-05/`). These document the complete development history from CubeMX baseline to production firmware.
 
-**Note**: The patches are already applied in this repository. You only need to apply them if starting from scratch with a fresh CubeMX-generated baseline.
+**Note**: Patches are already applied. The current codebase is the final integrated state ready for PlatformIO development.
 
-**To apply patches from scratch:**
+## Project Structure (Updated 2025-11-28)
 
-1. Generate baseline code from `STM32F407VET6_BMC.ioc` using CubeMX 6.10.0
-2. Replace generated Makefile with the one from this repository
-3. Apply patches:
-   ```bash
-   git am --ignore-space-change --ignore-whitespace patches-2025-11-05/*.patch
-   ```
-
-For detailed patch application history and validation, see [CONVERGENCE.md](CONVERGENCE.md).
-
-## Project Structure (Updated 2025-11-27)
-
-This project follows PlatformIO standard layout:
-
-- `src/` - Application source files
-- `include/` - Application headers
-- `Core/` - STM32CubeMX structure (symlinks for compatibility)
-- `Drivers/` - STM32 HAL and CMSIS drivers
-- `Middlewares/` - Third-party libraries (FreeRTOS, LwIP)
-
-See `docs/restructure-notes.md` for migration details.
-
-## Repository Structure
+This project follows **PlatformIO standard layout** with a clean root directory:
 
 ```
 hifive-premier-p550-mcu-patches/
-├── src/                           # Application source files
-│   ├── main.c                    # Main application
+├── src/                           # Application source files (28 .c files)
+│   ├── main.c                    # Main application entry point
 │   ├── hf_common.c               # Core system implementation
-│   ├── hf_board_init.c           # Board initialization
-│   ├── ...
-├── include/                       # Application headers
+│   ├── hf_power_process.c        # Power management state machine
+│   ├── hf_i2c.c                  # I2C HAL (INA226, PAC1934, EEPROM)
+│   ├── console.c                 # FreeRTOS CLI implementation
+│   ├── web-server.c              # HTTP server
+│   └── ...                       # Telnet servers, protocols, etc.
+├── include/                       # Application headers (20 .h files)
 │   ├── protocol_lib/             # Communication protocol library
 │   ├── hf_common.h               # Core system definitions
-│   ├── hf_i2c.h                  # I2C subsystem
-│   ├── ...
-├── Core/                          # CubeMX compatibility
-│   ├── Inc/                       # Retained system headers
-│   └── Src/                       # Symlinks to src/ (empty)
-├── Drivers/                       # STM32 drivers
-│   ├── CMSIS/                    # ARM CMSIS (Apache-2.0)
-│   ├── STM32F4xx_HAL_Driver/     # STM32 HAL (BSD-3-Clause)
-│   └── BSP/                      # Board support (LAN8742 Ethernet PHY)
-├── Middlewares/                   # Third-party middleware
-│   └── Third_Party/
-│       ├── FreeRTOS/             # FreeRTOS RTOS (MIT)
-│       └── LwIP/                 # LwIP TCP/IP stack (BSD-3-Clause)
+│   ├── main.h                    # GPIO pin definitions
+│   ├── FreeRTOSConfig.h          # RTOS configuration
+│   ├── lwipopts.h                # LwIP TCP/IP configuration
+│   └── ...
+├── boards/                        # Board configurations
+│   └── ft4232h-mcu-jtag.cfg      # OpenOCD config for onboard JTAG
+├── scripts/                       # Build automation
+│   ├── upload_ftdi.py            # FT4232H upload script
+│   └── renode_build.py           # Renode simulation builder
 ├── docs/                          # Documentation
-│   ├── restructure-notes.md      # PlatformIO migration notes
-│   └── patches/                  # Individual patch documentation
-├── patches-2025-11-05/            # 109 patch files
-└── ...
+│   ├── restructure-notes.md      # Migration notes
+│   └── debugging/                # Debug setup guides
+├── platformio.ini                 # PlatformIO build configuration
+├── CONTRIBUTORS.md                # Licensing and attribution
+├── project.spdx                   # SPDX license manifest
+└── README.md                      # This file
 ```
+
+**What's NOT in this repo** (automatically provided by PlatformIO):
+- ❌ No `Drivers/` - STM32 HAL/CMSIS provided by framework
+- ❌ No `Middlewares/` - FreeRTOS/LwIP provided by lib_deps
+- ❌ No `Makefile` - PlatformIO handles build system
+- ❌ No startup files or linker scripts - Framework-provided
+- ❌ No `.ioc` file needed for building - PlatformIO-native
+
+This results in a clean, minimal repository focused on application code.
 
 ## Hardware Requirements
 
@@ -236,8 +229,8 @@ See [CONTRIBUTORS.md](CONTRIBUTORS.md) for complete author attribution.
 
 - **[CONTRIBUTORS.md](CONTRIBUTORS.md)** - Complete licensing and attribution
 - **[project.spdx](project.spdx)** - SPDX 2.3 license manifest
-- **[CONVERGENCE.md](CONVERGENCE.md)** - Patch integration history and validation
-- **[docs/patches/](docs/patches/)** - Individual patch documentation (60+ files)
+- **[docs/restructure-notes.md](docs/restructure-notes.md)** - PlatformIO migration notes
+- **[docs/debugging/](docs/debugging/)** - Debug setup guides
 - **[HiFive Premier P550 MCU User Manual](https://www.sifive.com/document-file/premier-p550-mcu-user-manual)** - Official hardware documentation
 
 ## Support and Community
@@ -267,6 +260,7 @@ Contributions are welcome! Please ensure:
 
 ---
 
-**Last Updated**: 2025-11-26
-**Firmware Version**: BMC v2.8
+**Last Updated**: 2025-11-28
+**Firmware Version**: BMC v2.8.2
+**Build System**: PlatformIO
 **Build Status**: ✅ Passing
