@@ -137,28 +137,35 @@ This repository includes 109 patches in `patches-2025-11-05/` that document the 
 
 For detailed patch application history and validation, see [CONVERGENCE.md](CONVERGENCE.md).
 
+## Project Structure (Updated 2025-11-27)
+
+This project follows PlatformIO standard layout:
+
+- `src/` - Application source files
+- `include/` - Application headers
+- `Core/` - STM32CubeMX structure (symlinks for compatibility)
+- `Drivers/` - STM32 HAL and CMSIS drivers
+- `Middlewares/` - Third-party libraries (FreeRTOS, LwIP)
+
+See `docs/restructure-notes.md` for migration details.
+
 ## Repository Structure
 
 ```
 hifive-premier-p550-mcu-patches/
-├── Core/                          # Application source code
-│   ├── Inc/                       # Header files
-│   │   ├── hf_common.h           # Core system definitions
-│   │   ├── hf_i2c.h              # I2C subsystem
-│   │   ├── hf_power_process.h    # Power management
-│   │   └── ...
-│   └── Src/                       # Source files
-│       ├── main.c                # Main application
-│       ├── hf_common.c           # Core system implementation
-│       ├── hf_board_init.c       # Board initialization
-│       ├── hf_power_process.c    # Power management
-│       ├── hf_i2c.c              # I2C communication
-│       ├── hf_protocol_process.c # Protocol handling
-│       ├── web-server.c          # HTTP server
-│       ├── console.c             # CLI console
-│       ├── telnet_server.c       # Telnet server
-│       ├── protocol_lib/         # Communication protocol library
-│       └── ...
+├── src/                           # Application source files
+│   ├── main.c                    # Main application
+│   ├── hf_common.c               # Core system implementation
+│   ├── hf_board_init.c           # Board initialization
+│   ├── ...
+├── include/                       # Application headers
+│   ├── protocol_lib/             # Communication protocol library
+│   ├── hf_common.h               # Core system definitions
+│   ├── hf_i2c.h                  # I2C subsystem
+│   ├── ...
+├── Core/                          # CubeMX compatibility
+│   ├── Inc/                       # Retained system headers
+│   └── Src/                       # Symlinks to src/ (empty)
 ├── Drivers/                       # STM32 drivers
 │   ├── CMSIS/                    # ARM CMSIS (Apache-2.0)
 │   ├── STM32F4xx_HAL_Driver/     # STM32 HAL (BSD-3-Clause)
@@ -167,21 +174,11 @@ hifive-premier-p550-mcu-patches/
 │   └── Third_Party/
 │       ├── FreeRTOS/             # FreeRTOS RTOS (MIT)
 │       └── LwIP/                 # LwIP TCP/IP stack (BSD-3-Clause)
-├── LWIP/                          # LwIP configuration
-│   ├── App/                      # LwIP application layer
-│   └── Target/                   # STM32-specific port
 ├── docs/                          # Documentation
+│   ├── restructure-notes.md      # PlatformIO migration notes
 │   └── patches/                  # Individual patch documentation
 ├── patches-2025-11-05/            # 109 patch files
-├── scripts/                       # Helper scripts
-├── Makefile                       # Build system
-├── STM32F407VET6_BMC.ioc         # STM32CubeMX configuration
-├── STM32F407VETx_FLASH.ld        # Linker script
-├── openocd.cfg                   # OpenOCD debugger configuration
-├── CONTRIBUTORS.md               # License and attribution
-├── project.spdx                  # SPDX license manifest
-├── CONVERGENCE.md                # Patch integration history
-└── README.md                     # This file
+└── ...
 ```
 
 ## Hardware Requirements
