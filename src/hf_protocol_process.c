@@ -14,7 +14,7 @@
 #include "hf_common.h"
 #include "list.h"
 #include "main.h"
-#include "protocol.h"
+#include "protocol_lib/protocol.h"
 #include "stm32f4xx.h"
 #include "stm32f4xx_hal.h"
 #include "task.h"
