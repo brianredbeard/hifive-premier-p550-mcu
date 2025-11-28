@@ -63,3 +63,4 @@ htmlcov/
 .pytest_cache/
 logs/
 .worktrees/
+compile_commands.json
