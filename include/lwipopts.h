@@ -157,6 +157,9 @@
 #define IP_DEBUG                        LWIP_DBG_OFF
 #define HTTPD_DEBUG                     LWIP_DBG_OFF
 
+/*----- Enable receive timeout for telnet server support -----*/
+#define LWIP_SO_RCVTIMEO                1
+
 /* USER CODE END 1 */
 
 #ifdef __cplusplus

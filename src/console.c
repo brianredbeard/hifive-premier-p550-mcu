@@ -1273,7 +1273,7 @@ out:
 */
 static BaseType_t prvCommandBMCVersion(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString)
 {
-    snprintf(pcWriteBuffer, xWriteBufferLen, "%d.%d\n", (uint8_t)(BMC_SOFTWARE_VERSION_MAJOR), (uint8_t)(BMC_SOFTWARE_VERSION_MINOR));
+    snprintf(pcWriteBuffer, xWriteBufferLen, "%d.%d.%d\n", (uint8_t)(BMC_SOFTWARE_VERSION_MAJOR), (uint8_t)(BMC_SOFTWARE_VERSION_MINOR), (uint8_t)(BMC_SOFTWARE_VERSION_PATCH));
     return pdFALSE;
 }
 
@@ -1699,3 +1699,10 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
     #endif
 }
 #endif
+void vRestartSOM(void)
+{
+	change_som_power_state(SOM_POWER_OFF);
+	/*Delay 2 second*/
+	osDelay(pdMS_TO_TICKS(2000));
+	change_som_power_state(SOM_POWER_ON);
+}

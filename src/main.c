@@ -19,7 +19,8 @@
   */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "cmsis_os.h"
+// Modified for PlatformIO: using FreeRTOS library
+#include <cmsis_os2.h>
 #include <stdio.h>
 #include "stm32f4xx_hal_iwdg.h"
 #include "lwip.h"
@@ -142,8 +143,8 @@ int retry_count = 10;
 void hf_main_task(void *argument)
 {
   int ret = 0;
-  printf("HiFive 106SC, BMC Version:%d.%d!\n",
-    (uint8_t)(BMC_SOFTWARE_VERSION_MAJOR), (uint8_t)(BMC_SOFTWARE_VERSION_MINOR));
+  printf("HiFive 106SC, BMC Version:%d.%d.%d!\n",
+    (uint8_t)(BMC_SOFTWARE_VERSION_MAJOR), (uint8_t)(BMC_SOFTWARE_VERSION_MINOR), (uint8_t)(BMC_SOFTWARE_VERSION_PATCH));
 
   /* get board info from eeprom where the MAC is stored */
   do

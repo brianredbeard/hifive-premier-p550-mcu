@@ -238,6 +238,7 @@ extern UART_HandleTypeDef huart6;
 /* define ------------------------------------------------------------*/
 #define BMC_SOFTWARE_VERSION_MAJOR                   2
 #define BMC_SOFTWARE_VERSION_MINOR                   8
+#define BMC_SOFTWARE_VERSION_PATCH                   2
 
 #define MAGIC_NUMBER	0x45505EF1
 
@@ -307,10 +308,14 @@ A cbinfo	64		0
 /* functions prototypes ---------------------------------------------*/
 int hexstr2mac(uint8_t *mac, const char *hexstr);
 uint64_t atoh(const char *in, uint32_t len);
+uint32_t hf_crc32(const uint8_t *p, uint32_t len);
 
 void hf_http_task(void *argument);
 void es_eeprom_wp(uint8_t flag);
 void som_reset_control(uint8_t reset);
+power_switch_t get_som_power_state(void);
+void change_som_power_state(power_switch_t newState);
+void vRestartSOM(void);
 int web_cmd_handle(CommandType cmd, void *data, int data_len, uint32_t timeout);
 
 void eth_get_address(void);

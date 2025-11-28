@@ -7,9 +7,8 @@
 /* Private includes ----------------------------------------------------------*/
 #include "hf_common.h"
 #include "hf_i2c.h"
-#include "hf_spi_slv.h"
 /* Private typedef -----------------------------------------------------------*/
-// #define AUTO_BOOT
+ #define AUTO_BOOT
 /* Private define ------------------------------------------------------------*/
 #define ATX_POWER_GOOD GPIO_PIN_RESET
 #define ATX_POWER_FAIL GPIO_PIN_SET
@@ -20,36 +19,14 @@
 /* Private macro -------------------------------------------------------------*/
 #define PCA9450_ADDR (0x25u << 1)
 /* Private variables ---------------------------------------------------------*/
-volatile power_switch_t som_power_state = SOM_POWER_OFF;
+power_switch_t som_power_state = SOM_POWER_OFF;
 
 static uint8_t get_dc_power_status(void);
 static void pmic_status_led_on(uint8_t turnon);
-static uint8_t get_atx_power_status(void);
-static void pmic_power_on(uint8_t turnon);
 static void atx_power_on(uint8_t turnon);
+static void dc_power_on(uint8_t turnon);
 static void power_led_on(uint8_t turnon);
 static int pmic_b6out_105v(void);
-
-#define MAXTRYCOUNT		10
-int try_count = 0;
-
-power_switch_t get_som_power_state(void)
-{
-	power_switch_t state;
-
-	taskENTER_CRITICAL();
-	state = som_power_state;
-	taskEXIT_CRITICAL();
-	return state;
-}
-
-void change_som_power_state(power_switch_t newState)
-{
-	// Enter critical section to ensure thread safety when traversing and deleting
-	taskENTER_CRITICAL();
-	som_power_state = newState;
-	taskEXIT_CRITICAL();
-}
 
 void hf_power_task(void *parameter)
 {
@@ -58,72 +35,61 @@ void hf_power_task(void *parameter)
 	GPIO_PinState pin_state = GPIO_PIN_RESET;
 	printf("hf_power_task started!!!\r\n");
 
-#ifdef AUTO_BOOT
+	#ifdef AUTO_BOOT
 	power_state = ATX_PS_ON_STATE;
-	change_som_power_state(SOM_POWER_ON);
-#endif
-
+	som_power_state = SOM_POWER_ON;
+	#endif
 	power_led_on(pdFALSE);
-
 	while (1) {
-		taskENTER_CRITICAL();
 		switch (power_state) {
 		case ATX_PS_ON_STATE:
 			printf("ATX_PS_ON_STATE\r\n");
 			atx_power_on(pdTRUE);
-			power_state = ATX_PWR_GOOD_STATE;
+			power_state = DC_PWR_ON_STATE;
 			break;
-		case ATX_PWR_GOOD_STATE:
-			printf("ATX_PWR_GOOD_STATE\r\n");
-			// pin_state = get_atx_power_status();
-			// if (pin_state == pdTRUE)
-				power_state = DC_PWR_GOOD_STATE;
+		case DC_PWR_ON_STATE:
+			printf("DC_PWR_ON_STATE\r\n");
+			dc_power_on(pdTRUE);
+			power_state = DC_PWR_GOOD_STATE;
 			break;
 		case DC_PWR_GOOD_STATE:
-			printf("DC_PWR_GOOD_STATE\r\n");
-			try_count = MAXTRYCOUNT;
-			do
-			{
-				pin_state = get_dc_power_status();
-				osDelay(100);
-			} while (pin_state != pdTRUE && try_count--);
+		printf("DC_PWR_GOOD_STATE\r\n");
+		{
+			int retry_count = 10;
+			pin_state = GPIO_PIN_RESET;
 
-			if(try_count <= 0)
-			{
-				printf("DC_PWR_STATE fail\r\n");
-				power_state = STOP_POWER;
-			}
-			if (pin_state == pdTRUE) {
-				i2c_init(I2C3);
-				i2c_init(I2C1);
-				power_state = SOM_STATUS_CHECK_STATE;
-			}
-			break;
-		case SOM_STATUS_CHECK_STATE:
-			printf("SOM_STATUS_CHECK_STATE\r\n");
-			pmic_power_on(pdTRUE);
-			try_count = MAXTRYCOUNT;
-			do
-			{
+			/* Wait for DC power good with retry */
+			while (retry_count > 0) {
 				osDelay(200);
-				status = pmic_b6out_105v();
-				osDelay(50);
-			}while(pin_state != pdTRUE && try_count--);
-			if(try_count <= 0)
-			{
-				printf("SOM_STATUS_CHECK_STATE fail\r\n");
-				power_state = STOP_POWER;
-				break;
+				pin_state = get_dc_power_status();
+				if (pin_state == pdTRUE) {
+					break;
+				}
+				retry_count--;
 			}
-			som_reset_control(pdFALSE);
-			SPI2_FLASH_CS_HIGH();
-			pmic_status_led_on(pdTRUE);
-			power_led_on(pdTRUE);
-			power_state = POWERON;
-			printf("POWERON\r\n");
-			break;
-		case RESET_SOM:
-			break;
+
+
+		/* Only initialize I2C if DC power is good */
+		if (retry_count > 0) {
+			i2c_init(I2C3);
+			osDelay(100);
+			i2c_init(I2C1);
+			power_state = SOM_STATUS_CHECK_STATE;
+		} else {
+			printf("DC power good timeout, stopping power\r\n");
+			power_state = STOP_POWER;
+		}
+	}
+	break;
+	case SOM_STATUS_CHECK_STATE:
+		printf("SOM_STATUS_CHECK_STATE\r\n");
+		// pmic_power_on(pdTRUE);  // Removed in patch 0078
+		som_reset_control(pdFALSE);
+		pmic_status_led_on(pdTRUE);
+		power_led_on(pdTRUE);
+		power_state = POWERON;
+		printf("POWERON\r\n");
+		break;
 		case POWERON:
 			if (som_power_state == SOM_POWER_OFF) {
 				power_state = STOP_POWER;
@@ -133,7 +99,8 @@ void hf_power_task(void *parameter)
 			printf("STOP_POWER\r\n");
 			i2c_deinit(I2C3);
 
-			pmic_power_on(pdFALSE);
+			// pmic_power_on(pdFALSE);  // Removed in patch 0078
+			dc_power_on(pdFALSE);
 			atx_power_on(pdFALSE);
 			pmic_status_led_on(pdFALSE);
 			power_led_on(pdFALSE);
@@ -146,7 +113,6 @@ void hf_power_task(void *parameter)
 			}
 			break;
 		}
-		taskEXIT_CRITICAL();
 		osDelay(100);
 	}
 }
@@ -164,6 +130,22 @@ static void atx_power_on(uint8_t turnon)
 		HAL_GPIO_WritePin(ATX_PS_ON_GPIO_Port, ATX_PS_ON_Pin, GPIO_PIN_RESET);
 }
 
+/**
+ * @brief  DC power switch.
+ * @param  turnon turn on/off DC power 1:turnon; 0:turnoff.
+ * @retval None
+ */
+static void dc_power_on(uint8_t turnon)
+{
+	if (turnon) {
+		HAL_GPIO_WritePin(DC_POWER_EN0_GPIO_Port, DC_POWER_EN0_Pin, GPIO_PIN_SET);
+	} else {
+		HAL_GPIO_WritePin(DC_POWER_EN0_GPIO_Port, DC_POWER_EN0_Pin, GPIO_PIN_RESET);
+	}
+}
+
+// Removed in patch 0078 - hardware changed, these GPIO pins no longer exist
+#if 0
 /**
  * @brief  pmic power switch.
  * @param  turnon turn on/off pmic power 1:turnon; 0:turnoff.
@@ -189,6 +171,7 @@ static uint8_t get_atx_power_status(void)
 	else
 		return pdFALSE;
 }
+#endif
 
 /**
  * @brief  dcdc power switch.
@@ -224,6 +207,31 @@ static void pmic_status_led_on(uint8_t turnon)
  * @param  reset pdTRUE : reset; pdFALSE : release
  * @retval None
  */
+// HAL_GPIO_WritePin(MCU_RESET_SOM_N_GPIO_Port,
+// MCU_RESET_SOM_N_Pin, GPIO_PIN_SET); GPIO_InitTypeDef
+// GPIO_InitStruct = {0}; GPIO_InitStruct.Pin =
+// MCU_RESET_SOM_N_Pin; GPIO_InitStruct.Pull = GPIO_NOPULL;
+// GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
+// GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+// HAL_GPIO_Init(MCU_RESET_SOM_N_GPIO_Port, &GPIO_InitStruct);
+
+power_switch_t get_som_power_state(void)
+{
+	power_switch_t state;
+
+	taskENTER_CRITICAL();
+	state = som_power_state;
+	taskEXIT_CRITICAL();
+	return state;
+}
+
+void change_som_power_state(power_switch_t newState)
+{
+	taskENTER_CRITICAL();
+	som_power_state = newState;
+	taskEXIT_CRITICAL();
+}
+
 void som_reset_control(uint8_t reset)
 {
 	GPIO_InitTypeDef GPIO_InitStruct = {0};
@@ -234,8 +242,6 @@ void som_reset_control(uint8_t reset)
 		GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
 		HAL_GPIO_Init(MCU_RESET_SOM_N_GPIO_Port, &GPIO_InitStruct);
 		HAL_GPIO_WritePin(MCU_RESET_SOM_N_GPIO_Port, MCU_RESET_SOM_N_Pin, GPIO_PIN_RESET);
-		uart_deinit(UART4);
-		uart_deinit(USART6);
 	} else {
 		HAL_GPIO_WritePin(MCU_RESET_SOM_N_GPIO_Port, MCU_RESET_SOM_N_Pin, GPIO_PIN_SET);
 		GPIO_InitStruct.Pin = MCU_RESET_SOM_N_Pin;
@@ -243,8 +249,6 @@ void som_reset_control(uint8_t reset)
 		GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
 		GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
 		HAL_GPIO_Init(MCU_RESET_SOM_N_GPIO_Port, &GPIO_InitStruct);
-		uart_init(UART4);
-		uart_init(USART6);
 	}
 }
 

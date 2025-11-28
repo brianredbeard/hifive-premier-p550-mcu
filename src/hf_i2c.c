@@ -13,6 +13,30 @@
 #include <stdio.h>
 #include "cmsis_os.h"
 
+/* Power monitoring IC definitions (INA226, PAC1934) */
+#define INA226_12V_ADDR (0X44U << 1)
+#define INA2XX_CONFIG 0x00
+#define INA2XX_SHUNT_VOLTAGE 0x01 /* readonly */
+#define INA2XX_BUS_VOLTAGE 0x02	  /* readonly */
+#define INA2XX_POWER 0x03		  /* readonly */
+#define INA2XX_CURRENT 0x04		  /* readonly */
+#define INA2XX_CALIBRATION 0x05
+#define INA226_BUS_LSB 1250 /*uV*/
+#define INA226_SHUNT_RESISTOR 1000							 /*uOhm*/
+#define INA226_CURRENT_LSB (2500000 / INA226_SHUNT_RESISTOR) /*uA */
+#define INA226_POWER_LSB_FACTOR 25
+#define DIV_ROUND_CLOSEST(x, divisor) (        \
+	{                                          \
+		typeof(x) __x = x;                     \
+		typeof(divisor) __d = divisor;         \
+		(((typeof(x))-1) > 0 ||                \
+		 ((typeof(divisor))-1) > 0 ||          \
+		 (((__x) > 0) == ((__d) > 0)))         \
+			? (((__x) + ((__d) / 2)) / (__d))  \
+			: (((__x) - ((__d) / 2)) / (__d)); \
+	})
+#define SWAP16(w) ((((w) & 0xff) << 8) | (((w) & 0xff00) >> 8))
+
 void hf_i2c_reinit(I2C_HandleTypeDef *hi2c)
 {
 	if (hi2c->Instance == I2C1)
@@ -195,4 +219,75 @@ int hf_i2c_reg_read_block(I2C_HandleTypeDef *hi2c, uint8_t slave_addr,
 		return status;
 	}
 	return status;
+}
+
+static int ina226_init(void)
+{
+	uint16_t default_cfg = SWAP16(0x4527);
+	uint16_t calibration_value = SWAP16(2048);
+	int ret = 0;
+
+	ret = hf_i2c_reg_write_block(&hi2c3, INA226_12V_ADDR, INA2XX_CONFIG, (uint8_t *)&default_cfg, 2);
+	if (ret)
+	{
+		printf("init ina226 error1\n");
+		return -1;
+	}
+	ret = hf_i2c_reg_write_block(&hi2c3, INA226_12V_ADDR, INA2XX_CALIBRATION, (uint8_t *)&calibration_value, 2);
+	if (ret)
+	{
+		printf("init ina226 error2\n");
+		return -1;
+	}
+	return 0;
+}
+
+int get_board_power(uint32_t *volt, uint32_t *curr, uint32_t *power)
+{
+	uint32_t reg_bus = 0x0;
+	uint32_t reg_power = 0x0;
+	uint32_t reg_curr = 0x0;
+	int ret = 0;
+	static int is_first = 1;
+
+	if (1 == is_first)
+	{
+		/*Write failure, not find wrong reason*/
+		ret = ina226_init();
+		if (ret)
+		{
+			return -1;
+		}
+		is_first = 0;
+	}
+	ret = hf_i2c_reg_read_block(&hi2c3, INA226_12V_ADDR, INA2XX_BUS_VOLTAGE, (uint8_t *)&reg_bus, 2);
+	if (ret)
+	{
+		printf("get board volt error\n");
+		return -1;
+	}
+	ret = hf_i2c_reg_read_block(&hi2c3, INA226_12V_ADDR, INA2XX_POWER, (uint8_t *)&reg_power, 2);
+	if (ret)
+	{
+		printf("get board power error\n");
+		return -1;
+	}
+	ret = hf_i2c_reg_read_block(&hi2c3, INA226_12V_ADDR, INA2XX_CURRENT, (uint8_t *)&reg_curr, 2);
+	if (ret)
+	{
+		printf("get board current error\n");
+		return -1;
+	}
+	reg_bus = SWAP16(reg_bus);
+	reg_curr = SWAP16(reg_curr);
+	reg_power = SWAP16(reg_power);
+
+	*volt = reg_bus * INA226_BUS_LSB;
+	*volt = DIV_ROUND_CLOSEST(*volt, 1000);
+
+	*power = reg_power * INA226_CURRENT_LSB * INA226_POWER_LSB_FACTOR;
+	*curr = reg_curr * INA226_CURRENT_LSB;
+	*curr = DIV_ROUND_CLOSEST(*curr, 1000);
+
+	return 0;
 }

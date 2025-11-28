@@ -13,6 +13,7 @@
 #include "lwip/api.h"
 #include <unistd.h>
 #include <stdbool.h>
+#include <assert.h>
 #include "web-server.h"
 #include "string.h"
 #include "hf_common.h"
@@ -11184,7 +11185,8 @@ http_server_netconn_serve(struct netconn *conn)
 
             }else if(strncmp(path, "/board_info_som",15)==0 ){
                 printf("get ,location: /board_info_som \n");
-				som_info simpleInfo= get_som_info();
+				som_info simpleInfo;
+				get_som_info(&simpleInfo);
 // magicNumber
 // formatVersionNumber
 // productIdentifier
