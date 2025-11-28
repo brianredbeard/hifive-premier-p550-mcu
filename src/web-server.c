@@ -10588,7 +10588,7 @@ int xSOMRebootHandle(void)
 		som_reset_control(pdTRUE);
 		osDelay(10);
 		som_reset_control(pdFALSE);
-		printf("Faild to reboot SOM(ret %d), force reset SOM!\n", ret);
+		printf("Failed to reboot SOM(ret %d), force reset SOM!\n", ret);
 		ret = HAL_OK;
 		return ret;
 	}
@@ -10604,7 +10604,7 @@ int xSOMRestartHandle(void)
 
 	ret = web_cmd_handle(CMD_RESTART, NULL, 0, 2000);
 	if (HAL_OK != ret) {
-		printf("Faild to restart SOM(ret %d), force restart SOM!\n", ret);
+		printf("Failed to restart SOM(ret %d), force restart SOM!\n", ret);
 		vRestartSOM();
 		ret = HAL_OK;
 		return ret;
@@ -10757,7 +10757,7 @@ int get_som_info(som_info *psomInfo)
 	int ret = HAL_OK;
 	ret = web_cmd_handle(CMD_READ_BOARD_INFO, psomInfo, sizeof(som_info), 1000);
 	if (HAL_OK != ret) {
-		web_debug("Faild to get som info %d\n", ret);
+		web_debug("Failed to get som info %d\n", ret);
 	}
 	web_debug("web call get_som_info, magic %ld, version %d, "
 		"id %d, pcb %d, bom_revision %d, bom_variant %d, "

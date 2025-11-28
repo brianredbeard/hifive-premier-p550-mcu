@@ -559,7 +559,7 @@ static BaseType_t prvCommandSomBoardInfoGet(char *pcWriteBuffer, size_t xWriteBu
 
     ret = web_cmd_handle(CMD_READ_BOARD_INFO, psomInfo, sizeof(som_info), 1000);
     if (HAL_OK != ret) {
-        snprintf(pcWriteBuffer, xWriteBufferLen, "Faild to get som info(errcode %d)\n", ret);
+        snprintf(pcWriteBuffer, xWriteBufferLen, "Failed to get som info(errcode %d)\n", ret);
     }
     else {
         len = snprintf(pcWb, size, "[Somboard Information:]\r\n");
@@ -1121,7 +1121,7 @@ static BaseType_t prvCommandTempGet(char *pcWriteBuffer, size_t xWriteBufferLen,
 
     ret = web_cmd_handle(CMD_PVT_INFO, &pvtInfo, sizeof(PVTInfo), 1000);
     if (HAL_OK != ret) {
-         snprintf(pcWriteBuffer, xWriteBufferLen, "Faild to get PVT info(errcode:%d)\n", ret);
+         snprintf(pcWriteBuffer, xWriteBufferLen, "Failed to get PVT info(errcode:%d)\n", ret);
     }
     else {
         snprintf(pcWriteBuffer, xWriteBufferLen,"cpu_temp(Celsius):%d.%d  npu_temp(Celsius):%d.%d  fan_speed(rpm):%d\n",
