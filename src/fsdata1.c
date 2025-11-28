@@ -5,6 +5,9 @@
 
 #define file_NULL (struct fsdata_file *) NULL
 
+/* Suppress warnings for dummy_align variables that are required for memory alignment */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-const-variable"
 
 static const unsigned int dummy_align__STM32F4x7_files_ST_gif = 0;
 static const unsigned char data__STM32F4x7_files_ST_gif[] = {
@@ -3216,6 +3219,8 @@ data__STM32F4x7LED_html + 20,
 sizeof(data__STM32F4x7LED_html) - 20,
 1,
 }};
+
+#pragma GCC diagnostic pop
 
 #define FS_ROOT file__STM32F4x7LED_html
 #define FS_NUMFILES 6

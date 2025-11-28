@@ -55,17 +55,17 @@ static void MX_I2C1_Init(void);
 void MX_I2C3_Init(void);
 static void MX_SPI2_Init(void);
 static void MX_USART3_UART_Init(void);
-static void MX_WWDG_Init(void);
+/* MX_WWDG_Init not used - definition marked unused below */
 static void MX_USART6_UART_Init(void);
 static void MX_RTC_Init(void);
 static void MX_TIM4_Init(void);
-static void MX_SPI1_Init(void);
+/* MX_SPI1_Init not used - definition marked unused below */
 static void MX_UART4_Init(void);
 static void MX_TIM1_Init(void);
 static void MX_TIM9_Init(void);
 static void MX_TIM12_Init(void);
 static void MX_CRC_Init(void);
-static void MX_RNG_Init(void);
+/* MX_RNG_Init not used - definition marked unused below */
 void MX_IWDG_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
@@ -235,6 +235,7 @@ static void MX_I2C1_Init(void)
  */
 void MX_I2C3_Init(void)
 {
+	HAL_StatusTypeDef status;
 	hi2c3.Instance = I2C3;
 	hi2c3.Init.ClockSpeed = 100000;
 	hi2c3.Init.DutyCycle = I2C_DUTYCYCLE_2;
@@ -244,9 +245,12 @@ void MX_I2C3_Init(void)
 	hi2c3.Init.OwnAddress2 = 0;
 	hi2c3.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
 	hi2c3.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
-	if (HAL_I2C_Init(&hi2c3) != HAL_OK) {
+	status = HAL_I2C_Init(&hi2c3);
+	if (status != HAL_OK) {
+		printf("MX_I2C3_Init failed, status=%d\r\n", status);
 		Error_Handler();
 	}
+	printf("MX_I2C3_Init success\r\n");
 }
 
 /**
@@ -254,6 +258,7 @@ void MX_I2C3_Init(void)
  * @param None
  * @retval None
  */
+__attribute__((unused))
 static void MX_RNG_Init(void)
 {
 	hrng.Instance = RNG;
@@ -302,6 +307,7 @@ static void MX_RTC_Init(void)
  * @param None
  * @retval None
  */
+__attribute__((unused))
 static void MX_SPI1_Init(void)
 {
 	/* SPI1 parameter configuration*/
@@ -362,7 +368,6 @@ static void MX_TIM1_Init(void)
 
 	TIM_MasterConfigTypeDef sMasterConfig = {0};
 	TIM_OC_InitTypeDef sConfigOC = {0};
-	TIM_BreakDeadTimeConfigTypeDef sBreakDeadTimeConfig = {0};
 
 	/* USER CODE BEGIN TIM1_Init 1 */
 
@@ -626,6 +631,7 @@ static void MX_USART6_UART_Init(void)
  * @param None
  * @retval None
  */
+__attribute__((unused))
 static void MX_WWDG_Init(void)
 {
 	hwwdg.Instance = WWDG;

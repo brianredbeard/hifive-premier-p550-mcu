@@ -26,6 +26,8 @@
  *
  */
 
+// SPDX-License-Identifier: MIT
+
 #include <stdlib.h>
 #include <string.h>
 #include "cmsis_os.h"
@@ -209,3 +211,4 @@ void telnet_mcu_transmit(const char *data, telnet_console_t* inst_ptr)
 		printf("Telnet console send data failed! err = %d \n",err);
 	}
 }
+

@@ -312,9 +312,6 @@ void HAL_I2C_MspDeInit(I2C_HandleTypeDef* hi2c)
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-  /* USER CODE BEGIN I2C3_MspDeInit 1 */
-
-  /* USER CODE END I2C3_MspDeInit 1 */
   }
 
 }

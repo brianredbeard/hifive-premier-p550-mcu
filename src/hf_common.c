@@ -12,7 +12,7 @@
 #include <string.h>
 #include "lwip.h"
 #include "hf_common.h"
-#include "hf_crc32.h"
+#include "sifive_crc32.h"
 
 #include "cmsis_os.h"
 #include "semphr.h"
@@ -1451,7 +1451,7 @@ void set_mcu_led_status(led_status_t type)
 		HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
 		HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_3);
 	} else if( LED_SOM_KERNEL_RUNING == led_status_type) {
-		if((HAL_TIM_CHANNEL_STATE_BUSY == HAL_TIM_GetChannelState(&htim1, TIM_CHANNEL_2)) || 
+		if((HAL_TIM_CHANNEL_STATE_BUSY == HAL_TIM_GetChannelState(&htim1, TIM_CHANNEL_2)) ||
 			    HAL_TIM_CHANNEL_STATE_BUSY == HAL_TIM_GetChannelState(&htim1, TIM_CHANNEL_1)) {
 			HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_1);
 			HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_2);

@@ -15,6 +15,7 @@
 
 /* Power monitoring IC definitions (INA226, PAC1934) */
 #define INA226_12V_ADDR (0X44U << 1)
+#define PAC1934_ADDR (0X10U << 1)
 #define INA2XX_CONFIG 0x00
 #define INA2XX_SHUNT_VOLTAGE 0x01 /* readonly */
 #define INA2XX_BUS_VOLTAGE 0x02	  /* readonly */
@@ -25,6 +26,15 @@
 #define INA226_SHUNT_RESISTOR 1000							 /*uOhm*/
 #define INA226_CURRENT_LSB (2500000 / INA226_SHUNT_RESISTOR) /*uA */
 #define INA226_POWER_LSB_FACTOR 25
+#define PAC193X_CMD_CTRL 0x1
+#define PAC193X_CMD_VBUS1 0x7
+#define PAC193X_CMD_VSENSE1 0xb
+#define PAC193X_CMD_VPOWER1 0x17
+#define PAC193X_CMD_REFRESH_V 0x1F
+#define PAC193X_CMD_NEG_PWR_ACT 0x23
+#define PAC193X_COSTANT_PWR_M 3200000000ull /* 3.2V^2*1000mO*/
+#define PAC193X_COSTANT_CURRENT_M 100000	/* 100mv*1000mO*/
+#define PAC193X_SHUNT_RESISTOR_M 4			/* mO*/
 #define DIV_ROUND_CLOSEST(x, divisor) (        \
 	{                                          \
 		typeof(x) __x = x;                     \
@@ -36,6 +46,7 @@
 			: (((__x) - ((__d) / 2)) / (__d)); \
 	})
 #define SWAP16(w) ((((w) & 0xff) << 8) | (((w) & 0xff00) >> 8))
+#define SWAP32(w) ((((w) & 0xff) << 24) | (((w) & 0xff00) << 8) | (((w) & 0xff0000) >> 8) | (((w) & 0xff000000) >> 24))
 
 void hf_i2c_reinit(I2C_HandleTypeDef *hi2c)
 {
@@ -221,6 +232,7 @@ int hf_i2c_reg_read_block(I2C_HandleTypeDef *hi2c, uint8_t slave_addr,
 	return status;
 }
 
+/* Power monitoring functions */
 static int ina226_init(void)
 {
 	uint16_t default_cfg = SWAP16(0x4527);
@@ -239,6 +251,7 @@ static int ina226_init(void)
 		printf("init ina226 error2\n");
 		return -1;
 	}
+
 	return 0;
 }
 
@@ -290,4 +303,97 @@ int get_board_power(uint32_t *volt, uint32_t *curr, uint32_t *power)
 	*curr = DIV_ROUND_CLOSEST(*curr, 1000);
 
 	return 0;
+}
+
+int get_som_power(uint32_t *volt, uint32_t *curr, uint32_t *power)
+{
+	uint32_t reg_bus = 0x0;
+	uint32_t reg_power = 0x0;
+	uint32_t reg_curr = 0x0;
+	int ret = 0;
+	static int is_first = 1;
+	uint8_t act_val = 0;
+	uint8_t is_neg = 0;
+	uint8_t ctrl_value = 0x8;
+
+	taskENTER_CRITICAL();
+	if (1 == is_first)
+	{
+		/*Write failure, not find wrong reason*/
+		hf_i2c_reg_write(&hi2c3, PAC1934_ADDR, PAC193X_CMD_CTRL, &ctrl_value);
+
+		if (ret)
+		{
+			ret = -1;
+			goto out;
+		}
+		is_first = 0;
+	}
+
+	hf_i2c_reg_write_block(&hi2c3, PAC1934_ADDR, PAC193X_CMD_REFRESH_V, (uint8_t *)&ctrl_value, 0);
+	osDelay(1);
+	ret = hf_i2c_reg_read(&hi2c3, PAC1934_ADDR, PAC193X_CMD_NEG_PWR_ACT, &act_val);
+	if (ret)
+	{
+		printf("get PAC1934 act_val error\n");
+		ret = -1;
+		goto out;
+	}
+	ret = hf_i2c_reg_read_block(&hi2c3, PAC1934_ADDR, PAC193X_CMD_VBUS1, (uint8_t *)&reg_bus, 2);
+	if (ret)
+	{
+		printf("get PAC1934 voltage error\n");
+		ret = -1;
+		goto out;
+	}
+	reg_bus = reg_bus & 0XFFFF;
+	reg_bus = SWAP16(reg_bus);
+	if (0x1 == ((act_val >> 3) & 0x1))
+	{
+		*volt = reg_bus * 1000 / 1024;
+		is_neg = 1;
+	}
+	else
+	{
+		*volt = reg_bus * 1000 / 2048;
+	}
+	ret = hf_i2c_reg_read_block(&hi2c3, PAC1934_ADDR, PAC193X_CMD_VSENSE1, (uint8_t *)&reg_curr, 2);
+	reg_curr = SWAP16(reg_curr);
+	if (ret)
+	{
+		printf("get PAC1934 current error\n");
+		ret = -1;
+		goto out;
+	}
+	reg_curr = reg_curr & 0XFFFF;
+	if (0x1 == ((act_val >> 7) & 0x1))
+	{
+		*curr = reg_curr * PAC193X_COSTANT_CURRENT_M / (32768 * PAC193X_SHUNT_RESISTOR_M);
+		is_neg = 1;
+	}
+	else
+	{
+		*curr = reg_curr * PAC193X_COSTANT_CURRENT_M / (65536 * PAC193X_SHUNT_RESISTOR_M);
+	}
+	ret = hf_i2c_reg_read_block(&hi2c3, PAC1934_ADDR, PAC193X_CMD_VPOWER1, (uint8_t *)&reg_power, 4);
+	reg_power = SWAP32(reg_power);
+	if (ret)
+	{
+		printf("get PAC1934 power error\n");
+		ret = -1;
+		goto out;
+	}
+	reg_power = reg_power >> 4;
+	if (1 == is_neg)
+	{
+		*power = reg_power * PAC193X_COSTANT_PWR_M / (PAC193X_SHUNT_RESISTOR_M * 134217728ULL);
+	}
+	else
+	{
+		*power = reg_power * PAC193X_COSTANT_PWR_M / (PAC193X_SHUNT_RESISTOR_M * 268435456ULL);
+	}
+
+out:
+	taskEXIT_CRITICAL();
+	return ret;
 }

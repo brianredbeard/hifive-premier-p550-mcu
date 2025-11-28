@@ -152,7 +152,7 @@ void hf_main_task(void *argument)
     osDelay(220);
     ret = es_init_info_in_eeprom();
   } while (ret && (retry_count--));
-  
+
   if(ret || retry_count <=0) {
     printf("severe error: get info from eeprom failed!!!");
     while(1);
@@ -187,3 +187,21 @@ void hf_main_task(void *argument)
     osDelay(800);
   }
 }
+
+
+void get_rtc_info(void)
+{
+  RTC_DateTypeDef GetData;
+  RTC_TimeTypeDef GetTime;
+  HAL_RTC_GetTime(&hrtc, &GetTime, RTC_FORMAT_BIN);
+  /* Get the RTC current Date */
+  HAL_RTC_GetDate(&hrtc, &GetData, RTC_FORMAT_BIN);
+
+  /* Display date Format : yy/mm/dd */
+  printf("%s yy/mm/dd  %02d/%02d/%02d\r\n", __func__, 2000 + GetData.Year, GetData.Month, GetData.Date);
+  /* Display time Format : hh:mm:ss */
+  printf("%s hh:mm:ss %02d:%02d:%02d\r\n", __func__, GetTime.Hours, GetTime.Minutes, GetTime.Seconds);
+
+
+}
+
